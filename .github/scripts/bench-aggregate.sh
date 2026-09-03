@@ -122,7 +122,7 @@ jq -n \
       connections: $connections,
       # Requested size from the tag (c100 -> 100) so capped runs (e.g. Fusion at 99) land in the
       # same table row as the other netcodes; falls back to the actual connection count.
-      size: (($tag | capture("^c(?<n>[0-9]+)$")?.n // ($connections | tostring)) | tonumber),
+      size: (([$tag | capture("^c(?<n>[0-9]+)$") | .n] | first // ($connections | tostring)) | tonumber),
       tag: $tag,
       meta: {
         cpuModel: $server.cpuModel, cpuCount: $server.cpuCount, devBuild: $server.devBuild,
