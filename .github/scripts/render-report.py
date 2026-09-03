@@ -411,6 +411,15 @@ function buildNotes() {
     const short = TESTS.filter(t => r.clients[t] && r.clients[t].n < r.meta.measuredClients).map(t => `${t} (${r.clients[t].n}/${r.meta.measuredClients})`);
     if (short.length) items.push(`${NAMES[n]} at ${s}: measured on fewer clients than connected: ${short.join(", ")}`);
   }));
+  // All netcodes of one connection count are meant to run on the same server machine; if the CPU
+  // models differ the session did not run that way and CPU is not comparable inside that row.
+  sizes.forEach(s => {
+    const models = {};
+    netcodes.forEach(n => { const r = byKey[n + "@" + s]; if (r && r.meta.cpuModel) models[NAMES[n]] = r.meta.cpuModel; });
+    const distinct = [...new Set(Object.values(models))];
+    if (distinct.length > 1)
+      items.push(`${s} connections: servers ran on different CPU models (${Object.entries(models).map(([n, m]) => `${n}: ${m}`).join("; ")}), so CPU is not comparable across netcodes in that row`);
+  });
   const ul = document.getElementById("warnings");
   ul.innerHTML = items.map(t => `<li>${t}</li>`).join("");
   ul.hidden = items.length === 0;

@@ -160,6 +160,9 @@ def main():
             conn_notes.append(f"{NAMES[n]} ran with {r['meta'].get('connectedAtStart')}/{r['meta'].get('expectedClients')} clients")
         elif r and r.get("connections") != size:
             conn_notes.append(f"{NAMES[n]} ran with {r.get('connections')} clients")
+    models = {NAMES[n]: by[(n, size)]["meta"].get("cpuModel") for n in netcodes if (n, size) in by and by[(n, size)]["meta"].get("cpuModel")}
+    if len(set(models.values())) > 1:
+        conn_notes.append("servers ran on different CPU models (" + "; ".join(f"{n}: {m}" for n, m in models.items()) + "), so CPU is not comparable across netcodes here")
     if conn_notes:
         lines.append("_Note: " + "; ".join(conn_notes) + "._")
         lines.append("")

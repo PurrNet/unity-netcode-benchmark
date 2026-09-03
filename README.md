@@ -95,8 +95,9 @@ single-process measured clients (the remaining connections run as load generator
 ## Running it
 
 Dispatch **Netcode Scaling Benchmark** (`.github/workflows/scaling.yml`). Defaults run all five
-netcodes at 10 / 50 / 100 connections with 20-second windows, netcodes side by side, one size at a
-time, in about 25 to 30 minutes. Useful inputs: `netcodes`, `sizes`, `bench_seconds`,
+netcodes at 10 / 50 / 100 connections with 20-second windows. Each connection count is one
+session: the five netcodes run back to back on the same server machine and the same client
+machines, sessions run side by side, about 40 minutes in total. Useful inputs: `netcodes`, `sizes`, `bench_seconds`,
 `bench_objects`, `profiling` (development builds add a CPU-by-profiler-marker table),
 `max_parallel`, `fusion_max_clients`.
 
@@ -107,11 +108,12 @@ Each run renders the job summary, uploads raw per-process JSON as the `benchmark
 artifact, and commits `docs/index.html` (interactive report), `docs/latest.json` and the
 "Latest results" block above. Serve `docs/` with GitHub Pages to get a permanent report URL.
 
-How a run works: one server runner and the client runners meet over a Tailscale tailnet; every
-process is the same player driven by `Shared/com.purrnet.netbench` (`-role server|client`),
-which waits for all clients, runs the Idle window and the eight tests, writes JSON and quits.
-Clients detect the active test from the spawned objects themselves, so no cross-netcode signalling
-is needed. Locally:
+How a session works: one server runner and the client runners meet over a Tailscale tailnet and
+stay up for the whole session. The server announces which netcode is next on a small HTTP endpoint,
+every runner launches that netcode's player, and every process is the same harness driven by
+`Shared/com.purrnet.netbench` (`-role server|client`), which waits for all clients, runs the Idle
+window and the eight tests, writes JSON and quits. Clients detect the active test from the spawned
+objects themselves, so no cross-netcode signalling is needed inside a netcode. Locally:
 
 ```bash
 ./NetBench -batchmode -nographics -role server -count 2 -port 7777 -benchObjects 100 -benchSeconds 10 -results server.json
@@ -127,9 +129,12 @@ counters need Linux; frame stats work everywhere.
   relay hop and its traffic is measured on the public interface. The server still sends one stream
   per client, so its downstream is comparable. `fusion_max_clients` caps its client count to the
   Photon CCU plan.
-- **Hardware.** Jobs run on Blacksmith's `blacksmith-4vcpu-ubuntu-2404` pool so CPU numbers are
-  comparable between runs; the report lists the server CPU model per datapoint. Every runner is a
-  tailnet device (100 on Tailscale's Personal plan), which bounds `max_parallel`.
+- **Hardware.** Jobs run on Blacksmith's `blacksmith-4vcpu-ubuntu-2404` pool, which is a mix of
+  CPU models whose speed also varies over time. That is why all netcodes of one connection count
+  share one server machine: CPU is comparable across netcodes within a connection count, not
+  between connection counts and not between runs. Bandwidth, packets, GC and frame times do not
+  depend on the machine. Every runner is a tailnet device (100 on Tailscale's Personal plan), which
+  bounds `max_parallel`.
 - **Frame cap.** Mirror (headless server) and FishNet override the frame rate on start; the
   harness re-applies 60 fps at every measurement window.
 - **FishNet packet size.** Tugboat hard-codes 1350-byte packets and LiteNetLib sets don't-fragment;
