@@ -22,7 +22,7 @@ namespace FishNet.Demo.Prediction.Rigidbodies
             transform.Rotate(new Vector3(0f, 1f, 0f) * (_rotateRate * Time.deltaTime));
         }
 
-        private void NetworkTrigger_OnEnter(Collider c)
+        private void NetworkTrigger_OnEnter(Collider c, uint tick)
         {
             if (!c.transform.root.TryGetComponent(out RigidbodyPrediction rbp))
                 return;
@@ -31,7 +31,7 @@ namespace FishNet.Demo.Prediction.Rigidbodies
              * This trigger will invoke if the client enters it after a reconcile as well.
              * Because of this, it's not unusual to see enter/exit called many times over a second
              * due to the vehicle reconciling and running through the trigger again. */
-            rbp.SetBoosted();
+            rbp.BoostHit();
         }
     }
 }

@@ -90,7 +90,9 @@ namespace FishNet.Object.Prediction
         public static void WritePredictionRigidbody2D(this Writer w, PredictionRigidbody2D pr)
         {
             w.Write(pr.Rigidbody2D.GetState(pr.RotationPacking));
-            w.WriteList(pr.GetPendingForces());
+            /* This used to write pr.GetPendingForces() but is no longer needed, assuming the user properly
+             * reconciles everything that modifies the predictionRigidbody. */
+            w.WriteList<PredictionRigidbody2D.EntryData>(null);
         }
 
         public static PredictionRigidbody2D ReadPredictionRigidbody2D(this Reader r)
@@ -280,7 +282,11 @@ namespace FishNet.Object.Prediction
         /// </summary>
         public void Velocity(Vector3 force)
         {
+            #if UNITY_6000_1_OR_NEWER
             Rigidbody2D.linearVelocity = force;
+            #else
+            Rigidbody2D.velocity = force;
+            #endif
             RemoveForces(true);
         }
 
@@ -348,16 +354,25 @@ namespace FishNet.Object.Prediction
         }
 
         /// <summary>
-        /// Manually clears pending forces.
+        /// Clears current and pending forces for velocity and angularVelocity.
         /// </summary>
-        /// <param name = "velocity">True to clear velocities, false to clear angular velocities.</param>
-        public void ClearPendingForces(bool velocity)
+        public void ClearVelocities() 
         {
-            RemoveForces(velocity);
+            Velocity(Vector3.zero);
+            AngularVelocity(0f);
         }
 
         /// <summary>
-        /// Clears pending velocity and angular velocity forces.
+        /// Clears pending forces for velocity, or angular velocity.
+        /// </summary>
+        /// <param name = "nonRotational">True to clear velocities, false to clear angular velocities.</param>
+        public void ClearPendingForces(bool nonRotational)
+        {
+            RemoveForces(nonRotational);
+        }
+
+        /// <summary>
+        /// Clears pending forces for velocity and angularVelocity.
         /// </summary>
         public void ClearPendingForces()
         {
@@ -383,27 +398,28 @@ namespace FishNet.Object.Prediction
         /// <summary>
         /// Removes forces from pendingForces.
         /// </summary>
-        /// <param name = "velocity">True to remove if velocity, false if to remove angular velocity.</param>
-        private void RemoveForces(bool velocity)
+        /// <param name = "nonAngular">True to remove if velocity, false if to remove angular velocity.</param>
+        private void RemoveForces(bool nonAngular)
         {
             if (_pendingForces.Count > 0)
             {
                 ForceApplicationType velocityApplicationTypes = ForceApplicationType.AddRelativeForce | ForceApplicationType.AddForce;
 
-                List<EntryData> newDatas = CollectionCaches<EntryData>.RetrieveList();
+                List<EntryData> datasToKeep = CollectionCaches<EntryData>.RetrieveList();
                 foreach (EntryData item in _pendingForces)
-                {
-                    if (VelocityApplicationTypesContains(item.Type) == !velocity)
-                        newDatas.Add(item);
+                { 
+                    if (VelocityApplicationTypesContains(item.Type) == !nonAngular || item.Type == ForceApplicationType.MovePosition || item.Type == ForceApplicationType.MoveRotation)
+                        datasToKeep.Add(item);
                 }
                 // Add back to _pendingForces if changed.
-                if (newDatas.Count != _pendingForces.Count)
+                if (datasToKeep.Count != _pendingForces.Count)
                 {
                     _pendingForces.Clear();
-                    foreach (EntryData item in newDatas)
+                    
+                    foreach (EntryData item in datasToKeep)
                         _pendingForces.Add(item);
                 }
-                CollectionCaches<EntryData>.Store(newDatas);
+                CollectionCaches<EntryData>.Store(datasToKeep);
 
                 bool VelocityApplicationTypesContains(ForceApplicationType apt)
                 {

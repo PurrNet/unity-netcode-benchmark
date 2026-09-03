@@ -41,12 +41,16 @@ namespace FishNet.Serializing
         /// </summary>
         public NetworkManager NetworkManager;
         #endregion
-
+        
         #region Private.
         /// <summary>
         /// Buffer to prevent new allocations. This will grow as needed.
         /// </summary>
         private byte[] _buffer = new byte[64];
+        /// <summary>
+        /// A buffer convert Guid data.
+        /// </summary>
+        private static readonly byte[] _guidBuffer = new byte[16];
         #endregion
 
         #region Const.
@@ -557,7 +561,7 @@ namespace FishNet.Serializing
         /// </summary>
         [DefaultWriter]
         public void WriteAutoPackType(AutoPackType apt) => WriteUInt8Unpacked((byte)apt);
-        
+
         /// <summary>
         /// Writes a Vector2.
         /// </summary>
@@ -857,11 +861,15 @@ namespace FishNet.Serializing
         /// </summary>
         /// <param name = "value"></param>
         [DefaultWriter]
-        public void WriteGuidAllocated(Guid value)
+        public void WriteGuid(Guid value)
         {
-            byte[] data = value.ToByteArray();
+            byte[] data = _guidBuffer;
+            value.TryWriteBytes(data);
             WriteUInt8Array(data, 0, data.Length);
         }
+
+        [Obsolete("Use WriteGuid instead.")]
+        public void WriteGuidAllocated(Guid value) => WriteGuid(value);
 
         /// <summary>
         /// Writes a tick without packing.
@@ -1108,20 +1116,27 @@ namespace FishNet.Serializing
 
         #region Packed writers.
         /// <summary>
-        /// ZigZag encode an integer. Move the sign bit to the right.
+        /// Encodes a signed 64-bit integer using ZigZag encoding, mapping the sign bit
+        /// to the least-significant bit so that small-magnitude values (positive or
+        /// negative) produce small unsigned results suitable for variable-length packing.
+        /// 
+        /// Mapping:   0 → 0,  -1 → 1,  1 → 2,  -2 → 3,  2 → 4,  …
         /// </summary>
-        public ulong ZigZagEncode(ulong value)
+        /// <param name="value">The signed 64-bit integer to encode.</param>
+        /// <returns>
+        /// A <see cref="ulong"/> whose value equals <c>(value &lt;&lt; 1) ^ (value &gt;&gt; 63)</c>,
+        /// interpreted as an unsigned 64-bit integer.
+        /// </returns>
+        public ulong ZigZagEncode(long value)
         {
-            if (value >> 63 > 0)
-                return ~(value << 1) | 1;
-            return value << 1;
+            return (ulong)((value << 1) ^ (value >> 63));
         }
 
         /// <summary>
         /// Writes a packed whole number.
         /// </summary>
         /// <param name = "value"></param>
-        public void WriteSignedPackedWhole(long value) => WriteUnsignedPackedWhole(ZigZagEncode((ulong)value));
+        public void WriteSignedPackedWhole(long value) => WriteUnsignedPackedWhole(ZigZagEncode(value));
 
         /// <summary>
         /// Writes a packed whole number.
@@ -1133,7 +1148,7 @@ namespace FishNet.Serializing
         /// <param name = "value"> </param>
         public void WriteUnsignedPackedWhole(ulong value)
         {
-            EnsureBufferLength(9);
+            EnsureBufferLength(10);
             while (value > 127)
             {
                 _buffer[Position++] = (byte)((value & 0x7F) | 0x80);

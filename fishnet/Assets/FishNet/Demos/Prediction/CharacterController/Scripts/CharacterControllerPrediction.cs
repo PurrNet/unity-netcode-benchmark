@@ -1,8 +1,6 @@
-﻿#if !FISHNET_STABLE_REPLICATESTATES
-using System;
+﻿using System;
 using FishNet.Component.Prediction;
 using FishNet.Connection;
-using FishNet.Object;
 using FishNet.Object.Prediction;
 using FishNet.Transporting;
 using FishNet.Utility.Template;
@@ -162,8 +160,7 @@ namespace FishNet.Demo.Prediction.CharacterControllers
             _characterTrigger.OnEnter += CharacterTrigger_OnEnter;
             _characterTrigger.OnExit += CharacterTrigger_OnExit;
 
-            // We only need the OnTick callback for non-physics.
-            SetTickCallbacks(TickCallback.Tick);
+            SetTickCallbacks(TickCallback.Tick | TickCallback.PostTick);
         }
 
         public override void OnOwnershipClient(NetworkConnection prevOwner)
@@ -193,6 +190,16 @@ namespace FishNet.Demo.Prediction.CharacterControllers
         protected override void TimeManager_OnTick()
         {
             PerformReplicate(BuildMoveData());
+        }
+
+        protected override void TimeManager_OnPostTick()
+        {
+            /* Typically a CharacterController could send a reconcile within
+             * OnTick, after completing all moving logic. However, this demo
+             * uses a NetworkTrigger to jump on platforms, which we need the results
+             * from before sending a reconcile. The NetworkTrigger/Collider components
+             * trace after simulation which occurs between OnTick, and OnPostTick, therefor
+             * the trace would have happened by the time OnPostTick is called. */
             CreateReconcile();
         }
 
@@ -393,7 +400,15 @@ namespace FishNet.Demo.Prediction.CharacterControllers
              * in the reconcile data. */
             _verticalVelocity = rd.VerticalVelocity;
             Stamina = rd.Stamina;
-
+            
+            /* It is VERY important to disable the CharacterController
+             * component before updating its position. If you do not
+             * use the disable/enable work-around below, the Transform
+             * will show the correct position but the physics for
+             * the CharacterController will remain at it's prior position
+             * until the next simulate. */
+            _characterController.enabled = false;
+            
             /* Even though the platform is traced for in replicate we must also
              * pass the current platform into the reconcile, and set our local value
              * to whatever is provided in the reconcile.
@@ -405,17 +420,18 @@ namespace FishNet.Demo.Prediction.CharacterControllers
             _currentPlatform = rd.CurrentPlatform;
             //Set transform parent after assigning current.
             SetParent();
-
             /* Update position AFTER setting the parent, otherwise
              * you would face a potentially huge positional de-sync
              * as mentioned above. */
             transform.localPosition = rd.Position;
+            
+            _characterController.enabled = true;
         }
 
         /// <summary>
         /// Called when the trigger on this object enters another collider.
         /// </summary>
-        private void CharacterTrigger_OnEnter(Collider c)
+        private void CharacterTrigger_OnEnter(Collider c, uint tick)
         {
             //We only care about moving platforms.
             if (!c.TryGetComponent(out MovingPlatform mp))
@@ -428,8 +444,10 @@ namespace FishNet.Demo.Prediction.CharacterControllers
         /// <summary>
         /// Called when the trigger on this object exits another collider.
         /// </summary>
-        private void CharacterTrigger_OnExit(Collider c)
+        private void CharacterTrigger_OnExit(Collider c, uint tick)
         {
+            if (c == null)
+                return;
             if (!c.TryGetComponent(out MovingPlatform mp))
                 return;
 
@@ -479,4 +497,3 @@ namespace FishNet.Demo.Prediction.CharacterControllers
         }
     }
 }
-#endif
