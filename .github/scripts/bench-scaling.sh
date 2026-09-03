@@ -43,9 +43,11 @@ jq -r --argjson versions "$VERSIONS_JSON" --arg window "$WINDOW" --arg objects "
   | ["#2f6feb", "#e36209", "#6f42c1", "#1a7f37", "#cf222e"] as $palette
   | (map(.netcode) | unique) as $present
   | [ $order[] | select(. as $n | $present | index($n)) ] as $netcodes
-  | (map(.connections) | unique | sort) as $conns
-  # dp[netcode][conns] = datapoint
-  | (reduce .[] as $d ({}; .[$d.netcode][$d.connections | tostring] = $d)) as $dp
+  # Rows are keyed by the requested size (Fusion capped at 99 still sits in the 100 row); the
+  # "clients connected" table shows the actual counts.
+  | (map(.size // .connections) | unique | sort) as $conns
+  # dp[netcode][size] = datapoint
+  | (reduce .[] as $d ({}; .[$d.netcode][($d.size // $d.connections) | tostring] = $d)) as $dp
   | def cell($n; $c): $dp[$n][$c | tostring];
   # Generic table: rows = connection counts, columns = netcodes, cell = f(datapoint)
   def table(title; f):
@@ -75,7 +77,7 @@ jq -r --argjson versions "$VERSIONS_JSON" --arg window "$WINDOW" --arg objects "
   + "Fusion is relay-based: server and clients talk to Photon Cloud (traffic measured on the public interface, RTT includes the relay hop); the server still sends one stream per client, so its downstream is comparable.\n\n"
   + "### Machines\n\n"
   + table("Server CPU model (numbers are only comparable within a row when these match)"; "\(.meta.cpuModel | shortCpu) x\(.meta.cpuCount)\(if .meta.devBuild then " (dev)" else "" end)")
-  + table("Clients connected at start / expected · measured clients"; "\(.meta.connectedAtStart)/\(.meta.expectedClients) · \(.meta.measuredClients)\(if .meta.serverError != null then " ⚠️ \(.meta.serverError)" else "" end)")
+  + table("Clients connected at start / expected · measured clients (rows are the requested size; a capped or partially connected run shows its real count here)"; "\(.meta.connectedAtStart)/\(.meta.expectedClients) · \(.meta.measuredClients)\(if .meta.serverError != null then " ⚠️ \(.meta.serverError)" else "" end)")
   + "### Idle baseline (connected, nothing spawned)\n\n"
   + table("Server CPU % · frame p95 ms"; "\(.server.Idle.cpuPercent | r1)% · \(.server.Idle.p95FrameMs | r2) ms")
   + ( [ ("MoveY", "MoveAllAxis", "MoveWander", "SendRPC", "Static", "SpawnChurn", "ClientInput", "SyncVars") as $t

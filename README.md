@@ -105,9 +105,11 @@ Caveats worth keeping in mind when reading results:
 - **Fusion is relay-based.** Its dedicated server and its clients all talk to Photon Cloud
   instead of to each other, so its RTT includes the relay hop and its traffic is measured on the
   public interface (`eth0`) rather than the tailnet. The server still sends one stream per
-  client through the relay, so server-side downstream is comparable with the others. Its Photon
-  plan is capped at 100 CCU and the server counts as one, so the 100-connection point runs with
-  99 clients.
+  client through the relay, so server-side downstream is comparable with the others. Its client
+  count is capped by the `fusion_max_clients` input (default 100, the Photon CCU plan). If the
+  dedicated server turns out to count as one CCU, Photon refuses the last client, the server
+  proceeds with 99 after the connect timeout, and the "clients connected" table shows 99/100 for
+  that row; set the input to 99 to skip the 3-minute wait in that case.
 - **Machines.** Jobs default to Blacksmith's `blacksmith-4vcpu-ubuntu-2404` pool (fixed hardware
   generation, so CPU numbers are comparable across runs). Set `runner: ubuntu-latest` to fall
   back to GitHub-hosted runners, whose CPU model varies; the summary prints the server CPU model

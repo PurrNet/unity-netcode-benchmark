@@ -8,8 +8,9 @@ name: Netcode Scaling Benchmark
 # loadgen runners, e.g. size 100 = 1 + 10 + 4 = 15 runners. Every runner joins the tailnet as an
 # ephemeral device, so max_parallel x 15 must stay under the Tailscale device limit.
 #
-# Fusion's Photon plan is capped at 100 CCU and the dedicated server itself counts as one, so its
-# 100-connection point runs with 99 clients.
+# Fusion's client count is capped by fusion_max_clients (Photon CCU plan). If Photon refuses a
+# connection the server proceeds with the clients it has after -connectTimeout, and the summary
+# shows the actual count in its "connected at start" table.
 
 on:
   workflow_dispatch:
@@ -55,6 +56,10 @@ on:
         description: "runs-on label for loadgen runners"
         required: false
         default: "blacksmith-8vcpu-ubuntu-2404"
+      fusion_max_clients:
+        description: "Client cap for Fusion (Photon CCU plan limit; if the dedicated server counts as one CCU, set this to plan - 1)"
+        required: false
+        default: "100"
       max_parallel:
         description: "Benchmark runs in flight at once (netcodes run side by side, one size at a time). Every runner is a tailnet device: keep max_parallel x runners-per-run under your Tailscale device limit (100 on the Personal plan)"
         required: false
@@ -89,7 +94,7 @@ jobs:
           for s in $SIZES; do
             for n in $NETCODES; do
               CAP=200
-              [ "$n" = "fusion" ] && CAP=99
+              [ "$n" = "fusion" ] && CAP=${{ inputs.fusion_max_clients }}
               TOTAL=$s
               [ "$TOTAL" -gt "$CAP" ] && TOTAL=$CAP
               MEASURED=$TOTAL
