@@ -21,7 +21,7 @@ on:
       sizes:
         description: "Comma-separated connection counts"
         required: true
-        default: "10,25,50,100"
+        default: "10,50,100"
       bench_seconds:
         description: "Steady-state measurement window per test, seconds"
         required: true

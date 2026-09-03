@@ -1,7 +1,7 @@
 # Unity netcode benchmark
 
 Five Unity 6 projects (one per netcode) running the same four stress scenarios, plus GitHub
-Actions workflows that build every project, run the scenarios headless at 10 / 25 / 50 / 100
+Actions workflows that build every project, run the scenarios headless at 10 / 50 / 100
 connections on real machines, and render a cross-netcode comparison (bandwidth, CPU, frame
 times, RTT) into the workflow summary.
 
@@ -62,7 +62,7 @@ How a run works (same design as PurrNet's own benchmark CI):
    Raw JSON (every process) and the rendered Markdown are uploaded as the `benchmark-results`
    artifact.
 
-Dispatch inputs: `netcodes` (default all five), `sizes` (default `10,25,50,100`),
+Dispatch inputs: `netcodes` (default all five), `sizes` (default `10,50,100`),
 `bench_seconds` (20), `bench_objects` (100), `profiling` (development builds add a
 CPU-by-profiler-marker table), `runner` (`runs-on` label, see below), `region`
 (Photon Cloud region for Fusion), plus the parallelism knobs below.
@@ -70,11 +70,11 @@ CPU-by-profiler-marker table), `runner` (`runs-on` label, see below), `region`
 ### Parallelism and run time
 
 Runs are laid out size-major: with `max_parallel` (default 5) all selected netcodes run side by
-side at 10 connections, then at 25, and so on. Each run uses 1 server runner,
+side at 10 connections, then at 50, then at 100. Each run uses 1 server runner,
 `measured_clients` (default 10) single-process client runners, and enough `loadgen_runner`
 machines (default `blacksmith-8vcpu-ubuntu-2404`, `loadgen_procs` = 24 client processes each,
 3 per vCPU) to reach the connection count, so a 100-connection run is 15 runners and the full
-five-netcode matrix peaks at about 75 runners. The whole default matrix takes roughly 35 to 40
+five-netcode matrix peaks at about 75 runners. The whole default matrix takes roughly 25 to 30
 minutes wall time including builds.
 
 Two limits to keep in mind when raising parallelism:
