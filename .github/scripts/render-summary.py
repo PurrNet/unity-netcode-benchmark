@@ -4,7 +4,7 @@
 Usage: render-summary.py <scaling.json> [--versions versions.json] [--run-url URL] [--report-url URL]
 
 Prints Markdown: a header line with run date / versions, then two tables at the largest connection
-count (server downstream on-wire per test, server CPU minus idle per test) and pointers to the
+count (server downstream on-wire per test, server CPU per test) and pointers to the
 full report. Everything else lives in the interactive report.
 """
 import argparse
@@ -14,7 +14,7 @@ from pathlib import Path
 
 ORDER = ["purrnet", "fishnet", "mirror", "ngo", "fusion"]
 NAMES = {"purrnet": "PurrNet", "fishnet": "FishNet", "mirror": "Mirror", "ngo": "NGO", "fusion": "Fusion"}
-TESTS = ["MoveY", "MoveAllAxis", "MoveWander", "SendRPC", "Static", "SpawnChurn", "ClientInput", "SyncVars"]
+TESTS = ["Idle", "MoveY", "MoveAllAxis", "MoveWander", "SendRPC", "Static", "SpawnChurn", "ClientInput", "SyncVars"]
 
 
 def fmt_kb(v):
@@ -140,16 +140,13 @@ def main():
     window = round(any_test["windowSeconds"]) if any_test else "?"
     date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    def idle(r):
-        return (r.get("server", {}).get("Idle") or {}).get("cpuPercent", 0) or 0
-
     def srv_down(r, t):
         s = r.get("server", {}).get(t)
         return s["txBytesPerSec"] if s else None
 
     def cpu(r, t):
         s = r.get("server", {}).get(t)
-        return (s["cpuPercent"] - idle(r)) if s else None
+        return s["cpuPercent"] if s else None
 
     lines = []
     ver = " · ".join(f"{NAMES[n]} {versions.get(n, '?')}" for n in netcodes)
@@ -167,7 +164,7 @@ def main():
         lines.append("_Note: " + "; ".join(conn_notes) + "._")
         lines.append("")
     t1 = f"Server downstream on-wire at {size} connections"
-    t2 = f"Server CPU minus idle at {size} connections"
+    t2 = f"Server CPU at {size} connections"
     if args.svg_out:
         blocks = [(t1, "KB/s", rows_for("KB/s", netcodes, sizes, by, srv_down)),
                   (t2, "% of one core", rows_for("%", netcodes, sizes, by, cpu))]

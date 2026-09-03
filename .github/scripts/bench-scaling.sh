@@ -64,8 +64,6 @@ jq -r --argjson versions "$VERSIONS_JSON" --arg window "$WINDOW" --arg objects "
         + ( [ $series[] | "    line [\(map(tostring) | join(", "))]" ] | join("\n") )
         + "\n```\n"
         + "Series: " + ( [ range(0; $netcodes|length) as $i | "\($palette[$i]) \($netcodes[$i])" ] | join(" · ") ) + "\n\n";
-  def idleCpu($d): ($d.server.Idle.cpuPercent // 0);
-
   "## Netcode scaling benchmark\n\n"
   + "Window: \($window)s per test · Objects per test: \($objects) · Connections: \($conns | map(tostring) | join(" / "))\n\n"
   + "| Netcode | Version |\n|---|---|\n"
@@ -73,7 +71,7 @@ jq -r --argjson versions "$VERSIONS_JSON" --arg window "$WINDOW" --arg objects "
   + "\n| unity | \($versions.unity // "?") |\n\n"
   + "Every netcode runs the same scenario: the server spawns N objects and replicates them to every client. MoveY / MoveAllAxis / MoveWander move them each tick; SendRPC fires one observers-RPC with one float per object per tick; Static spawns them and never touches them; SpawnChurn keeps N alive while despawning and spawning N/50 per tick; ClientInput spawns one hub object and every client sends one small server RPC (Vector3 + float) per tick; SyncVars changes one of four synced fields per object per tick. "
   + "Server numbers come from the single server process; client numbers are averages over the single-process measured clients. "
-  + "On-wire bandwidth is read from the network interface (headers, ACKs and resends included). CPU is the whole process, all threads, as % of one core with the frame loop capped at 60 fps; the Idle row (connected, nothing spawned) is the per-netcode baseline and is subtracted in the \"CPU − idle\" tables. "
+  + "On-wire bandwidth is read from the network interface (headers, ACKs and resends included). CPU is the whole process, all threads, as % of one core with the frame loop capped at 60 fps; nothing is subtracted, so the Idle row (connected, nothing spawned) is what holding the connections costs on its own. "
   + "Fusion is relay-based: server and clients talk to Photon Cloud (traffic measured on the public interface, RTT includes the relay hop); the server still sends one stream per client, so its downstream is comparable.\n\n"
   + "### Machines\n\n"
   + table("Server CPU model (numbers are only comparable within a row when these match)"; "\(.meta.cpuModel | shortCpu) x\(.meta.cpuCount)\(if .meta.devBuild then " (dev)" else "" end)")
@@ -87,14 +85,14 @@ jq -r --argjson versions "$VERSIONS_JSON" --arg window "$WINDOW" --arg objects "
         + table("\($t) — server upstream on-wire (KB/s, all clients)"; .server[$t].rxBytesPerSec | kb)
         + table("\($t) — per-client upstream on-wire (KB/s, client-measured)"; .clients[$t].txBytesPerSec | kb)
         + ( if $t == "ClientInput" then table("ClientInput — server input RPCs received per second (expected ≈ 20 × connections)"; .server[$t].inputsPerSec | if . == null then "-" else floor end) else "" end )
-        + table("\($t) — server CPU % minus idle (raw)"; . as $d | ($d.server[$t].cpuPercent) as $c | if $c == null then "-" else "\(($c - idleCpu($d)) | r1)% (\($c | r1)%)" end)
+        + table("\($t) — server CPU %"; .server[$t].cpuPercent | if . == null then "-" else "\(. | r1)%" end)
         + table("\($t) — server frame avg / p95 / p99 (ms)"; "\(.server[$t].avgFrameMs | r2) / \(.server[$t].p95FrameMs | r2) / \(.server[$t].p99FrameMs | r2)")
         + table("\($t) — server GC collections · peak RSS"; "\(.server[$t].gcCollections // "-") · \(((.server[$t].peakRssBytes // 0) / 1048576) | floor) MB")
         + table("\($t) — client RTT p50 / p95 (ms, netcode-reported)"; "\(.clients[$t].rttP50Ms | r2) / \(.clients[$t].rttP95Ms | r2)")
         + ( if ($conns | length) < 2 then "_Charts need ≥2 connection sizes._\n\n"
             else chart("\($t) — server downstream KB/s vs connections"; "KB/s"; (.server[$t].txBytesPerSec // 0) / 1024)
                + chart("\($t) — per-client downstream KB/s vs connections"; "KB/s"; (.clients[$t].rxBytesPerSec // 0) / 1024)
-               + chart("\($t) — server CPU % minus idle vs connections"; "CPU %"; . as $d | (($d.server[$t].cpuPercent // 0) - idleCpu($d)))
+               + chart("\($t) — server CPU % vs connections"; "CPU %"; .server[$t].cpuPercent // 0)
                + chart("\($t) — client RTT p95 ms vs connections"; "ms"; .clients[$t].rttP95Ms // 0)
             end )
       ] | join("") )

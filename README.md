@@ -11,7 +11,7 @@ _Last run 2026-09-03: PurrNet 1.23.0-beta.23 · FishNet 4.7.3 · Mirror 96.0.1 �
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/latest-dark.svg">
-  <img alt="Server downstream on-wire at 100 connections; Server CPU minus idle at 100 connections. Best value per row highlighted in green." src="docs/latest-light.svg">
+  <img alt="Server downstream on-wire at 100 connections; Server CPU at 100 connections. Best value per row highlighted in green." src="docs/latest-light.svg">
 </picture>
 
 <details><summary>Same tables as text</summary>
@@ -20,6 +20,7 @@ _Last run 2026-09-03: PurrNet 1.23.0-beta.23 · FishNet 4.7.3 · Mirror 96.0.1 �
 
 | Test | PurrNet | FishNet | Mirror | NGO | Fusion |
 |---|---:|---:|---:|---:|---:|
+| Idle | 13.9 | 14.4 | 187 | **12.1** | 245 |
 | MoveY | **490** | 1,249 | 2,437 | 3,098 | 2,866 |
 | MoveAllAxis | **1,281** | 2,024 | 4,422 | 5,025 | 2,786 |
 | MoveWander | **1,671** | 2,839 | 5,194 | 6,534 | 3,720 |
@@ -29,18 +30,19 @@ _Last run 2026-09-03: PurrNet 1.23.0-beta.23 · FishNet 4.7.3 · Mirror 96.0.1 �
 | ClientInput | **92.3** | 93.7 | 280 | 114 | 218 |
 | SyncVars | **2,640** | 3,642 | 4,997 | 4,251 | 3,401 |
 
-**Server CPU minus idle at 100 connections** (% of one core, lower is better)
+**Server CPU at 100 connections** (% of one core, lower is better)
 
 | Test | PurrNet | FishNet | Mirror | NGO | Fusion |
 |---|---:|---:|---:|---:|---:|
-| MoveY | 6.2 | **3.8** | 5.7 | 52.7 | 9.6 |
-| MoveAllAxis | 5.1 | **3.4** | 6.3 | 46.7 | 11.5 |
-| MoveWander | 6.3 | **5.2** | 7.1 | 53.8 | 21.1 |
-| SendRPC | **6.2** | 9.9 | 15.2 | 48.4 | 14.4 |
-| Static | 0.8 | 1.2 | 1.0 | **-2.2** | 4.4 |
-| SpawnChurn | 20.4 | 7.1 | 6.7 | **0.6** | 13.7 |
-| ClientInput | 4.4 | 3.1 | 3.1 | **-2.6** | 20.7 |
-| SyncVars | **7.4** | 7.6 | 11.4 | 43.0 | 14.0 |
+| Idle | **3.4** | 5.2 | 11.0 | 8.6 | 10.4 |
+| MoveY | 9.6 | **9.0** | 16.7 | 61.3 | 19.9 |
+| MoveAllAxis | **8.5** | 8.6 | 17.3 | 55.3 | 21.9 |
+| MoveWander | **9.7** | 10.4 | 18.1 | 62.4 | 31.5 |
+| SendRPC | **9.6** | 15.1 | 26.2 | 57.0 | 24.8 |
+| Static | **4.2** | 6.4 | 12.0 | 6.4 | 14.7 |
+| SpawnChurn | 23.8 | 12.3 | 17.7 | **9.1** | 24.1 |
+| ClientInput | 7.8 | 8.3 | 14.1 | **6.0** | 31.1 |
+| SyncVars | **10.8** | 12.8 | 22.4 | 51.6 | 24.4 |
 
 </details>
 
@@ -72,7 +74,7 @@ The server spawns `N` objects (100 by default) and replicates them to every clie
 | ClientInput | one hub object; every **client** sends one server RPC (`Vector3` + `float`) per tick |
 | SyncVars | one of four synced fields (`float`, `float`, `float`, `Vector3`) changed per tick |
 
-An **Idle** window (connected, nothing spawned) is measured first as each netcode's CPU baseline.
+An **Idle** window (connected, nothing spawned) is measured first and reported as its own row: what holding the connections costs before anything is replicated. Nothing is subtracted from the other tests.
 Payloads are floats rather than ints on purpose: FishNet varint-packs integers by default and the
 others do not, whereas a float is 4 bytes on every netcode, so the RPC and SyncVar tests compare
 framing and batching instead of integer encoding.
@@ -82,7 +84,7 @@ framing and batching instead of integer encoding.
 | Metric | How |
 |---|---|
 | Downstream / upstream on-wire | interface byte counters (`/proc/net/dev`) read in-process; headers, ACKs and resends included |
-| CPU % | process CPU time, all threads, as % of one core; Idle subtracted in the comparison |
+| CPU % | process CPU time, all threads, as % of one core; whole process, nothing subtracted |
 | Frame avg / p95 / p99 | main-thread frame time; 16.7 ms means on budget at 60 fps |
 | GC, heap, peak RSS | `GC.CollectionCount`, `GC.GetTotalMemory`, `/proc/self/status` |
 | RTT p50 / p95 | each netcode's own estimate, sampled on measured clients |

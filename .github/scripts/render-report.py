@@ -172,7 +172,7 @@ TEMPLATE = r"""<meta charset="utf-8">
   </header>
 
   <details class="best" open>
-    <summary><span>Winners by goal</span> <span id="best-size" class="hint"></span> <span class="hint">&middot; server downstream, server CPU minus idle and GC collections judged separately; lower is better; ties share the win</span></summary>
+    <summary><span>Winners by goal</span> <span id="best-size" class="hint"></span> <span class="hint">&middot; server downstream, server CPU and GC collections judged separately; lower is better; ties share the win</span></summary>
     <div class="tablewrap"><table id="winners" class="winners"></table></div>
   </details>
 
@@ -198,7 +198,7 @@ TEMPLATE = r"""<meta charset="utf-8">
   <section class="notes">
     <div>
       <h2>Run notes</h2>
-      <p>Every netcode runs the same scenario: the server spawns N objects and replicates them to every client. On-wire bytes are read from the network interface (UDP/IP headers, ACKs and resends included). CPU is the whole server process, all threads, as % of one core with the frame loop capped at 60 fps; the Idle window is each netcode's baseline. Fusion is relay-based (Photon Cloud): its RTT includes the relay hop and its traffic is measured on the public interface, but the server still sends one stream per client, so its downstream is comparable.</p>
+      <p>Every netcode runs the same scenario: the server spawns N objects and replicates them to every client. On-wire bytes are read from the network interface (UDP/IP headers, ACKs and resends included). CPU is the whole server process, all threads, as % of one core with the frame loop capped at 60 fps; nothing is subtracted, so the Idle row is what holding N connections costs on its own. Fusion is relay-based (Photon Cloud): its RTT includes the relay hop and its traffic is measured on the public interface, but the server still sends one stream per client, so its downstream is comparable.</p>
     </div>
     <ul id="warnings" class="warnings" hidden></ul>
   </section>
@@ -212,21 +212,19 @@ const DATA = __DATA__;
 
 const ORDER = ["purrnet", "fishnet", "mirror", "ngo", "fusion"];
 const NAMES = { purrnet: "PurrNet", fishnet: "FishNet", mirror: "Mirror", ngo: "NGO", fusion: "Fusion" };
-const TESTS = ["MoveY", "MoveAllAxis", "MoveWander", "SendRPC", "Static", "SpawnChurn", "ClientInput", "SyncVars"];
+const TESTS = ["Idle", "MoveY", "MoveAllAxis", "MoveWander", "SendRPC", "Static", "SpawnChurn", "ClientInput", "SyncVars"];
 const TEST_DESC = {
-  MoveY: "N objects, sine on Y", MoveAllAxis: "N objects, sine on a random axis", MoveWander: "N objects, wander (position + rotation)",
+  Idle: "connected, nothing spawned", MoveY: "N objects, sine on Y", MoveAllAxis: "N objects, sine on a random axis", MoveWander: "N objects, wander (position + rotation)",
   SendRPC: "N objects, 1 observers RPC (float) per tick", Static: "N objects, never touched", SpawnChurn: "N alive, N/50 despawned + spawned per tick",
   ClientInput: "1 object, each client sends 1 RPC per tick", SyncVars: "N objects, 1 synced field changed per tick"
 };
 const kb = v => v == null ? null : v / 1024;
-const idle = r => (r.server && r.server.Idle && r.server.Idle.cpuPercent) || 0;
 const METRICS = [
   { id: "srvDown", label: "Server downstream", unit: "KB/s", lower: true, hint: "bytes the server puts on the wire to all clients", get: (r, t) => kb(r.server[t] && r.server[t].txBytesPerSec) },
   { id: "cliDown", label: "Per-client downstream", unit: "KB/s", lower: true, hint: "average received by one measured client", get: (r, t) => kb(r.clients[t] && r.clients[t].rxBytesPerSec) },
   { id: "srvUp", label: "Server upstream", unit: "KB/s", lower: true, hint: "bytes the server receives from all clients", get: (r, t) => kb(r.server[t] && r.server[t].rxBytesPerSec) },
   { id: "cliUp", label: "Per-client upstream", unit: "KB/s", lower: true, hint: "average sent by one measured client", get: (r, t) => kb(r.clients[t] && r.clients[t].txBytesPerSec) },
-  { id: "cpu", label: "Server CPU \u2212 idle", unit: "%", lower: true, hint: "process CPU % of one core, Idle window subtracted", get: (r, t) => r.server[t] ? r.server[t].cpuPercent - idle(r) : null },
-  { id: "cpuRaw", label: "Server CPU", unit: "%", lower: true, hint: "process CPU % of one core, raw", get: (r, t) => r.server[t] ? r.server[t].cpuPercent : null },
+  { id: "cpu", label: "Server CPU", unit: "%", lower: true, hint: "whole process CPU as % of one core, nothing subtracted", get: (r, t) => r.server[t] ? r.server[t].cpuPercent : null },
   { id: "p95", label: "Frame p95", unit: "ms", lower: true, hint: "server main-thread frame time, 95th percentile (16.7 ms = on budget)", get: (r, t) => r.server[t] ? r.server[t].p95FrameMs : null },
   { id: "p99", label: "Frame p99", unit: "ms", lower: true, hint: "server main-thread frame time, 99th percentile", get: (r, t) => r.server[t] ? r.server[t].p99FrameMs : null },
   { id: "pkts", label: "Packets out", unit: "/s", lower: true, hint: "server datagrams sent per second", get: (r, t) => r.server[t] ? r.server[t].txPacketsPerSec : null },
@@ -421,7 +419,7 @@ function buildNotes() {
 // ---- Winners by goal: bandwidth, CPU and GC judged separately per test at the largest size.
 const GOALS = [
   { id: "srvDown", label: "Bandwidth", fmt: v => (v >= 100 ? v.toFixed(0) : v.toFixed(1)) + " KB/s" },
-  { id: "cpu", label: "CPU", fmt: v => v.toFixed(1) + " %" },
+  { id: "cpu", label: "Server CPU", unit: "%", lower: true, hint: "whole process CPU as % of one core, nothing subtracted", get: (r, t) => r.server[t] ? r.server[t].cpuPercent : null },
   { id: "gc", label: "GC", fmt: v => v + (v === 1 ? " collection" : " collections") }
 ];
 function metricById(id) { return METRICS.find(m => m.id === id); }
@@ -436,7 +434,7 @@ function buildBest() {
     body += `<tr><td class="test">${t}</td>` + GOALS.map(g => {
       const vals = netcodes.map(n => ({ n, v: rawM(g.id, n, s, t) })).filter(x => x.v != null);
       if (!vals.length) return `<td class="na">–</td>`;
-      // GC counts are small integers and CPU-minus-idle sits inside its noise band near zero, so
+      // GC counts are small integers and CPU sits inside its noise band at low load, so
       // treat values within a small tolerance as tied rather than crowning a winner on noise.
       const tol = g.id === "cpu" ? 0.5 : 0;
       const best = Math.min(...vals.map(x => x.v));
