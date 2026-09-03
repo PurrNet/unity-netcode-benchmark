@@ -4,302 +4,13 @@
         <name>Fusion.Log</name>
     </assembly>
     <members>
-        <member name="T:Fusion.FilteringLogStream">
-            <summary>
-            A proxy log streams that allows for filtering messages. Note that filtering is applied after the message is formatted,
-            so it is really mostly suitable for Unit tests.
-            </summary>
-        </member>
-        <member name="M:Fusion.FilteringLogStream.#ctor(System.String,Fusion.LogStream)">
-            <param name="filter">If a message contains this, it will not be logged</param>
-            <param name="actualLogStream">The actual log stream that will consume filtered messages</param>
-        </member>
-        <member name="M:Fusion.FilteringLogStream.Log(System.String)">
-            <inheritdoc/>
-        </member>
-        <member name="M:Fusion.FilteringLogStream.Log(System.String,System.Exception)">
-            <inheritdoc/>
-        </member>
-        <member name="M:Fusion.FilteringLogStream.Log(System.Exception)">
-            <inheritdoc/>
-        </member>
-        <member name="M:Fusion.FilteringLogStream.Log(Fusion.ILogSource,System.String)">
-            <inheritdoc/>
-        </member>
-        <member name="M:Fusion.FilteringLogStream.Log(Fusion.ILogSource,System.String,System.Exception)">
-            <inheritdoc/>
-        </member>
-        <member name="T:Fusion.FusionEditorLog">
-            <summary>
-            A logger that writes logs to the Unity console with the purpose of being used in the Unity Editor.
-            </summary>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.TraceConfig(System.String)">
-            <summary>
-            Logs a message to the Unity console if FUSION_EDITOR_TRACE is defined. Use in the Config context.
-            </summary>
-            <param name="msg">A message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.WarnConfig(System.String)">
-            <summary>
-            Logs a warning to the Unity console if UNITY_EDITOR is defined. Use in the Config context.
-            </summary>
-            <param name="msg">A message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.LogConfig(System.String)">
-            <summary>
-            Logs a message to the Unity console if UNITY_EDITOR is defined. Use in the Config context.
-            </summary>
-            <param name="msg">A message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.ErrorConfig(System.String)">
-            <summary>
-            Logs an errpr to the Unity console if UNITY_EDITOR is defined. Use in the Config context.
-            </summary>
-            <param name="msg">A message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.TraceInstaller(System.String)">
-            <summary>
-            Logs a message to the Unity console if FUSION_EDITOR_TRACE is defined. Use in the Installer context.
-            </summary>
-            <param name="msg">A message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.WarnInstaller(System.String)">
-            <summary>
-            Logs a warning to the Unity console if UNITY_EDITOR is defined. Use in the Installer context.
-            </summary>
-            <param name="msg">A message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.LogInstaller(System.String)">
-            <summary>
-            Logs a message to the Unity console if UNITY_EDITOR is defined. Use in the Installer context.
-            </summary>
-            <param name="msg">A message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.ErrorInstaller(System.String)">
-            <summary>
-            Logs an errpr to the Unity console if UNITY_EDITOR is defined. Use in the Installer context.
-            </summary>
-            <param name="msg">A message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.SetPrefixColor(UnityEngine.Color32)">
-            <summary>
-            Sets the color of the prefix.
-            </summary>
-            <param name="c"></param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.Initialize(System.Boolean)">
-            <summary>
-            Ensures the logger is initialized. Call in the main thread if you want to log from a different thread.
-            </summary>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.Assert(System.Boolean,System.String)">
-            <summary>
-            Logs an assertion with a message if the condition is <c>><see langword="false"/></c> and UNITY_ASSERTIONS is defined.
-            </summary>
-            <param name="condition">Value to check</param>
-            <param name="message">An error message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.Assert(System.Boolean)">
-            <summary>
-            Logs an assertion if the condition is <c>><see langword="false"/></c> and UNITY_ASSERTIONS is defined.
-            </summary>
-            <param name="condition">Value to check</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.TraceImport(System.String,System.String)">
-            <summary>
-            Logs a message to the Unity console if FUSION_EDITOR_TRACE is defined. Used in the import process.
-            </summary>
-            <param name="assetPath">Asset being imported</param>
-            <param name="msg">A message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.WarnImport(System.String,System.String)">
-            <summary>
-            Logs a warning to the Unity console if UNITY_EDITOR is defined. Used in the import process.
-            </summary>
-            <param name="assetPath">Asset being imported</param>
-            <param name="msg">A message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.LogImport(System.String,System.String)">
-            <summary>
-            Logs a message to the Unity console if UNITY_EDITOR is defined. Used in the import process.
-            </summary>
-            <param name="assetPath">Asset being imported</param>
-            <param name="msg">A message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.ErrorImport(System.String,System.String)">
-            <summary>
-            Logs an error to the Unity console if UNITY_EDITOR is defined. Used in the import process.
-            </summary>
-            <param name="assetPath">Asset being imported</param>
-            <param name="msg">A message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.TraceImport(System.String,UnityEngine.Object)">
-            <summary>
-            Logs a message to the Unity console if FUSION_EDITOR_TRACE is defined. Used in the import process.
-            </summary>
-            <param name="msg">A message</param>
-            <param name="asset">Asset being imported</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.WarnImport(System.String,UnityEngine.Object)">
-            <summary>
-            Logs a warning to the Unity console if UNITY_EDITOR is defined. Used in the import process.
-            </summary>
-            <param name="msg">A message</param>
-            <param name="asset">Asset being imported</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.LogImport(System.String,UnityEngine.Object)">
-            <summary>
-            Logs a message to the Unity console if UNITY_EDITOR is defined. Used in the import process.
-            </summary>
-            <param name="msg">A message</param>
-            <param name="asset">Asset being imported</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.ErrorImport(System.String,UnityEngine.Object)">
-            <summary>
-            Logs an error to the Unity console if UNITY_EDITOR is defined. Used in the import process.
-            </summary>
-            <param name="msg">A message</param>
-            <param name="asset">Asset being imported</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.Warn(System.String,UnityEngine.Object)">
-            <summary>
-            Logs a message to the Unity console if UNITY_EDITOR is defined.
-            </summary>
-            <param name="msg">A message</param>
-            <param name="obj">The source of the message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.Log(System.String,UnityEngine.Object)">
-            <summary>
-            Logs a message to the Unity console if UNITY_EDITOR is defined.
-            </summary>
-            <param name="msg">A message</param>
-            <param name="obj">The source of the message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.Error(System.String,UnityEngine.Object)">
-            <summary>
-            Logs an error to the Unity console if UNITY_EDITOR is defined.
-            </summary>
-            <param name="msg">A message</param>
-            <param name="obj">The source of the message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.Exception(System.String,System.Exception)">
-            <summary>
-            Logs an exception to the Unity console if UNITY_EDITOR is defined.
-            </summary>
-            <param name="message">A message to log before the exception.</param>
-            <param name="ex">The exception to log</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.Exception(System.Exception)">
-            <summary>
-            Logs an exception to the Unity console if UNITY_EDITOR is defined.
-            </summary>
-            <param name="ex">The exception to log</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.Trace(System.String)">
-            <summary>
-            Logs a message to the Unity console if FUSION_EDITOR_TRACE is defined.
-            </summary>
-            <param name="msg">A message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.Warn(System.String)">
-            <summary>
-            Logs a warning to the Unity console if UNITY_EDITOR is defined.
-            </summary>
-            <param name="msg">A message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.Log(System.String)">
-            <summary>
-            Logs a message to the Unity console if UNITY_EDITOR is defined.
-            </summary>
-            <param name="msg">A message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.Error(System.String)">
-            <summary>
-            Logs an errpr to the Unity console if UNITY_EDITOR is defined.
-            </summary>
-            <param name="msg">A message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.TraceImport(System.String)">
-            <summary>
-            Logs a message to the Unity console if FUSION_EDITOR_TRACE_IMPORT is defined. Use in the Import context.
-            </summary>
-            <param name="msg">A message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.WarnImport(System.String)">
-            <summary>
-            Logs a warning to the Unity console if UNITY_EDITOR is defined. Use in the Import context.
-            </summary>
-            <param name="msg">A message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.LogImport(System.String)">
-            <summary>
-            Logs a message to the Unity console if UNITY_EDITOR is defined. Use in the Import context.
-            </summary>
-            <param name="msg">A message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.ErrorImport(System.String)">
-            <summary>
-            Logs an errpr to the Unity console if UNITY_EDITOR is defined. Use in the Import context.
-            </summary>
-            <param name="msg">A message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.TraceInspector(System.String)">
-            <summary>
-            Logs a message to the Unity console if FUSION_EDITOR_TRACE_INSPECTOR is defined. Use in the Inspector context.
-            </summary>
-            <param name="msg">A message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.WarnInspector(System.String)">
-            <summary>
-            Logs a warning to the Unity console if UNITY_EDITOR is defined. Use in the Inspector context.
-            </summary>
-            <param name="msg">A message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.LogInspector(System.String)">
-            <summary>
-            Logs a message to the Unity console if UNITY_EDITOR is defined. Use in the Inspector context.
-            </summary>
-            <param name="msg">A message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.ErrorInspector(System.String)">
-            <summary>
-            Logs an errpr to the Unity console if UNITY_EDITOR is defined. Use in the Inspector context.
-            </summary>
-            <param name="msg">A message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.TraceTest(System.String)">
-            <summary>
-            Logs a message to the Unity console if FUSION_EDITOR_TRACE_TEST is defined. Use in the Test context.
-            </summary>
-            <param name="msg">A message</param>
-        </member>
-        <member name="M:Fusion.FusionEditorLog.TraceMppm(System.String)">
-            <summary>
-            Logs a message to the Unity console if FUSION_EDITOR_TRACE_MPPM is defined. Use in the Mppm context.
-            </summary>
-            <param name="msg">A message</param>
-        </member>
-        <member name="T:Fusion.AssertException">
-            <summary>
-            An exception that is thrown when an assertion fails.
-            </summary>
-        </member>
-        <member name="M:Fusion.AssertException.#ctor">
-            <summary>
-            Creates a new instance of the exception.
-            </summary>
-        </member>
-        <member name="M:Fusion.AssertException.#ctor(System.String)">
-            <summary>
-            Creates a new instance of the exception with a message.
-            </summary>
-            <param name="msg">A message</param>
-        </member>
         <member name="T:Fusion.Assert">
             <summary>
             Provides methods for asserting conditions. Throws an AssertException when a condition is not met. Methods are only invoked in DEBUG builds unless otherwise specified.
             </summary>
+        </member>
+        <member name="M:Fusion.Assert.Check``1(System.ReadOnlySpan{``0},System.String)">
+            <summary/>
         </member>
         <member name="M:Fusion.Assert.Fail">
             <summary>
@@ -542,6 +253,337 @@
             <param name="condition">Value to check</param>
             <param name="format"></param>
         </member>
+        <member name="T:Fusion.FilteringLogStream">
+            <summary>
+            A proxy log streams that allows for filtering messages. Note that filtering is applied after the message is formatted,
+            so it is really mostly suitable for Unit tests.
+            </summary>
+        </member>
+        <member name="M:Fusion.FilteringLogStream.#ctor(System.String,Fusion.LogStream)">
+            <param name="filter">If a message contains this, it will not be logged</param>
+            <param name="actualLogStream">The actual log stream that will consume filtered messages</param>
+        </member>
+        <member name="M:Fusion.FilteringLogStream.Log(System.String)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Fusion.FilteringLogStream.Log(System.String,System.Exception)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Fusion.FilteringLogStream.Log(System.Exception)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Fusion.FilteringLogStream.Log(Fusion.ILogSource,System.String)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Fusion.FilteringLogStream.Log(Fusion.ILogSource,System.String,System.Exception)">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.FusionEditorLog">
+            <summary>
+            A logger that writes logs to the Unity console with the purpose of being used in the Unity Editor.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.TraceConfig(System.String)">
+            <summary>
+            Logs a message to the Unity console if FUSION_EDITOR_TRACE is defined. Use in the Config context.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.WarnConfig(System.String)">
+            <summary>
+            Logs a warning to the Unity console if UNITY_EDITOR is defined. Use in the Config context.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.LogConfig(System.String)">
+            <summary>
+            Logs a message to the Unity console if UNITY_EDITOR is defined. Use in the Config context.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.ErrorConfig(System.String)">
+            <summary>
+            Logs an errpr to the Unity console if UNITY_EDITOR is defined. Use in the Config context.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.TraceInstaller(System.String)">
+            <summary>
+            Logs a message to the Unity console if FUSION_EDITOR_TRACE is defined. Use in the Installer context.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.WarnInstaller(System.String)">
+            <summary>
+            Logs a warning to the Unity console if UNITY_EDITOR is defined. Use in the Installer context.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.LogInstaller(System.String)">
+            <summary>
+            Logs a message to the Unity console if UNITY_EDITOR is defined. Use in the Installer context.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.ErrorInstaller(System.String)">
+            <summary>
+            Logs an errpr to the Unity console if UNITY_EDITOR is defined. Use in the Installer context.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.TracePlugin(System.String)">
+            <summary>
+            Logs a message to the Unity console if FUSION_EDITOR_TRACE is defined. Use in the Plugin context.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.WarnPlugin(System.String)">
+            <summary>
+            Logs a warning to the Unity console if UNITY_EDITOR is defined. Use in the Plugin context.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.LogPlugin(System.String)">
+            <summary>
+            Logs a message to the Unity console if UNITY_EDITOR is defined. Use in the Plugin context.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.ErrorPlugin(System.String)">
+            <summary>
+            Logs an errpr to the Unity console if UNITY_EDITOR is defined. Use in the Plugin context.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.SetPrefixColor(UnityEngine.Color32)">
+            <summary>
+            Sets the color of the prefix.
+            </summary>
+            <param name="c"></param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.Initialize(System.Boolean)">
+            <summary>
+            Ensures the logger is initialized. Call in the main thread if you want to log from a different thread.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.Assert(System.Boolean,System.String)">
+            <summary>
+            Logs an assertion with a message if the condition is <c>><see langword="false"/></c> and UNITY_ASSERTIONS is defined.
+            </summary>
+            <param name="condition">Value to check</param>
+            <param name="message">An error message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.Assert(System.Boolean)">
+            <summary>
+            Logs an assertion if the condition is <c>><see langword="false"/></c> and UNITY_ASSERTIONS is defined.
+            </summary>
+            <param name="condition">Value to check</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.TraceImport(System.String,System.String)">
+            <summary>
+            Logs a message to the Unity console if FUSION_EDITOR_TRACE is defined. Used in the import process.
+            </summary>
+            <param name="assetPath">Asset being imported</param>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.WarnImport(System.String,System.String)">
+            <summary>
+            Logs a warning to the Unity console if UNITY_EDITOR is defined. Used in the import process.
+            </summary>
+            <param name="assetPath">Asset being imported</param>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.LogImport(System.String,System.String)">
+            <summary>
+            Logs a message to the Unity console if UNITY_EDITOR is defined. Used in the import process.
+            </summary>
+            <param name="assetPath">Asset being imported</param>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.ErrorImport(System.String,System.String)">
+            <summary>
+            Logs an error to the Unity console if UNITY_EDITOR is defined. Used in the import process.
+            </summary>
+            <param name="assetPath">Asset being imported</param>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.TraceImport(System.String,UnityEngine.Object)">
+            <summary>
+            Logs a message to the Unity console if FUSION_EDITOR_TRACE is defined. Used in the import process.
+            </summary>
+            <param name="msg">A message</param>
+            <param name="asset">Asset being imported</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.WarnImport(System.String,UnityEngine.Object)">
+            <summary>
+            Logs a warning to the Unity console if UNITY_EDITOR is defined. Used in the import process.
+            </summary>
+            <param name="msg">A message</param>
+            <param name="asset">Asset being imported</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.LogImport(System.String,UnityEngine.Object)">
+            <summary>
+            Logs a message to the Unity console if UNITY_EDITOR is defined. Used in the import process.
+            </summary>
+            <param name="msg">A message</param>
+            <param name="asset">Asset being imported</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.ErrorImport(System.String,UnityEngine.Object)">
+            <summary>
+            Logs an error to the Unity console if UNITY_EDITOR is defined. Used in the import process.
+            </summary>
+            <param name="msg">A message</param>
+            <param name="asset">Asset being imported</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.Warn(System.String,UnityEngine.Object)">
+            <summary>
+            Logs a message to the Unity console if UNITY_EDITOR is defined.
+            </summary>
+            <param name="msg">A message</param>
+            <param name="obj">The source of the message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.Log(System.String,UnityEngine.Object)">
+            <summary>
+            Logs a message to the Unity console if UNITY_EDITOR is defined.
+            </summary>
+            <param name="msg">A message</param>
+            <param name="obj">The source of the message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.Error(System.String,UnityEngine.Object)">
+            <summary>
+            Logs an error to the Unity console if UNITY_EDITOR is defined.
+            </summary>
+            <param name="msg">A message</param>
+            <param name="obj">The source of the message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.Exception(System.String,System.Exception)">
+            <summary>
+            Logs an exception to the Unity console if UNITY_EDITOR is defined.
+            </summary>
+            <param name="message">A message to log before the exception.</param>
+            <param name="ex">The exception to log</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.Exception(System.Exception)">
+            <summary>
+            Logs an exception to the Unity console if UNITY_EDITOR is defined.
+            </summary>
+            <param name="ex">The exception to log</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.Exception(System.Exception,UnityEngine.Object)">
+            <summary>
+            Logs an exception to the Unity console if UNITY_EDITOR is defined.
+            </summary>
+            <param name="ex">The exception to log</param>
+            <param name="obj">The source of the message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.Exception(System.String,System.Exception,UnityEngine.Object)">
+            <summary>
+            Logs an exception to the Unity console if UNITY_EDITOR is defined.
+            </summary>
+            <param name="message">A message to log before the exception.</param>
+            <param name="ex">The exception to log</param>
+            <param name="obj">The source of the message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.Trace(System.String)">
+            <summary>
+            Logs a message to the Unity console if FUSION_EDITOR_TRACE is defined.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.Warn(System.String)">
+            <summary>
+            Logs a warning to the Unity console if UNITY_EDITOR is defined.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.Log(System.String)">
+            <summary>
+            Logs a message to the Unity console if UNITY_EDITOR is defined.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.Error(System.String)">
+            <summary>
+            Logs an errpr to the Unity console if UNITY_EDITOR is defined.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.TraceImport(System.String)">
+            <summary>
+            Logs a message to the Unity console if FUSION_EDITOR_TRACE_IMPORT is defined. Use in the Import context.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.WarnImport(System.String)">
+            <summary>
+            Logs a warning to the Unity console if UNITY_EDITOR is defined. Use in the Import context.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.LogImport(System.String)">
+            <summary>
+            Logs a message to the Unity console if UNITY_EDITOR is defined. Use in the Import context.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.ErrorImport(System.String)">
+            <summary>
+            Logs an errpr to the Unity console if UNITY_EDITOR is defined. Use in the Import context.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.TraceInspector(System.String)">
+            <summary>
+            Logs a message to the Unity console if FUSION_EDITOR_TRACE_INSPECTOR is defined. Use in the Inspector context.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.WarnInspector(System.String)">
+            <summary>
+            Logs a warning to the Unity console if UNITY_EDITOR is defined. Use in the Inspector context.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.LogInspector(System.String)">
+            <summary>
+            Logs a message to the Unity console if UNITY_EDITOR is defined. Use in the Inspector context.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.ErrorInspector(System.String)">
+            <summary>
+            Logs an errpr to the Unity console if UNITY_EDITOR is defined. Use in the Inspector context.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.TraceTest(System.String)">
+            <summary>
+            Logs a message to the Unity console if FUSION_EDITOR_TRACE_TEST is defined. Use in the Test context.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
+        <member name="M:Fusion.FusionEditorLog.TraceMppm(System.String)">
+            <summary>
+            Logs a message to the Unity console if FUSION_EDITOR_TRACE_MPPM is defined. Use in the Mppm context.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
+        <member name="T:Fusion.AssertException">
+            <summary>
+            An exception that is thrown when an assertion fails.
+            </summary>
+        </member>
+        <member name="M:Fusion.AssertException.#ctor">
+            <summary>
+            Creates a new instance of the exception.
+            </summary>
+        </member>
+        <member name="M:Fusion.AssertException.#ctor(System.String)">
+            <summary>
+            Creates a new instance of the exception with a message.
+            </summary>
+            <param name="msg">A message</param>
+        </member>
         <member name="T:Fusion.ConsoleLogStream">
             <summary>
             A log stream that writes log messages to the console with a specified color.
@@ -705,11 +747,35 @@
         <member name="F:Fusion.InternalLogStreams.LogTraceMemoryTrack">
             <summary>LogTraceMemoryTrack stream</summary>
         </member>
+        <member name="F:Fusion.InternalLogStreams.LogTraceAreaOfInterest">
+            <summary>LogTraceAreaOfInterest stream</summary>
+        </member>
         <member name="F:Fusion.InternalLogStreams.LogTraceSnapshots">
             <summary>LogTraceSnapshots stream</summary>
         </member>
         <member name="F:Fusion.InternalLogStreams.LogTraceTime">
             <summary>LogTraceTime stream</summary>
+        </member>
+        <member name="F:Fusion.InternalLogStreams.LogTraceSendRecv">
+            <summary>LogTraceSendRecv stream</summary>
+        </member>
+        <member name="F:Fusion.InternalLogStreams.LogTracePools">
+            <summary>LogTracePools stream</summary>
+        </member>
+        <member name="F:Fusion.InternalLogStreams.LogTraceParent">
+            <summary>LogTraceParent stream</summary>
+        </member>
+        <member name="F:Fusion.InternalLogStreams.LogTraceForecast">
+            <summary>LogTraceForecast stream</summary>
+        </member>
+        <member name="F:Fusion.InternalLogStreams.LogTraceAutomatedRun">
+            <summary>LogTraceAutomatedRun stream</summary>
+        </member>
+        <member name="F:Fusion.InternalLogStreams.LogTracePluginVersion">
+            <summary>LogTracePluginVersion stream</summary>
+        </member>
+        <member name="F:Fusion.InternalLogStreams.LogTraceLagCompensation">
+            <summary>LogTraceLagCompensation stream</summary>
         </member>
         <member name="T:Fusion.Log">
             <summary>
@@ -928,6 +994,24 @@
         <member name="M:Fusion.Log.TraceSceneManagerError``1(``0,System.String)">
             <summary>Enabled by <c>FUSION_TRACE_SCENEMANAGER</c></summary>
         </member>
+        <member name="M:Fusion.Log.TraceRealtime(System.String)">
+            <summary>Enabled by <c>FUSION_TRACE_REALTIME</c></summary>
+        </member>
+        <member name="M:Fusion.Log.TraceRealtimeWarn(System.String)">
+            <summary>Enabled by <c>FUSION_TRACE_REALTIME</c></summary>
+        </member>
+        <member name="M:Fusion.Log.TraceRealtimeError(System.String)">
+            <summary>Enabled by <c>FUSION_TRACE_REALTIME</c></summary>
+        </member>
+        <member name="M:Fusion.Log.TraceRealtime``1(``0,System.String)">
+            <summary>Enabled by <c>FUSION_TRACE_REALTIME</c></summary>
+        </member>
+        <member name="M:Fusion.Log.TraceRealtimeWarn``1(``0,System.String)">
+            <summary>Enabled by <c>FUSION_TRACE_REALTIME</c></summary>
+        </member>
+        <member name="M:Fusion.Log.TraceRealtimeError``1(``0,System.String)">
+            <summary>Enabled by <c>FUSION_TRACE_REALTIME</c></summary>
+        </member>
         <member name="T:Fusion.LogType">
             <summary>
             Log type.
@@ -1091,6 +1175,65 @@
         </member>
         <member name="M:Fusion.LogStream.Dispose">
             <inheritdoc/>
+        </member>
+        <member name="T:Fusion.LogStream.LogTracker">
+            <summary>
+            Defines a Tracker Type for logs based on an incremental ID and amount of logs
+            </summary>
+        </member>
+        <member name="M:Fusion.LogStream.LogTracker.#ctor(System.UInt64,System.Boolean)">
+            <summary>
+            Defines a Tracker Type for logs based on an incremental ID and amount of logs
+            </summary>
+        </member>
+        <member name="M:Fusion.LogStream.LogTracker.Create(System.UInt64,System.Boolean)">
+            <summary>
+            Sets up a new <see cref="T:Fusion.LogStream.LogTracker"/>.
+            </summary>
+            <param name="threshold">The maximum number of logs allowed (or the frequency if repeating).</param>
+            <param name="repeat">If true, it logs every X times (10th, 20th, etc.). If false, it stops logging after the threshold is hit.</param>
+            <returns>A configured LogTracker instance.</returns>
+        </member>
+        <member name="M:Fusion.LogStream.LogTracker.ResetTracker(System.Int32)">
+            <summary>
+            Reset Log Tracker for a given ID
+            </summary>
+            <param name="dynamicUniqueId">Unique ID to reset Log Tracking</param>
+        </member>
+        <member name="M:Fusion.LogStream.LogTracker.ResetAllTrackers">
+            <summary>
+            Reset all tracked entries
+            </summary>
+        </member>
+        <member name="M:Fusion.LogStream.Limit(Fusion.LogStream.LogTracker,System.Int32,System.UInt64@,System.Boolean@)">
+            <summary>
+            Controls how often logs are written for a specific source to prevent spam.
+            It checks if the source (identified by ID) has reached its limit based on the rules in the LogTracker.
+            </summary>
+            <param name="tracker">The ruleset that decides how many logs are allowed.</param>
+            <param name="dynamicUniqueId">The ID of the item or area sending the log.</param>
+            <param name="logCount">The updated total number of times this source has tried to log.</param>
+            <param name="allowLogging">True if this specific log is allowed to be written; otherwise, false.</param>
+            <returns>Returns the current LogStream if logging is allowed, or null if it should be blocked.</returns>
+        </member>
+        <member name="M:Fusion.LogStream.Limit(Fusion.LogStream.LogTracker,System.Int32,System.UInt64@)">
+            <summary>
+            Controls how often logs are written for a specific source to prevent spam.
+            It checks if the source (identified by ID) has reached its limit based on the rules in the LogTracker.
+            </summary>
+            <param name="tracker">The ruleset that decides how many logs are allowed.</param>
+            <param name="dynamicUniqueId">The ID of the item or area sending the log.</param>
+            <param name="logCount">The updated total number of times this source has tried to log.</param>
+            <returns>Returns the current LogStream if logging is allowed, or null if it should be blocked.</returns>
+        </member>
+        <member name="M:Fusion.LogStream.Limit(Fusion.LogStream.LogTracker,System.Int32)">
+            <summary>
+            Controls how often logs are written for a specific source to prevent spam.
+            It checks if the source (identified by ID) has reached its limit based on the rules in the LogTracker.
+            </summary>
+            <param name="tracker">The ruleset that decides how many logs are allowed.</param>
+            <param name="dynamicUniqueId">The ID of the item or area sending the log.</param>
+            <returns>Returns the current LogStream if logging is allowed, or null if it should be blocked.</returns>
         </member>
         <member name="T:Fusion.FusionUnityLoggerBase">
             <summary>
@@ -1474,11 +1617,35 @@
         <member name="F:Fusion.TraceChannels.MemoryTrack">
             <summary>MemoryTrack</summary>
         </member>
+        <member name="F:Fusion.TraceChannels.AreaOfInterest">
+            <summary>AreaOfInterest</summary>
+        </member>
         <member name="F:Fusion.TraceChannels.Snapshots">
             <summary>Snapshots</summary>
         </member>
         <member name="F:Fusion.TraceChannels.Time">
             <summary>Time</summary>
+        </member>
+        <member name="F:Fusion.TraceChannels.SendRecv">
+            <summary>SendRecv</summary>
+        </member>
+        <member name="F:Fusion.TraceChannels.Pools">
+            <summary>Pools</summary>
+        </member>
+        <member name="F:Fusion.TraceChannels.Parent">
+            <summary>Parent</summary>
+        </member>
+        <member name="F:Fusion.TraceChannels.Forecast">
+            <summary>Forecast</summary>
+        </member>
+        <member name="F:Fusion.TraceChannels.AutomatedRun">
+            <summary>AutomatedRun</summary>
+        </member>
+        <member name="F:Fusion.TraceChannels.PluginVersion">
+            <summary>PluginVersion</summary>
+        </member>
+        <member name="F:Fusion.TraceChannels.LagCompensation">
+            <summary>LagCompensation</summary>
         </member>
         <member name="T:Fusion.LogUtils">
             <summary>
@@ -1491,6 +1658,14 @@
             </summary>
             <typeparam name="T">The type of the unmanaged object.</typeparam>
             <param name="ptr">Pointer to the unmanaged object.</param>
+            <returns>A deferred dump of the pointer.</returns>
+        </member>
+        <member name="M:Fusion.LogUtils.GetDump``1(``0@)">
+            <summary>
+            Gets a deferred dump of a pointer to an unmanaged object.
+            </summary>
+            <typeparam name="T">The type of the unmanaged object.</typeparam>
+            <param name="obj">Pointer to the unmanaged object.</param>
             <returns>A deferred dump of the pointer.</returns>
         </member>
         <member name="M:Fusion.LogUtils.GetDump``1(``0)">

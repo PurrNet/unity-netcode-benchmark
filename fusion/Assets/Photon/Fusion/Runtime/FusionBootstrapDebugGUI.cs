@@ -25,7 +25,7 @@ namespace Fusion {
 
     FusionBootstrap _networkDebugStart;
     string _clientCount;
-    bool _isMultiplePeerMode;
+    bool IsMultiplePeerMode => NetworkProjectConfig.Global.PeerMode == NetworkProjectConfig.PeerModes.Multiple;
 
     Dictionary<FusionBootstrap.Stage, string> _nicifiedStageNames;
 
@@ -66,7 +66,6 @@ namespace Fusion {
       ValidateClientCount();
     }
     protected virtual void Start() {
-      _isMultiplePeerMode = NetworkProjectConfig.Global.PeerMode == NetworkProjectConfig.PeerModes.Multiple;
     }
 
     protected FusionBootstrap EnsureNetworkDebugStartExists() {
@@ -102,7 +101,7 @@ namespace Fusion {
         }
 
         if (Input.GetKeyDown(KeyCode.H)) {
-          if (_isMultiplePeerMode) {
+          if (IsMultiplePeerMode) {
             StartHostWithClients(_networkDebugStart);
           } else {
             _networkDebugStart.StartHost();
@@ -110,7 +109,7 @@ namespace Fusion {
         }
 
         if (Input.GetKeyDown(KeyCode.S)) {
-          if (_isMultiplePeerMode) {
+          if (IsMultiplePeerMode) {
             StartServerWithClients(_networkDebugStart);
           } else {
             _networkDebugStart.StartServer();
@@ -118,7 +117,7 @@ namespace Fusion {
         }
 
         if (Input.GetKeyDown(KeyCode.C)) {
-          if (_isMultiplePeerMode) {
+          if (IsMultiplePeerMode) {
             StartMultipleClients(nds);
           } else {
             nds.StartClient();
@@ -126,7 +125,7 @@ namespace Fusion {
         }
 
         if (Input.GetKeyDown(KeyCode.A)) {
-          if (_isMultiplePeerMode) {
+          if (IsMultiplePeerMode) {
             StartMultipleAutoClients(nds);
           } else {
             nds.StartAutoClient();
@@ -134,7 +133,7 @@ namespace Fusion {
         }
 
         if (Input.GetKeyDown(KeyCode.P)) {
-          if (_isMultiplePeerMode) {
+          if (IsMultiplePeerMode) {
             StartMultipleSharedClients(nds);
           } else {
             nds.StartSharedClient();
@@ -196,7 +195,7 @@ namespace Fusion {
             }
 
             if (GUILayout.Button(EnableHotkeys ? "Start Shared Client (P)" : "Start Shared Client", GUILayout.Height(height))) {
-              if (_isMultiplePeerMode) {
+              if (IsMultiplePeerMode) {
                 StartMultipleSharedClients(nds);
               } else {
                 nds.StartSharedClient();
@@ -204,7 +203,7 @@ namespace Fusion {
             }
 
             if (GUILayout.Button(EnableHotkeys ? "Start Server (S)" : "Start Server", GUILayout.Height(height))) {
-              if (_isMultiplePeerMode) {
+              if (IsMultiplePeerMode) {
                 StartServerWithClients(nds);
 
               } else {
@@ -213,7 +212,7 @@ namespace Fusion {
             }
 
             if (GUILayout.Button(EnableHotkeys ? "Start Host (H)" : "Start Host", GUILayout.Height(height))) {
-              if (_isMultiplePeerMode) {
+              if (IsMultiplePeerMode) {
                 StartHostWithClients(nds);
               } else {
                 nds.StartHost();
@@ -221,7 +220,7 @@ namespace Fusion {
             }
 
             if (GUILayout.Button(EnableHotkeys ? "Start Client (C)" : "Start Client", GUILayout.Height(height))) {
-              if (_isMultiplePeerMode) {
+              if (IsMultiplePeerMode) {
                 StartMultipleClients(nds);
               } else {
                 nds.StartClient();
@@ -229,14 +228,14 @@ namespace Fusion {
             }
 
             if (GUILayout.Button(EnableHotkeys ? "Start Auto Host Or Client (A)" : "Start Auto Host Or Client", GUILayout.Height(height))) {
-              if (_isMultiplePeerMode) {
+              if (IsMultiplePeerMode) {
                 StartMultipleAutoClients(nds);
               } else {
                 nds.StartAutoClient();
               }
             }
 
-            if (_isMultiplePeerMode) {
+            if (IsMultiplePeerMode) {
 
               GUILayout.BeginHorizontal(/*GUI.skin.button*/);
               {
@@ -305,6 +304,9 @@ namespace Fusion {
       int count;
       try {
         count = Convert.ToInt32(_clientCount);
+        if (IsMultiplePeerMode) {
+          count++; // add 1 for convenience to match host mode
+        }
       } catch {
         count = 0;
       }

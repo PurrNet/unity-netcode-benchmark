@@ -38,7 +38,7 @@ namespace StinkySteak.FusionBenchmark
                 SceneManager = _runner.gameObject.AddComponent<NetworkSceneManagerDefault>(),
                 Scene = SceneRef.FromIndex(0),
                 SessionName = "my-session",
-                AuthValues = new Fusion.Photon.Realtime.AuthenticationValues { UserId = SystemInfo.deviceUniqueIdentifier + Path.GetDirectoryName(Directory.GetCurrentDirectory()) }
+                AuthValues = new Photon.Realtime.AuthenticationValues { UserId = SystemInfo.deviceUniqueIdentifier + Path.GetDirectoryName(Directory.GetCurrentDirectory()) }
             });
         }
         protected override void StressTest(StressTestEssential stressTest)

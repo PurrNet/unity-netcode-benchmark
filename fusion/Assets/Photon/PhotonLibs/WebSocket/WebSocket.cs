@@ -14,7 +14,7 @@
 // --------------------------------------------------------------------------------------------------------------------
 
 
-namespace ExitGames.Client.Photon
+namespace Photon.Client
 {
     using System;
 
@@ -57,7 +57,7 @@ namespace ExitGames.Client.Photon
         private Action<int, string> errorCallback;
         private Action<int, string> closeCallback;
         // logging callback
-        public Action<DebugLevel, string> DebugReturn { get; set; }
+        public Action<LogLevel, string> DebugReturn { get; set; }
 
 
         public WebSocket(Uri url, string proxyAddress, Action openCallback, Action<byte[], int>  recvCallback, Action<int, string> errorCallback, Action<int, string> closeCallback, string protocols = null)
@@ -98,26 +98,26 @@ namespace ExitGames.Client.Photon
         {
             this.m_Socket = new WebSocketSharp.WebSocket(this.Url.ToString(), new string[] {this.protocols});
             this.m_Socket.Log.Output = (ld, f) =>
-                                       {
-                                           var s = string.Format("WebSocketSharp: {0}", ld.Message);
-                                           switch (ld.Level)
-                                           {
-                                               case LogLevel.Trace:
-                                               case LogLevel.Debug:
-                                                   this.DebugReturn(DebugLevel.ALL, s);
-                                                   break;
-                                               case LogLevel.Info:
-                                                   this.DebugReturn(DebugLevel.INFO, s);
-                                                   break;
-                                               case LogLevel.Warn:
-                                                   this.DebugReturn(DebugLevel.WARNING, s);
-                                                   break;
-                                               case LogLevel.Error:
-                                               case LogLevel.Fatal:
-                                                   this.DebugReturn(DebugLevel.ERROR, s);
-                                                   break;
-                                           }
-                                       };
+                                  {
+                                      var s = string.Format("WebSocketSharp: {0}", ld.Message);
+                                      switch (ld.Level)
+                                      {
+                                          case WebSocketSharp.LogLevel.Trace:
+                                          case WebSocketSharp.LogLevel.Debug:
+                                              DebugReturn(LogLevel.Debug, s);
+                                              break;
+                                          case WebSocketSharp.LogLevel.Info:
+                                              DebugReturn(LogLevel.Info, s);
+                                              break;
+                                          case WebSocketSharp.LogLevel.Warn:
+                                              DebugReturn(LogLevel.Warning, s);
+                                              break;
+                                          case WebSocketSharp.LogLevel.Error:
+                                          case WebSocketSharp.LogLevel.Fatal:
+                                              DebugReturn(LogLevel.Error, s);
+                                              break;
+                                      }
+                                  };
 
             this.m_Socket.OnOpen += (sender, e) =>
                                     {
@@ -130,7 +130,7 @@ namespace ExitGames.Client.Photon
                                        };
             this.m_Socket.OnError += (sender, e) =>
                                      {
-                                         this.Connected = false;
+                                         //this.Connected = false;      // websocket-sharp calls this for non-fatal errors, too
                                          this.Error = e.Message + (e.Exception == null ? "" : " / " + e.Exception);
                                          this.errorCallback(0, e.Message);
                                      };

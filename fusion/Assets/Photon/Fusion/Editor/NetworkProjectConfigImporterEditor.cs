@@ -82,7 +82,7 @@ namespace Fusion.Editor {
         foreach (var asm in assemblies) {
           var assemblyFullName = asm.FullName;
           if (assemblyFullName.StartsWith("Fusion.Runtime,")) {
-            _version = $"{NetworkRunner.BuildType}: {System.Diagnostics.FileVersionInfo.GetVersionInfo(asm.Location).ProductVersion}";
+            _version = $"{NetworkRunner.BuildStage} / {NetworkRunner.BuildType} / {System.Diagnostics.FileVersionInfo.GetVersionInfo(asm.Location).ProductVersion}";
           }
 
           if (assemblyFullName.StartsWith("Fusion.") || assemblyFullName.StartsWith("Fusion,")) {

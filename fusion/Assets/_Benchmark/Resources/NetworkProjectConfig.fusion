@@ -1,6 +1,7 @@
 {
     "Version": 1,
     "TypeId": "NetworkProjectConfig",
+    "HubMode": 0,
     "PeerMode": 0,
     "LagCompensation": {
         "Enabled": false,
@@ -8,32 +9,62 @@
         "HitboxDefaultCapacity": 512,
         "CachedStaticCollidersSize": 64
     },
+    "PhysicsForecast": false,
     "EnqueueIncompleteSynchronousSpawns": false,
-    "InvokeRenderInBatchMode": true,
+    "InvokeRenderMode": 1,
     "NetworkIdIsObjectName": false,
     "HideNetworkObjectInactivityGuard": false,
     "AllowClientServerModesInWebGL": false,
+    "AllowMasterClientReassignRequest": false,
+    "MasterClientRequestReassignThreshold": 2.0,
     "ClientsRecordFrameAndPacketTimingTraces": false,
     "Simulation": {
         "InputDataWordCount": 0,
-        "ReplicationFeatures": 1,
+        "ReplicationFeatures": 0,
+        "InterestManagementConfig": {
+            "AreaOfInterestCellSize": 32,
+            "AreaOfInterestCellGridSize": {
+                "x": 1024,
+                "y": 1024,
+                "z": 1024
+            }
+        },
         "InputTransferMode": 0,
         "SimulationUpdateTimeMode": 0,
         "PlayerCount": 10,
         "TickRateSelection": {
             "Client": 20,
-            "ServerIndex": 0,
-            "ClientSendIndex": 0,
-            "ServerSendIndex": 0
-        },
-        "MaxObjectDestroysSentPerPacket": 32,
-        "EnableExperimentalPacketLossRecovery": false,
-        "EnableAdaptivePacketFragmentation": false
+            "ClientSendInterval": 1,
+            "ServerTickInterval": 1,
+            "ServerSendInterval": 1,
+            "ClientSendIndex": 1,
+            "ServerIndex": 1,
+            "ServerSendIndex": 1
+        }
+    },
+    "TimeSync": {
+        "StateReceiveBufferSettings": 0,
+        "MaxLateSnapshots": 5.0,
+        "RedundantSnapshots": 1.0,
+        "StateReceiveBufferDelayAdded": 0,
+        "StateReceiveBufferDelayAddedUnit": 0,
+        "InputReceiveBufferSettings": 0,
+        "MaxLateInputs": 5.0,
+        "RedundantInputs": 1.0,
+        "InputReceiveBufferDelayAdded": 0,
+        "InputReceiveBufferDelayAddedUnit": 0,
+        "InputDelaySettings": 0,
+        "MinimumInputDelay": 0,
+        "MinimumInputDelayUnit": 0,
+        "ClientsCanAddInputDelayToLimitResims": false,
+        "ClientMaxResimsPerFrame": -1
     },
     "Network": {
         "ConnectionTimeout": 10.0,
         "ConnectionShutdownTime": 1.0,
-        "ReliableDataTransferModes": 3
+        "ReliableDataTransferModes": 3,
+        "GameChannelSendCount": 2,
+        "GameReliableChannelSendCount": 1
     },
     "HostMigration": {
         "EnableAutoUpdate": false,

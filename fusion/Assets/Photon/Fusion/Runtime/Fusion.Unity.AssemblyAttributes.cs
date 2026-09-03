@@ -4,6 +4,21 @@
 
 // merged AssemblyAttributes
 
+#region DetectEnableProfiler.cs
+
+[assembly: Fusion.MarkProfilerAsEnabledIfEnableProfilerDefinedAttribute]
+
+#endregion
+
+
+#region DetectUnityDefines.cs
+
+[assembly: Fusion.MarkPlatformAsIL2CPPIfEnableIL2CPPDefined]
+[assembly: Fusion.MarkPlatformAsWebIfUnityWebGlDefined]
+
+#endregion
+
+
 #region RegisterResourcesLoader.cs
 
 // register a default loader; it will attempt to load the asset from their default paths if they happen to be Resources

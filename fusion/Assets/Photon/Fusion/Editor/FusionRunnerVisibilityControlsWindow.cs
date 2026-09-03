@@ -15,7 +15,7 @@ namespace Fusion.Editor {
     private const int WINDOW_MIN_H = 48;
 
     private const int STATS_BTTN_WIDE = 66;
-    private const int STATS_BTTN_SLIM = 24;
+    private const int STATS_BTTN_SLIM = 34;
     private const int RUNNR_BTTN_WIDE = 60;
     private const int RUNNR_BTTN_SLIM = 24;
     private const int FONT_SIZE = 9;
@@ -36,10 +36,8 @@ namespace Fusion.Editor {
       public const string Dash = "--";
       public const string ProvidingInputs = "\u2002Providing Inputs";
       public const string NoInputs = "\u2002(No Inputs)";
-      public const string StatsLeft = "<< Stats";
-      public const string StatsRight = "Stats >>";
-      public const string ArrowsLeft = "<<";
-      public const string ArrowsRight = ">>";
+      public const string StatsFull = "Statistics";
+      public const string StatsShort = "Stats";
       public const string UserID = "UserID: ";
 
       public const string VisibilityTooltip =
@@ -117,7 +115,7 @@ namespace Fusion.Editor {
     private Vector2 _scrollPosition;
     private double _lastRepaintTime;
 
-    private readonly Dictionary<NetworkRunner, FusionStatistics> _stats = new Dictionary<NetworkRunner, FusionStatistics>();
+    private readonly Dictionary<NetworkRunner, FusionStatistics> _stats = new();
     /// <summary>
     /// Create window instance.
     /// </summary>
@@ -287,17 +285,11 @@ namespace Fusion.Editor {
           
           // Draw runtime stats creation buttons. Reflection used since this namespace can't see FusionStats.
           if (currentViewWidth >= WINDOW_MIN_W + 10) {
-            var statsLeftRect  = EditorGUILayout.GetControlRect(GUILayout.Width(isWide ? STATS_BTTN_WIDE : STATS_BTTN_SLIM));
-            var statsRightRect = EditorGUILayout.GetControlRect(GUILayout.Width(isWide ? STATS_BTTN_WIDE : STATS_BTTN_SLIM));
+            var statsRect  = EditorGUILayout.GetControlRect(GUILayout.Width(isWide ? STATS_BTTN_WIDE : STATS_BTTN_SLIM));
             var statsGC        = s_statsGC.Value;
-            statsGC.text = isWide ? Labels.StatsLeft : Labels.ArrowsLeft;
-            if (GUI.Button(statsLeftRect, statsGC, s_buttonStyle.Value)) {
-              CreateOrUpdateFusionStats(runner, CanvasAnchor.TopLeft);
-            }
-
-            statsGC.text = isWide ? Labels.StatsRight : Labels.ArrowsRight;
-            if (GUI.Button(statsRightRect, statsGC, s_buttonStyle.Value)) {
-              CreateOrUpdateFusionStats(runner, CanvasAnchor.TopRight);
+            statsGC.text = isWide ? Labels.StatsFull : Labels.StatsShort;
+            if (GUI.Button(statsRect, statsGC, s_buttonStyle.Value)) {
+              CreateOrDestroyFusionStats(runner);
             }
           }
 
@@ -315,19 +307,20 @@ namespace Fusion.Editor {
       }
     }
     
-    private void CreateOrUpdateFusionStats(NetworkRunner runner, CanvasAnchor anchor) {
-      if (_stats.TryGetValue(runner, out var stats) == false) {
-        stats = runner.gameObject.AddComponent<FusionStatistics>();
-        EditorGUIUtility.PingObject(stats.gameObject);
-        Selection.activeObject = stats.gameObject;
-
-        _stats.Add(runner, stats);
-        stats.SetupStatisticsPanel();
+    private void CreateOrDestroyFusionStats(NetworkRunner runner) {
+      // stats were destroyed by other means.
+      if (_stats.TryGetValue(runner, out var statistics) && statistics == false) {
+        _stats.Remove(runner);
       }
       
-      stats.SetCanvasAnchor(anchor);
-      if (stats.IsPanelActive == false) {
-        stats.SetupStatisticsPanel();
+      if (_stats.Remove(runner, out var stats) == false) {
+        stats = runner.SetupStatistics();
+        EditorGUIUtility.PingObject(stats.Root);
+        Selection.activeObject = stats.Root;
+
+        _stats.Add(runner, stats);
+      } else {
+        runner.RemoveStatistics();
       }
     }
 

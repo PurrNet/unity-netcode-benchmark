@@ -85,7 +85,7 @@ namespace Fusion {
     private bool _originalState;
 
     /// <summary>
-    /// Set to false to indicate that this object should remain disabled even when <see cref="NetworkRunner.IsVisible"/> is set to true.
+    /// Set to false to indicate that this object should remain disabled even when a runner is visible.
     /// </summary>
     public bool DefaultState {
       get {

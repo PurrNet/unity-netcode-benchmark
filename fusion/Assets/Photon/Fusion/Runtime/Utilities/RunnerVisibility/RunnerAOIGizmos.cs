@@ -55,9 +55,12 @@ namespace Fusion {
       if ((object)runner == null || runner.IsRunning == false) {
         return;
       }
+
+      if (runner.GetVisible() == false) return;
       
       var datas  = _reusableGizmoData ??= new List<(Vector3 center, Vector3 size, int playerCount, int objectCount)>();
       var colors = Customization;
+      var drawSharedClientCells = Runner.IsClient && Runner.Topology == Topologies.Shared;
 
       runner.GetAreaOfInterestGizmoData(datas);
 
@@ -73,7 +76,7 @@ namespace Fusion {
         }
 
         // Draw player interest regions
-        if (data.playerCount > 0) {
+        if (data.playerCount > 0 || drawSharedClientCells) {
           Gizmos.color = colors.PlayerInterestColor;
           Gizmos.DrawCube(c, s);
         }

@@ -4,18 +4,15 @@ namespace Fusion {
   using UnityEngine;
 
   [StructLayout(LayoutKind.Explicit)]
-  [NetworkStructWeaved(WORDS + 4)]
+  [NetworkStructWeaved(WORDS)]
   public unsafe struct NetworkCCData : INetworkStruct {
-    public const int WORDS = NetworkTRSPData.WORDS + 4;
+    public const int WORDS = 4;
     public const int SIZE  = WORDS * 4;
 
-    [FieldOffset(0)]
-    public NetworkTRSPData TRSPData;
-
-    [FieldOffset((NetworkTRSPData.WORDS + 0) * Allocator.REPLICATE_WORD_SIZE)]
+    [FieldOffset(0 * Allocator.REPLICATE_WORD_SIZE)]
     int _grounded;
 
-    [FieldOffset((NetworkTRSPData.WORDS + 1) * Allocator.REPLICATE_WORD_SIZE)]
+    [FieldOffset(1 * Allocator.REPLICATE_WORD_SIZE)]
     Vector3Compressed _velocityData;
 
     public bool Grounded {
@@ -33,10 +30,10 @@ namespace Fusion {
 
   [DisallowMultipleComponent]
   [RequireComponent(typeof(CharacterController))]
-  [NetworkBehaviourWeaved(NetworkCCData.WORDS)]
+  [NetworkBehaviourWeaved(NetworkTRSPData.WORDS + NetworkCCData.WORDS)]
   // ReSharper disable once CheckNamespace
   public sealed unsafe class NetworkCharacterController : NetworkTRSP, INetworkTRSPTeleport, IBeforeAllTicks, IAfterAllTicks, IBeforeCopyPreviousState {
-    new ref NetworkCCData Data => ref ReinterpretState<NetworkCCData>();
+    ref NetworkCCData CCData => ref ReinterpretState<NetworkCCData>(NetworkTRSPData.WORDS);
 
     [Header("Character Controller Settings")]
     public float gravity = -20.0f;
@@ -50,13 +47,13 @@ namespace Fusion {
     CharacterController _controller;
 
     public Vector3 Velocity {
-      get => Data.Velocity;
-      set => Data.Velocity = value;
+      get => CCData.Velocity;
+      set => CCData.Velocity = value;
     }
 
     public bool Grounded {
-      get => Data.Grounded;
-      set => Data.Grounded = value;
+      get => CCData.Grounded;
+      set => CCData.Grounded = value;
     }
 
     public void Teleport(Vector3? position = null, Quaternion? rotation = null) {
@@ -67,21 +64,21 @@ namespace Fusion {
 
 
     public void Jump(bool ignoreGrounded = false, float? overrideImpulse = null) {
-      if (Data.Grounded || ignoreGrounded) {
-        var newVel = Data.Velocity;
+      if (CCData.Grounded || ignoreGrounded) {
+        var newVel = CCData.Velocity;
         newVel.y      += overrideImpulse ?? jumpImpulse;
-        Data.Velocity =  newVel;
+        CCData.Velocity =  newVel;
       }
     }
 
     public void Move(Vector3 direction) {
       var deltaTime    = Runner.DeltaTime;
       var previousPos  = transform.position;
-      var moveVelocity = Data.Velocity;
+      var moveVelocity = CCData.Velocity;
 
       direction = direction.normalized;
 
-      if (Data.Grounded && moveVelocity.y < 0) {
+      if (CCData.Grounded && moveVelocity.y < 0) {
         moveVelocity.y = 0f;
       }
 
@@ -103,18 +100,26 @@ namespace Fusion {
 
       _controller.Move(moveVelocity * deltaTime);
 
-      Data.Velocity = (transform.position - previousPos) * Runner.TickRate;
-      Data.Grounded = _controller.isGrounded;
+      CCData.Velocity = (transform.position - previousPos) * Runner.TickRate;
+      CCData.Grounded = _controller.isGrounded;
     }
     
     public override void Spawned() {
       _initial = default;
       TryGetComponent(out _controller);
+      
       // Without disabling and re-enabling the CharacterController here, the first Move call will reset the position to 0,0,0 instead of
       // keeping the position it was spawned at. Presumably disabling it clears some kind of internally cached "previous position" value
       _controller.enabled = false;
+      
+      // This object could already exist on shared mode, just out of interest. So we need to check if it has snapshots.
+      if (Object.HasStateAuthority && Object.LastReceiveTick == default) {
+        CopyToBuffer();
+      } else {
+        CopyToEngine();
+      }
+      
       _controller.enabled = true;
-      CopyToBuffer();
     }
 
     public override void Render() {
@@ -138,16 +143,18 @@ namespace Fusion {
     }
 
     void CopyToBuffer() {
-      Data.TRSPData.Position = transform.position;
-      Data.TRSPData.Rotation = transform.rotation;
+      ref var state = ref State;
+      state.Position = transform.position;
+      state.Rotation = transform.rotation;
     }
 
     void CopyToEngine() {
       // CC must be disabled before resetting the transform state
       _controller.enabled = false;
-
+      
       // set position and rotation
-      transform.SetPositionAndRotation(Data.TRSPData.Position, Data.TRSPData.Rotation);
+      ref var state = ref State;
+      transform.SetPositionAndRotation(state.Position, state.Rotation);
 
       // Re-enable CC
       _controller.enabled = true;

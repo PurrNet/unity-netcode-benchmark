@@ -73,11 +73,10 @@ namespace Fusion {
     void INetworkRunnerCallbacks.OnDisconnectedFromServer(NetworkRunner       runner, NetDisconnectReason reason)                                                            { }
     void INetworkRunnerCallbacks.OnConnectRequest(NetworkRunner               runner, NetworkRunnerCallbackArgs.ConnectRequest request,       byte[]                 token)  { }
     void INetworkRunnerCallbacks.OnConnectFailed(NetworkRunner                runner, NetAddress                               remoteAddress, NetConnectFailedReason reason) { }
-    void INetworkRunnerCallbacks.OnUserSimulationMessage(NetworkRunner        runner, SimulationMessagePtr                     message)                         { }
     void INetworkRunnerCallbacks.OnSessionListUpdated(NetworkRunner           runner, List<SessionInfo>                        sessionList)                     { }
     void INetworkRunnerCallbacks.OnCustomAuthenticationResponse(NetworkRunner runner, Dictionary<string, object>               data)                            { }
     void INetworkRunnerCallbacks.OnHostMigration(NetworkRunner                runner, HostMigrationToken                       hostMigrationToken)              { }
-    void INetworkRunnerCallbacks.OnReliableDataReceived(NetworkRunner         runner, PlayerRef                                player, ReliableKey key, ArraySegment<byte> data) { }
+    void INetworkRunnerCallbacks.OnReliableDataReceived(NetworkRunner         runner, PlayerRef                                player, ReliableKey key, ReadOnlySpan<byte> data) { }
     void INetworkRunnerCallbacks.OnSceneLoadStart(NetworkRunner               runner) { }
 
     #endregion

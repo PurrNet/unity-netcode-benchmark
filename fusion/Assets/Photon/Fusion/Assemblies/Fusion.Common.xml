@@ -216,11 +216,21 @@
             <summary>
             Converts a buffer of 32-bit integers to a hexadecimal string representation.
             </summary>
+            <param name="buffer">The buffer containing the 32-bit integers to convert.</param>
+            <param name="columns">The number of columns to format the output. Default is 4.</param>
+            <param name="rowSeparator">The string to use as a row separator. Default is newline.</param>
+            <param name="columnSeparator">The string to use as a column separator. Default is a space.</param>
+            <returns>A string representing the hexadecimal values of the 32-bit integers in the buffer.</returns>
         </member>
         <member name="M:Fusion.BinUtils.WordsToHex(System.ReadOnlySpan{System.UInt32},System.Int32,System.String,System.String)">
             <summary>
             Converts a buffer of 32-bit unsigned integers to a hexadecimal string representation.
             </summary>
+            <param name="buffer">The buffer containing the 32-bit unsigned integers to convert.</param>
+            <param name="columns">The number of columns to format the output. Default is 4.</param>
+            <param name="rowSeparator">The string to use as a row separator. Default is newline.</param>
+            <param name="columnSeparator">The string to use as a column separator. Default is a space.</param>
+            <returns>A string representing the hexadecimal values of the 32-bit unsigned integers in the buffer.</returns>
         </member>
         <member name="M:Fusion.BinUtils.HexToBytes(System.String,System.Byte*,System.Int32)">
             <summary>
@@ -272,32 +282,6 @@
             <param name="source">The span of ints to read from.</param>
             <returns>The value of type T read from the span.</returns>
         </member>
-        <member name="M:Fusion.BinUtils.AsRef``1(System.Span{System.Byte})">
-            <summary>
-            Returns a managed pointer to a value of type T.
-            </summary>
-        </member>
-        <member name="M:Fusion.BinUtils.AsRef``1(System.Span{System.Int32})">
-            <summary>
-            Returns a managed pointer to a value of type T.
-            </summary>
-        </member>
-        <member name="M:Fusion.BinUtils.AsPointer``1(System.Span{System.Byte})">
-            <summary>
-            Returns a pointer to a value of type T from the given byte span.
-            </summary>
-            <typeparam name="T">The type of the value to point to.</typeparam>
-            <param name="source">The span of bytes to get the pointer from.</param>
-            <returns>A pointer to the value of type T.</returns>
-        </member>
-        <member name="M:Fusion.BinUtils.AsPointer``1(System.Span{System.Int32})">
-            <summary>
-            Returns a pointer to a value of type T from the given int span.
-            </summary>
-            <typeparam name="T">The type of the value to point to.</typeparam>
-            <param name="source">The span of ints to get the pointer from.</param>
-            <returns>A pointer to the value of type T.</returns>
-        </member>
         <member name="M:Fusion.CompressionUtils.Compress(System.Byte[])">
             <summary>
             Compress the byte array uisng GZip
@@ -342,257 +326,22 @@
             <param name="length">The length of the data.</param>
             <returns>The computed CRC64 checksum.</returns>
         </member>
-        <member name="T:Fusion.EngineProfiler">
+        <member name="M:Fusion.CRC64.Compute(System.UInt64,System.Byte*,System.Int32)">
             <summary>
-            Provides a set of methods to profile the engine.
+            Computes the CRC64 checksum for the given data with an initial CRC value.
             </summary>
+            <param name="crc">The initial CRC value.</param>
+            <param name="data">A pointer to the data to compute the checksum for.</param>
+            <param name="length">The length of the data.</param>
+            <returns>The computed CRC64 checksum.</returns>
         </member>
-        <member name="F:Fusion.EngineProfiler.RoundTripTimeCallback">
+        <member name="T:Fusion.DualChannelPriorityQueue`1">
             <summary>
-            Callback for round trip time profiling.
+            A priority queue that supports "unordered" elements, i.e. elements that can be
+            appended without having a valid priority. The queue also does not accept duplicate keys and
+            allows for by-index access.
             </summary>
-        </member>
-        <member name="F:Fusion.EngineProfiler.ResimulationsCallback">
-            <summary>
-            Callback for resimulations profiling.
-            </summary>
-        </member>
-        <member name="F:Fusion.EngineProfiler.WorldSnapshotSizeCallback">
-            <summary>
-            Callback for world snapshot size profiling.
-            </summary>
-        </member>
-        <member name="F:Fusion.EngineProfiler.InputSizeCallback">
-            <summary>
-            Callback for input size profiling.
-            </summary>
-        </member>
-        <member name="F:Fusion.EngineProfiler.InputQueueCallback">
-            <summary>
-            Callback for input queue profiling.
-            </summary>
-        </member>
-        <member name="F:Fusion.EngineProfiler.RpcInCallback">
-            <summary>
-            Callback for RPC in profiling.
-            </summary>
-        </member>
-        <member name="F:Fusion.EngineProfiler.RpcOutCallback">
-            <summary>
-            Callback for RPC out profiling.
-            </summary>
-        </member>
-        <member name="F:Fusion.EngineProfiler.StateRecvDeltaCallback">
-            <summary>
-            Callback for state receive delta profiling.
-            </summary>
-        </member>
-        <member name="F:Fusion.EngineProfiler.StateRecvDeltaDeviationCallback">
-            <summary>
-            Callback for state receive delta deviation profiling.
-            </summary>
-        </member>
-        <member name="F:Fusion.EngineProfiler.InterpolationSpeedCallback">
-            <summary>
-            Callback for interpolation speed profiling.
-            </summary>
-        </member>
-        <member name="F:Fusion.EngineProfiler.InterpolationOffsetCallback">
-            <summary>
-            Callback for interpolation offset profiling.
-            </summary>
-        </member>
-        <member name="F:Fusion.EngineProfiler.InterpolationOffsetDeviationCallback">
-            <summary>
-            Callback for interpolation offset deviation profiling.
-            </summary>
-        </member>
-        <member name="F:Fusion.EngineProfiler.InputRecvDeltaCallback">
-            <summary>
-            Callback for input receive delta profiling.
-            </summary>
-        </member>
-        <member name="F:Fusion.EngineProfiler.SimulationSpeedCallback">
-            <summary>
-            Callback for simulation speed profiling.
-            </summary>
-        </member>
-        <member name="F:Fusion.EngineProfiler.InputRecvDeltaDeviationCallback">
-            <summary>
-            Callback for input receive delta deviation profiling.
-            </summary>
-        </member>
-        <member name="F:Fusion.EngineProfiler.SimulationOffsetCallback">
-            <summary>
-            Callback for simulation offset profiling.
-            </summary>
-        </member>
-        <member name="F:Fusion.EngineProfiler.SimulationOffsetDeviationCallback">
-            <summary>
-            Callback for simulation offset deviation profiling.
-            </summary>
-        </member>
-        <member name="F:Fusion.EngineProfiler.InternalObjectAllocatedCallback">
-            <summary>
-            Callback for simulation offset deviation profiling.
-            </summary>
-        </member>
-        <member name="F:Fusion.EngineProfiler.InternalObjectFreedCallback">
-            <summary>
-            Callback for simulation offset deviation profiling.
-            </summary>
-        </member>
-        <member name="M:Fusion.EngineProfiler.Begin(System.String)">
-            <summary>
-            Begins a profiling sample with the specified name.
-            </summary>
-            <param name="sample">The name of the profiling sample.</param>
-        </member>
-        <member name="M:Fusion.EngineProfiler.End">
-            <summary>
-            Ends the current profiling sample.
-            </summary>
-        </member>
-        <member name="M:Fusion.EngineProfiler.RoundTripTime(System.Single)">
-            <summary>
-            Invokes the round trip time callback with the specified value.
-            </summary>
-            <param name="value">The round trip time value.</param>
-        </member>
-        <member name="M:Fusion.EngineProfiler.Resimulations(System.Int32)">
-            <summary>
-            Invokes the resimulations callback with the specified value.
-            </summary>
-            <param name="value">The resimulations value.</param>
-        </member>
-        <member name="M:Fusion.EngineProfiler.WorldSnapshotSize(System.Int32)">
-            <summary>
-            Invokes the world snapshot size callback with the specified value.
-            </summary>
-            <param name="value">The world snapshot size value.</param>
-        </member>
-        <member name="M:Fusion.EngineProfiler.InputSize(System.Int32)">
-            <summary>
-            Invokes the input size callback with the specified value.
-            </summary>
-            <param name="value">The input size value.</param>
-        </member>
-        <member name="M:Fusion.EngineProfiler.InputQueue(System.Int32)">
-            <summary>
-            Invokes the input queue callback with the specified value.
-            </summary>
-            <param name="value">The input queue value.</param>
-        </member>
-        <member name="M:Fusion.EngineProfiler.RpcIn(System.Int32)">
-            <summary>
-            Invokes the RPC in callback with the specified value.
-            </summary>
-            <param name="value">The RPC in value.</param>
-        </member>
-        <member name="M:Fusion.EngineProfiler.RpcOut(System.Int32)">
-            <summary>
-            Invokes the RPC out callback with the specified value.
-            </summary>
-            <param name="value">The RPC out value.</param>
-        </member>
-        <member name="M:Fusion.EngineProfiler.StateRecvDelta(System.Single)">
-            <summary>
-            Invokes the state receive delta callback with the specified value.
-            </summary>
-            <param name="value">The state receive delta value.</param>
-        </member>
-        <member name="M:Fusion.EngineProfiler.StateRecvDeltaDeviation(System.Single)">
-            <summary>
-            Invokes the state receive delta deviation callback with the specified value.
-            </summary>
-            <param name="value">The state receive delta deviation value.</param>
-        </member>
-        <member name="M:Fusion.EngineProfiler.InterpolationSpeed(System.Single)">
-            <summary>
-            Invokes the interpolation speed callback with the specified value.
-            </summary>
-            <param name="value">The interpolation speed value.</param>
-        </member>
-        <member name="M:Fusion.EngineProfiler.InterpolationOffset(System.Single)">
-            <summary>
-            Invokes the interpolation offset callback with the specified value.
-            </summary>
-            <param name="value">The interpolation offset value.</param>
-        </member>
-        <member name="M:Fusion.EngineProfiler.InterpolationOffsetDeviation(System.Single)">
-            <summary>
-            Invokes the interpolation offset deviation callback with the specified value.
-            </summary>
-            <param name="value">The interpolation offset deviation value.</param>
-        </member>
-        <member name="M:Fusion.EngineProfiler.InputRecvDelta(System.Single)">
-            <summary>
-            Invokes the input receive delta callback with the specified value.
-            </summary>
-            <param name="value">The input receive delta value.</param>
-        </member>
-        <member name="M:Fusion.EngineProfiler.InputRecvDeltaDeviation(System.Single)">
-            <summary>
-            Invokes the input receive delta deviation callback with the specified value.
-            </summary>
-            <param name="value">The input receive delta deviation value.</param>
-        </member>
-        <member name="M:Fusion.EngineProfiler.SimulationSpeed(System.Single)">
-            <summary>
-            Invokes the simulation speed callback with the specified value.
-            </summary>
-            <param name="value">The simulation speed value.</param>
-        </member>
-        <member name="M:Fusion.EngineProfiler.SimulationOffset(System.Single)">
-            <summary>
-            Invokes the simulation offset callback with the specified value.
-            </summary>
-            <param name="value">The simulation offset value.</param>
-        </member>
-        <member name="M:Fusion.EngineProfiler.SimulationOffsetDeviation(System.Single)">
-            <summary>
-            Invokes the simulation offset deviation callback with the specified value.
-            </summary>
-            <param name="value">The simulation offset deviation value.</param>
-        </member>
-        <member name="M:Fusion.EngineProfiler.InternalObjectAllocated(Fusion.EngineProfiler.InternalSimulationType,System.Int32)">
-            <summary>
-            Invokes the simulation offset deviation callback with the specified value.
-            </summary>
-        </member>
-        <member name="M:Fusion.EngineProfiler.InternalObjectFreed(Fusion.EngineProfiler.InternalSimulationType,System.Int32)">
-            <summary>
-            Invokes the simulation offset deviation callback with the specified value.
-            </summary>
-        </member>
-        <member name="T:Fusion.EngineProfiler.InternalSimulationType">
-            <summary>
-            Enum representing internal simulation types. To be used with EngineProfiler callbacks.
-            </summary>
-        </member>
-        <member name="F:Fusion.EngineProfiler.InternalSimulationType.Object">
-            <summary/>
-        </member>
-        <member name="F:Fusion.EngineProfiler.InternalSimulationType.ObjectChanges">
-            <summary/>
-        </member>
-        <member name="F:Fusion.EngineProfiler.InternalSimulationType.ObjectSnapshot">
-            <summary/>
-        </member>
-        <member name="F:Fusion.EngineProfiler.InternalSimulationType.Message">
-            <summary/>
-        </member>
-        <member name="F:Fusion.EngineProfiler.InternalSimulationType.Input">
-            <summary/>
-        </member>
-        <member name="F:Fusion.EngineProfiler.InternalSimulationType.PacketEnvelope">
-            <summary/>
-        </member>
-        <member name="F:Fusion.EngineProfiler.InternalSimulationType.MessageEnvelope">
-            <summary/>
-        </member>
-        <member name="F:Fusion.EngineProfiler.InternalSimulationType.ObjectPacketData">
-            <summary/>
+            <typeparam name="T"></typeparam>
         </member>
         <member name="T:Fusion.Protocol.ICommunicator">
             <summary>
@@ -661,17 +410,6 @@
             Represents a Protocol Message
             
             Used to tag the Messages in <see cref="T:Fusion.Protocol.ICommunicator"/>.
-            </summary>
-        </member>
-        <member name="T:Fusion.Common.ExceptionConstants">
-            <summary>
-            Hold Exception Key used to attach extra data to exception within the SDK
-            </summary>
-        </member>
-        <member name="F:Fusion.Common.ExceptionConstants.TrackerId">
-            <summary>
-            Used to associate a unique ID to an Exception
-            It must contain a long value
             </summary>
         </member>
         <member name="T:Fusion.ArrayLengthAttribute">
@@ -1163,8 +901,16 @@
             Specifies that the integer array field should be drawn as a layer matrix in the inspector.
             </summary>
         </member>
-        <member name="M:Fusion.LayerMatrixAttribute.#ctor">
-            <summary />
+        <member name="P:Fusion.LayerMatrixAttribute.LayerNamesField">
+            <summary>
+            The name of the sibling string array field containing layer names.
+            </summary>
+        </member>
+        <member name="M:Fusion.LayerMatrixAttribute.#ctor(System.String)">
+            <summary>
+            Initializes a new instance with a reference to a sibling string array field to use as layer names.
+            </summary>
+            <param name="layerNamesField"></param>
         </member>
         <member name="T:Fusion.MaxStringByteCountAttribute">
             <summary>
@@ -1366,6 +1112,42 @@
             Height of the space.
             </summary>
         </member>
+        <member name="T:Fusion.StructExplicitAttribute">
+            <summary>
+            Marks a struct for automatic generation of fixed layout constants and [StructLayout(LayoutKind.Explicit, Size = ...)]. 
+            Fields must have [FieldOffset].
+            </summary>
+            <param name="Size"><seealso cref="F:System.Runtime.InteropServices.StructLayoutAttribute.Size"/></param>
+        </member>
+        <member name="M:Fusion.StructExplicitAttribute.#ctor(System.Int32)">
+            <summary>
+            Marks a struct for automatic generation of fixed layout constants and [StructLayout(LayoutKind.Explicit, Size = ...)]. 
+            Fields must have [FieldOffset].
+            </summary>
+            <param name="Size"><seealso cref="F:System.Runtime.InteropServices.StructLayoutAttribute.Size"/></param>
+        </member>
+        <member name="P:Fusion.StructExplicitAttribute.Size">
+            <summary> <seealso cref="F:System.Runtime.InteropServices.StructLayoutAttribute.Size"/> </summary>
+        </member>
+        <member name="P:Fusion.StructExplicitAttribute.Pack">
+            <summary> <seealso cref="F:System.Runtime.InteropServices.StructLayoutAttribute.Pack"/> </summary>
+        </member>
+        <member name="P:Fusion.StructExplicitAttribute.AllowOversizing">
+            <summary>If true, allows for the struct to be larger than its contents.</summary>
+        </member>
+        <member name="P:Fusion.StructExplicitAttribute.EmitWordOffsets">
+            <summary>If true, emits word offsets for each field not marked with <seealso cref="T:Fusion.FieldNotWordAlignedAttribute"/>.</summary>
+        </member>
+        <member name="P:Fusion.StructExplicitAttribute.WordCountName">
+            <summary>Custom name for the WORD_COUNT constant. Default is "WORD_COUNT".</summary>
+        </member>
+        <member name="T:Fusion.FieldNotWordAlignedAttribute">
+            <summary>
+            Marks a field as not word-aligned. Fields with this attribute will be skipped
+            when generating word-based constants (WORD_OF_*, WORD_COUNT_OF_*) and byte-based
+            field constants (BYTE_OF_*, BYTE_COUNT_OF_*).
+            </summary>
+        </member>
         <member name="T:Fusion.ToggleLeftAttribute">
             <summary>
             Specifies that the bool field should be drawn as the toggle on the left side of the label.
@@ -1478,6 +1260,17 @@
             A replacement for UnityEngine.PropertyAttribute.
             </summary>
         </member>
+        <member name="P:Fusion.PropertyAttribute.applyToCollection">
+            <summary/>
+        </member>
+        <member name="M:Fusion.PropertyAttribute.#ctor(System.Boolean)">
+            <summary/>
+        </member>
+        <member name="T:Fusion.UnityNavMeshAreaAttribute">
+            <summary>
+            Specifies that the string field represents a path to a Unity resource.
+            </summary>
+        </member>
         <member name="T:Fusion.UnityResourcePathAttribute">
             <summary>
             Specifies that the string field represents a path to a Unity resource.
@@ -1525,6 +1318,1854 @@
             </summary>
             <param name="conditionMember"></param>
             <param name="message"></param>
+        </member>
+        <member name="T:Fusion.MetaConstant">
+            <summary>META: utility class for MetaConstant types</summary>
+        </member>
+        <member name="M:Fusion.MetaConstant.GetPredefined(System.Int32)">
+            <summary>
+            Returns the type with the specified size.
+            </summary>
+            <param name="value"></param>
+            <returns></returns>
+            <exception cref="T:System.ArgumentOutOfRangeException"></exception>
+        </member>
+        <member name="F:Fusion.MetaConstant.MaxValue">
+            <summary>
+            Maximum value that can be passed to <see cref="M:Fusion.MetaConstant.Get(System.Int32)"/> (inclusive).
+            </summary>
+        </member>
+        <member name="M:Fusion.MetaConstant.Get(System.Int32)">
+            <summary>
+            Returns the type with the specified size.
+            </summary>
+            <param name="size"></param>
+            <returns></returns>
+            <exception cref="T:System.ArgumentOutOfRangeException"></exception>
+        </member>
+        <member name="F:Fusion.MetaConstant.PredefinedCount">
+            <summary>Max constant</summary>
+        </member>
+        <member name="F:Fusion.MetaConstant.TypeNameFormat">
+            <summary>Type name format</summary>
+        </member>
+        <member name="T:Fusion.MetaMul">
+            <summary>META: utility class for MetaMul types</summary>
+        </member>
+        <member name="M:Fusion.MetaMul.GetPredefined(System.Int32)">
+            <summary>
+            Returns a type that performs size multiplication. Note that returned type is a generic type definition.
+            </summary>
+            <param name="value"></param>
+            <returns></returns>
+            <exception cref="T:System.ArgumentOutOfRangeException"></exception>
+        </member>
+        <member name="F:Fusion.MetaMul.PredefinedCount">
+            <summary>Max constant</summary>
+        </member>
+        <member name="F:Fusion.MetaMul.TypeNameFormat">
+            <summary>Type name format</summary>
+        </member>
+        <member name="T:Fusion.MetaAdd`2">
+            <summary>META: a type with size equal to sizeof(A)+sizeof(B)</summary>
+        </member>
+        <member name="P:Fusion.MetaAdd`2.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.IMetaConstant">
+            <summary>
+            
+            </summary>
+        </member>
+        <member name="P:Fusion.IMetaConstant.ExpectedSize">
+            <summary>
+            The expected size of the type.
+            </summary>
+        </member>
+        <member name="T:Fusion.MetaConstant1">
+            <summary>META: A constant of size 1.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant1.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant2">
+            <summary>META: A constant of size 2.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant2.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant3">
+            <summary>META: A constant of size 3.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant3.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant4">
+            <summary>META: A constant of size 4.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant4.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant5">
+            <summary>META: A constant of size 5.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant5.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant6">
+            <summary>META: A constant of size 6.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant6.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant7">
+            <summary>META: A constant of size 7.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant7.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant8">
+            <summary>META: A constant of size 8.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant8.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant9">
+            <summary>META: A constant of size 9.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant9.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant10">
+            <summary>META: A constant of size 10.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant10.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant11">
+            <summary>META: A constant of size 11.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant11.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant12">
+            <summary>META: A constant of size 12.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant12.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant13">
+            <summary>META: A constant of size 13.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant13.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant14">
+            <summary>META: A constant of size 14.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant14.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant15">
+            <summary>META: A constant of size 15.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant15.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant16">
+            <summary>META: A constant of size 16.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant16.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant17">
+            <summary>META: A constant of size 17.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant17.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant18">
+            <summary>META: A constant of size 18.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant18.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant19">
+            <summary>META: A constant of size 19.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant19.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant20">
+            <summary>META: A constant of size 20.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant20.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant21">
+            <summary>META: A constant of size 21.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant21.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant22">
+            <summary>META: A constant of size 22.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant22.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant23">
+            <summary>META: A constant of size 23.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant23.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant24">
+            <summary>META: A constant of size 24.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant24.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant25">
+            <summary>META: A constant of size 25.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant25.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant26">
+            <summary>META: A constant of size 26.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant26.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant27">
+            <summary>META: A constant of size 27.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant27.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant28">
+            <summary>META: A constant of size 28.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant28.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant29">
+            <summary>META: A constant of size 29.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant29.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant30">
+            <summary>META: A constant of size 30.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant30.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant31">
+            <summary>META: A constant of size 31.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant31.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant32">
+            <summary>META: A constant of size 32.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant32.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant33">
+            <summary>META: A constant of size 33.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant33.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant34">
+            <summary>META: A constant of size 34.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant34.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant35">
+            <summary>META: A constant of size 35.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant35.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant36">
+            <summary>META: A constant of size 36.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant36.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant37">
+            <summary>META: A constant of size 37.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant37.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant38">
+            <summary>META: A constant of size 38.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant38.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant39">
+            <summary>META: A constant of size 39.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant39.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant40">
+            <summary>META: A constant of size 40.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant40.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant41">
+            <summary>META: A constant of size 41.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant41.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant42">
+            <summary>META: A constant of size 42.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant42.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant43">
+            <summary>META: A constant of size 43.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant43.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant44">
+            <summary>META: A constant of size 44.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant44.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant45">
+            <summary>META: A constant of size 45.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant45.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant46">
+            <summary>META: A constant of size 46.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant46.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant47">
+            <summary>META: A constant of size 47.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant47.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant48">
+            <summary>META: A constant of size 48.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant48.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant49">
+            <summary>META: A constant of size 49.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant49.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant50">
+            <summary>META: A constant of size 50.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant50.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant51">
+            <summary>META: A constant of size 51.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant51.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant52">
+            <summary>META: A constant of size 52.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant52.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant53">
+            <summary>META: A constant of size 53.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant53.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant54">
+            <summary>META: A constant of size 54.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant54.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant55">
+            <summary>META: A constant of size 55.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant55.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant56">
+            <summary>META: A constant of size 56.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant56.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant57">
+            <summary>META: A constant of size 57.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant57.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant58">
+            <summary>META: A constant of size 58.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant58.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant59">
+            <summary>META: A constant of size 59.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant59.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant60">
+            <summary>META: A constant of size 60.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant60.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant61">
+            <summary>META: A constant of size 61.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant61.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant62">
+            <summary>META: A constant of size 62.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant62.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant63">
+            <summary>META: A constant of size 63.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant63.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant64">
+            <summary>META: A constant of size 64.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant64.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant65">
+            <summary>META: A constant of size 65.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant65.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant66">
+            <summary>META: A constant of size 66.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant66.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant67">
+            <summary>META: A constant of size 67.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant67.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant68">
+            <summary>META: A constant of size 68.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant68.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant69">
+            <summary>META: A constant of size 69.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant69.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant70">
+            <summary>META: A constant of size 70.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant70.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant71">
+            <summary>META: A constant of size 71.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant71.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant72">
+            <summary>META: A constant of size 72.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant72.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant73">
+            <summary>META: A constant of size 73.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant73.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant74">
+            <summary>META: A constant of size 74.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant74.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant75">
+            <summary>META: A constant of size 75.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant75.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant76">
+            <summary>META: A constant of size 76.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant76.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant77">
+            <summary>META: A constant of size 77.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant77.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant78">
+            <summary>META: A constant of size 78.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant78.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant79">
+            <summary>META: A constant of size 79.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant79.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant80">
+            <summary>META: A constant of size 80.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant80.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant81">
+            <summary>META: A constant of size 81.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant81.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant82">
+            <summary>META: A constant of size 82.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant82.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant83">
+            <summary>META: A constant of size 83.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant83.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant84">
+            <summary>META: A constant of size 84.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant84.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant85">
+            <summary>META: A constant of size 85.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant85.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant86">
+            <summary>META: A constant of size 86.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant86.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant87">
+            <summary>META: A constant of size 87.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant87.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant88">
+            <summary>META: A constant of size 88.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant88.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant89">
+            <summary>META: A constant of size 89.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant89.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant90">
+            <summary>META: A constant of size 90.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant90.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant91">
+            <summary>META: A constant of size 91.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant91.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant92">
+            <summary>META: A constant of size 92.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant92.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant93">
+            <summary>META: A constant of size 93.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant93.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant94">
+            <summary>META: A constant of size 94.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant94.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant95">
+            <summary>META: A constant of size 95.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant95.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant96">
+            <summary>META: A constant of size 96.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant96.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant97">
+            <summary>META: A constant of size 97.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant97.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant98">
+            <summary>META: A constant of size 98.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant98.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant99">
+            <summary>META: A constant of size 99.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant99.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant100">
+            <summary>META: A constant of size 100.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant100.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant101">
+            <summary>META: A constant of size 101.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant101.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant102">
+            <summary>META: A constant of size 102.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant102.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant103">
+            <summary>META: A constant of size 103.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant103.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant104">
+            <summary>META: A constant of size 104.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant104.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant105">
+            <summary>META: A constant of size 105.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant105.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant106">
+            <summary>META: A constant of size 106.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant106.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant107">
+            <summary>META: A constant of size 107.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant107.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant108">
+            <summary>META: A constant of size 108.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant108.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant109">
+            <summary>META: A constant of size 109.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant109.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant110">
+            <summary>META: A constant of size 110.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant110.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant111">
+            <summary>META: A constant of size 111.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant111.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant112">
+            <summary>META: A constant of size 112.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant112.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant113">
+            <summary>META: A constant of size 113.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant113.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant114">
+            <summary>META: A constant of size 114.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant114.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant115">
+            <summary>META: A constant of size 115.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant115.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant116">
+            <summary>META: A constant of size 116.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant116.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant117">
+            <summary>META: A constant of size 117.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant117.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant118">
+            <summary>META: A constant of size 118.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant118.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant119">
+            <summary>META: A constant of size 119.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant119.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant120">
+            <summary>META: A constant of size 120.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant120.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant121">
+            <summary>META: A constant of size 121.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant121.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant122">
+            <summary>META: A constant of size 122.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant122.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant123">
+            <summary>META: A constant of size 123.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant123.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant124">
+            <summary>META: A constant of size 124.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant124.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant125">
+            <summary>META: A constant of size 125.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant125.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant126">
+            <summary>META: A constant of size 126.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant126.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant127">
+            <summary>META: A constant of size 127.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant127.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant128">
+            <summary>META: A constant of size 128.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant128.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant129">
+            <summary>META: A constant of size 129.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant129.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant130">
+            <summary>META: A constant of size 130.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant130.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant131">
+            <summary>META: A constant of size 131.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant131.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant132">
+            <summary>META: A constant of size 132.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant132.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant133">
+            <summary>META: A constant of size 133.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant133.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant134">
+            <summary>META: A constant of size 134.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant134.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant135">
+            <summary>META: A constant of size 135.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant135.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant136">
+            <summary>META: A constant of size 136.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant136.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant137">
+            <summary>META: A constant of size 137.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant137.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant138">
+            <summary>META: A constant of size 138.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant138.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant139">
+            <summary>META: A constant of size 139.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant139.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant140">
+            <summary>META: A constant of size 140.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant140.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant141">
+            <summary>META: A constant of size 141.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant141.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant142">
+            <summary>META: A constant of size 142.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant142.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant143">
+            <summary>META: A constant of size 143.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant143.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant144">
+            <summary>META: A constant of size 144.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant144.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant145">
+            <summary>META: A constant of size 145.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant145.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant146">
+            <summary>META: A constant of size 146.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant146.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant147">
+            <summary>META: A constant of size 147.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant147.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant148">
+            <summary>META: A constant of size 148.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant148.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant149">
+            <summary>META: A constant of size 149.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant149.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant150">
+            <summary>META: A constant of size 150.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant150.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant151">
+            <summary>META: A constant of size 151.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant151.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant152">
+            <summary>META: A constant of size 152.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant152.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant153">
+            <summary>META: A constant of size 153.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant153.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant154">
+            <summary>META: A constant of size 154.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant154.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant155">
+            <summary>META: A constant of size 155.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant155.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant156">
+            <summary>META: A constant of size 156.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant156.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant157">
+            <summary>META: A constant of size 157.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant157.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant158">
+            <summary>META: A constant of size 158.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant158.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant159">
+            <summary>META: A constant of size 159.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant159.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant160">
+            <summary>META: A constant of size 160.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant160.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant161">
+            <summary>META: A constant of size 161.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant161.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant162">
+            <summary>META: A constant of size 162.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant162.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant163">
+            <summary>META: A constant of size 163.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant163.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant164">
+            <summary>META: A constant of size 164.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant164.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant165">
+            <summary>META: A constant of size 165.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant165.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant166">
+            <summary>META: A constant of size 166.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant166.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant167">
+            <summary>META: A constant of size 167.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant167.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant168">
+            <summary>META: A constant of size 168.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant168.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant169">
+            <summary>META: A constant of size 169.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant169.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant170">
+            <summary>META: A constant of size 170.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant170.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant171">
+            <summary>META: A constant of size 171.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant171.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant172">
+            <summary>META: A constant of size 172.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant172.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant173">
+            <summary>META: A constant of size 173.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant173.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant174">
+            <summary>META: A constant of size 174.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant174.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant175">
+            <summary>META: A constant of size 175.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant175.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant176">
+            <summary>META: A constant of size 176.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant176.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant177">
+            <summary>META: A constant of size 177.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant177.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant178">
+            <summary>META: A constant of size 178.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant178.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant179">
+            <summary>META: A constant of size 179.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant179.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant180">
+            <summary>META: A constant of size 180.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant180.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant181">
+            <summary>META: A constant of size 181.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant181.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant182">
+            <summary>META: A constant of size 182.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant182.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant183">
+            <summary>META: A constant of size 183.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant183.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant184">
+            <summary>META: A constant of size 184.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant184.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant185">
+            <summary>META: A constant of size 185.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant185.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant186">
+            <summary>META: A constant of size 186.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant186.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant187">
+            <summary>META: A constant of size 187.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant187.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant188">
+            <summary>META: A constant of size 188.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant188.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant189">
+            <summary>META: A constant of size 189.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant189.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant190">
+            <summary>META: A constant of size 190.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant190.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant191">
+            <summary>META: A constant of size 191.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant191.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant192">
+            <summary>META: A constant of size 192.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant192.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant193">
+            <summary>META: A constant of size 193.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant193.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant194">
+            <summary>META: A constant of size 194.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant194.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant195">
+            <summary>META: A constant of size 195.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant195.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant196">
+            <summary>META: A constant of size 196.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant196.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant197">
+            <summary>META: A constant of size 197.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant197.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant198">
+            <summary>META: A constant of size 198.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant198.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant199">
+            <summary>META: A constant of size 199.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant199.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant200">
+            <summary>META: A constant of size 200.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant200.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant201">
+            <summary>META: A constant of size 201.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant201.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant202">
+            <summary>META: A constant of size 202.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant202.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant203">
+            <summary>META: A constant of size 203.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant203.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant204">
+            <summary>META: A constant of size 204.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant204.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant205">
+            <summary>META: A constant of size 205.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant205.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant206">
+            <summary>META: A constant of size 206.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant206.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant207">
+            <summary>META: A constant of size 207.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant207.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant208">
+            <summary>META: A constant of size 208.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant208.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant209">
+            <summary>META: A constant of size 209.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant209.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant210">
+            <summary>META: A constant of size 210.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant210.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant211">
+            <summary>META: A constant of size 211.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant211.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant212">
+            <summary>META: A constant of size 212.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant212.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant213">
+            <summary>META: A constant of size 213.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant213.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant214">
+            <summary>META: A constant of size 214.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant214.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant215">
+            <summary>META: A constant of size 215.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant215.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant216">
+            <summary>META: A constant of size 216.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant216.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant217">
+            <summary>META: A constant of size 217.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant217.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant218">
+            <summary>META: A constant of size 218.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant218.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant219">
+            <summary>META: A constant of size 219.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant219.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant220">
+            <summary>META: A constant of size 220.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant220.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant221">
+            <summary>META: A constant of size 221.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant221.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant222">
+            <summary>META: A constant of size 222.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant222.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant223">
+            <summary>META: A constant of size 223.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant223.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant224">
+            <summary>META: A constant of size 224.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant224.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant225">
+            <summary>META: A constant of size 225.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant225.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant226">
+            <summary>META: A constant of size 226.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant226.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant227">
+            <summary>META: A constant of size 227.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant227.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant228">
+            <summary>META: A constant of size 228.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant228.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant229">
+            <summary>META: A constant of size 229.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant229.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant230">
+            <summary>META: A constant of size 230.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant230.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant231">
+            <summary>META: A constant of size 231.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant231.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant232">
+            <summary>META: A constant of size 232.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant232.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant233">
+            <summary>META: A constant of size 233.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant233.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant234">
+            <summary>META: A constant of size 234.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant234.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant235">
+            <summary>META: A constant of size 235.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant235.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant236">
+            <summary>META: A constant of size 236.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant236.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant237">
+            <summary>META: A constant of size 237.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant237.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant238">
+            <summary>META: A constant of size 238.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant238.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant239">
+            <summary>META: A constant of size 239.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant239.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant240">
+            <summary>META: A constant of size 240.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant240.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant241">
+            <summary>META: A constant of size 241.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant241.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant242">
+            <summary>META: A constant of size 242.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant242.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant243">
+            <summary>META: A constant of size 243.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant243.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant244">
+            <summary>META: A constant of size 244.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant244.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant245">
+            <summary>META: A constant of size 245.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant245.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant246">
+            <summary>META: A constant of size 246.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant246.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant247">
+            <summary>META: A constant of size 247.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant247.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant248">
+            <summary>META: A constant of size 248.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant248.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant249">
+            <summary>META: A constant of size 249.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant249.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant250">
+            <summary>META: A constant of size 250.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant250.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant251">
+            <summary>META: A constant of size 251.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant251.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant252">
+            <summary>META: A constant of size 252.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant252.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant253">
+            <summary>META: A constant of size 253.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant253.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant254">
+            <summary>META: A constant of size 254.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant254.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant255">
+            <summary>META: A constant of size 255.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant255.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaConstant256">
+            <summary>META: A constant of size 256.</summary>
+        </member>
+        <member name="P:Fusion.MetaConstant256.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaMul1`1">
+            <summary>META: A multiplication of 1 constants.</summary>
+        </member>
+        <member name="P:Fusion.MetaMul1`1.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaMul2`1">
+            <summary>META: A multiplication of 2 constants.</summary>
+        </member>
+        <member name="P:Fusion.MetaMul2`1.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaMul3`1">
+            <summary>META: A multiplication of 3 constants.</summary>
+        </member>
+        <member name="P:Fusion.MetaMul3`1.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaMul4`1">
+            <summary>META: A multiplication of 4 constants.</summary>
+        </member>
+        <member name="P:Fusion.MetaMul4`1.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaMul5`1">
+            <summary>META: A multiplication of 5 constants.</summary>
+        </member>
+        <member name="P:Fusion.MetaMul5`1.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaMul6`1">
+            <summary>META: A multiplication of 6 constants.</summary>
+        </member>
+        <member name="P:Fusion.MetaMul6`1.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaMul7`1">
+            <summary>META: A multiplication of 7 constants.</summary>
+        </member>
+        <member name="P:Fusion.MetaMul7`1.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaMul8`1">
+            <summary>META: A multiplication of 8 constants.</summary>
+        </member>
+        <member name="P:Fusion.MetaMul8`1.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaMul9`1">
+            <summary>META: A multiplication of 9 constants.</summary>
+        </member>
+        <member name="P:Fusion.MetaMul9`1.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaMul10`1">
+            <summary>META: A multiplication of 10 constants.</summary>
+        </member>
+        <member name="P:Fusion.MetaMul10`1.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaMul11`1">
+            <summary>META: A multiplication of 11 constants.</summary>
+        </member>
+        <member name="P:Fusion.MetaMul11`1.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaMul12`1">
+            <summary>META: A multiplication of 12 constants.</summary>
+        </member>
+        <member name="P:Fusion.MetaMul12`1.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaMul13`1">
+            <summary>META: A multiplication of 13 constants.</summary>
+        </member>
+        <member name="P:Fusion.MetaMul13`1.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaMul14`1">
+            <summary>META: A multiplication of 14 constants.</summary>
+        </member>
+        <member name="P:Fusion.MetaMul14`1.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaMul15`1">
+            <summary>META: A multiplication of 15 constants.</summary>
+        </member>
+        <member name="P:Fusion.MetaMul15`1.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.MetaMul16`1">
+            <summary>META: A multiplication of 16 constants.</summary>
+        </member>
+        <member name="P:Fusion.MetaMul16`1.ExpectedSize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Fusion.DefaultHostProfilerAttribute">
+            <summary>
+            
+            </summary>
+        </member>
+        <member name="M:Fusion.DefaultHostProfilerAttribute.#ctor(System.Type)">
+            <summary>
+            
+            </summary>
+            <param name="profilerType"></param>
+        </member>
+        <member name="F:Fusion.DefaultHostProfilerAttribute.ProfilerType">
+            <summary>
+            
+            </summary>
+        </member>
+        <member name="T:Fusion.HostProfilerMarker">
+            <summary>
+            Pre-defined marker for the host profiler. 
+            </summary>
+        </member>
+        <member name="M:Fusion.HostProfilerMarker.Begin">
+            <summary><see cref="M:Fusion.HostProfilerMarker.Start"/></summary>
+        </member>
+        <member name="M:Fusion.HostProfilerMarker.Start">
+            <summary>
+            Begins profiling for the marker. Call <see cref="M:Fusion.HostProfilerMarkerScope.Dispose"/> to end profiling.
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:Fusion.HostProfilerMarker.End">
+            <summary>
+            Ends profiling for the marker. Consider using <see cref="T:Fusion.HostProfilerMarkerScope"/> returned by <see cref="M:Fusion.HostProfilerMarker.Start"/> instead of calling this method directly.
+            </summary>
+        </member>
+        <member name="T:Fusion.HostProfilerCounterExtensions">
+            <summary/>
+        </member>
+        <member name="M:Fusion.HostProfilerCounterExtensions.Add(Fusion.HostProfilerCounter{System.Int32}@)">
+            <summary>
+            Adds 1 to the counter.
+            </summary>
+        </member>
+        <member name="M:Fusion.HostProfilerCounterExtensions.Add(Fusion.HostProfilerCounter{System.Single}@)">
+            <summary>
+            Adds 1 to the counter.
+            </summary>
+        </member>
+        <member name="T:Fusion.HostProfiler">
+            <summary>
+            Provides profiling functionality for the host.
+            </summary>
+        </member>
+        <member name="M:Fusion.HostProfiler.Start(System.String)">
+            <summary/>
+        </member>
+        <member name="M:Fusion.HostProfiler.Begin(System.String)">
+            <summary/>
+        </member>
+        <member name="M:Fusion.HostProfiler.End">
+            <summary/>
+        </member>
+        <member name="M:Fusion.HostProfiler.CreateMarker(System.String,System.Nullable{Fusion.HostProfilerCategory}@)">
+            <summary/>
+        </member>
+        <member name="M:Fusion.HostProfiler.CreateCounter``1(System.String,Fusion.HostProfilerDataUnit,System.Nullable{Fusion.HostProfilerCategory}@,System.Boolean)">
+            <summary/>
+        </member>
+        <member name="M:Fusion.HostProfiler.CreateCategory(System.String)">
+            <summary/>
+        </member>
+        <member name="T:Fusion.MarkProfilerAsEnabledIfEnableProfilerDefinedAttribute">
+            <summary>
+            Place this attribute on Unity side; it will be only included in assembly if the ENABLE_IL2CPP define is there.
+            </summary>
+        </member>
+        <member name="T:Fusion.HostProfilerCategory">
+            <summary/>
+        </member>
+        <member name="F:Fusion.HostProfilerCategory.InternalCategory">
+            <summary>
+            Raw value of the marker. Implementation-defined.
+            </summary>
+        </member>
+        <member name="T:Fusion.HostProfilerCounter`1">
+            <summary>
+            Pre-defined float counter for the host profiler. 
+            </summary>
+        </member>
+        <member name="F:Fusion.HostProfilerCounter`1.Ptr">
+            <summary>
+            Raw value of the marker. Implementation-defined.
+            </summary>
+        </member>
+        <member name="M:Fusion.HostProfilerCounter`1.#ctor(System.Void*)">
+            <summary>
+            Pre-defined marker for the host profiler. 
+            </summary>>
+        </member>
+        <member name="M:Fusion.HostProfilerCounter`1.Set(`0)">
+            <summary>
+            Records a value for this counter.
+            </summary>
+        </member>
+        <member name="M:Fusion.HostProfilerCounter`1.Add(`0)">
+            <summary>
+            Records a value for this counter.
+            </summary>
+        </member>
+        <member name="T:Fusion.HostProfilerDataUnit">
+            <summary/>
+        </member>
+        <member name="F:Fusion.HostProfilerDataUnit.Undefined">
+            <summary/>
+        </member>
+        <member name="F:Fusion.HostProfilerDataUnit.TimeNanoseconds">
+            <summary/>
+        </member>
+        <member name="F:Fusion.HostProfilerDataUnit.Bytes">
+            <summary/>
+        </member>
+        <member name="F:Fusion.HostProfilerDataUnit.Count">
+            <summary/>
+        </member>
+        <member name="F:Fusion.HostProfilerDataUnit.Percent">
+            <summary/>
+        </member>
+        <member name="F:Fusion.HostProfilerDataUnit.FrequencyHz">
+            <summary/>
+        </member>
+        <member name="T:Fusion.HostProfilerMarkerScope">
+            <summary>
+            Provides a scope for a host profiler marker. Do not use this struct directly, use <see cref="M:Fusion.HostProfilerMarker.Start"/> instead.
+            </summary>
+        </member>
+        <member name="M:Fusion.HostProfilerMarkerScope.#ctor(Fusion.HostProfilerMarker)">
+            <summary>
+            Provides a scope for a host profiler marker. Do not use this struct directly, use <see cref="M:Fusion.HostProfilerMarker.Start"/> instead.
+            </summary>
+        </member>
+        <member name="M:Fusion.HostProfilerMarkerScope.Dispose">
+            <summary>
+            Stops profiling for the marker.
+            </summary>
+        </member>
+        <member name="T:Fusion.HostProfilerNamedMarkerScope">
+            <summary>
+            Provides a scope for a host profiler marker. Do not use this struct directly, use <see cref="M:Fusion.HostProfilerMarker.Start"/> instead.
+            </summary>
+        </member>
+        <member name="M:Fusion.HostProfilerNamedMarkerScope.Dispose">
+            <inheritdoc />
         </member>
         <member name="T:Fusion.FieldsMask">
             <summary>
@@ -1773,6 +3414,19 @@
             are loaded is driven by usages of <see cref="T:Fusion.FusionGlobalScriptableObjectSourceAttribute"/> attributes. 
             </summary>
         </member>
+        <member name="F:Fusion.FusionGlobalScriptableObject._typesFailedToLoad">
+            <summary>
+            Types that failed to load. Used to limit attempts until a reimport happens. Also, there's a nasty bug
+            at least in some Unity versions (verified on 2021), where if there's a type of the same name in multiple assemblies,
+            AssetDatabase.GetMainAssetPath may return the wrong one.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionGlobalScriptableObject.ClearTypesFailedToLoad">
+            <summary>
+            Use to clear internal list marking specific type as unable to load. Types might be unable to load during bootstrap, so cleaning the list
+            in some static initializer is a good way to ensure things can recover.
+            </summary>
+        </member>
         <member name="T:Fusion.FusionGlobalScriptableObject`1">
             <inheritdoc cref="T:Fusion.FusionGlobalScriptableObject`1"/>
         </member>
@@ -1816,6 +3470,12 @@
             <param name="global"></param>
             <returns></returns>
         </member>
+        <member name="M:Fusion.FusionGlobalScriptableObject`1.GetGlobalAsyncInternal">
+            <summary>
+            Loads or returns the current global instance asynchronously. Returns <see langword="null"/> if loading an instance failed.
+            </summary>
+            <returns></returns>
+        </member>
         <member name="M:Fusion.FusionGlobalScriptableObject`1.UnloadGlobalInternal">
             <summary>
             Unloads the global instance if it is loaded.
@@ -1857,6 +3517,8 @@
             [assembly: Fusion.FusionGlobalScriptableObjectResource(typeof(Fusion.FusionGlobalScriptableObject), Order = 2000, AllowFallback = true)]
             </code>
             </summary>
+            <seealso cref="!:FusionGlobalScriptableObjectAddressAttribute"/>
+            <seealso cref="!:FusionGlobalScriptableObjectResourceAttribute"/>
         </member>
         <member name="M:Fusion.FusionGlobalScriptableObjectSourceAttribute.#ctor(System.Type)">
             <param name="objectType">Type or the base type of <see cref="T:Fusion.FusionGlobalScriptableObject"/> that this loader supports.</param>
@@ -1886,6 +3548,13 @@
             Attempt to load the object of the specified type. Return <see langword="default"/> if the object cannot be loaded.
             </summary>
             <param name="type">The requested type</param>
+        </member>
+        <member name="M:Fusion.FusionGlobalScriptableObjectSourceAttribute.LoadAsync(System.Type)">
+            <summary>
+            
+            </summary>
+            <param name="type"></param>
+            <returns></returns>
         </member>
         <member name="T:Fusion.FusionGlobalScriptableObjectUnloadDelegate">
             <summary>
@@ -1922,9 +3591,608 @@
             Base class for all Fusion MonoBehaviours.
             </summary>
         </member>
+        <member name="T:Fusion.FusionPlayerLoopSystemAddMode">
+            <summary>
+            Enum representing the possible modes for adding a system to the Unity Player Loop System.
+            </summary>
+        </member>
+        <member name="F:Fusion.FusionPlayerLoopSystemAddMode.FirstChild">
+            <summary>Add the system as the first child of the parent system.</summary>
+        </member>
+        <member name="F:Fusion.FusionPlayerLoopSystemAddMode.LastChild">
+            <summary>Add the system as the last child of the parent system.</summary>
+        </member>
+        <member name="F:Fusion.FusionPlayerLoopSystemAddMode.Before">
+            <summary>Add the system before the parent system in the player loop.</summary>
+        </member>
+        <member name="F:Fusion.FusionPlayerLoopSystemAddMode.After">
+            <summary>Add the system after the parent system in the player loop.</summary>
+        </member>
+        <member name="T:Fusion.FusionPlayerLoopSystemHandle">
+            <summary>
+            Represents a system that has been added to the PlayerLoopSystem.
+            </summary>
+        </member>
+        <member name="F:Fusion.FusionPlayerLoopSystemHandle.Type">
+            <summary>
+            The type of the system.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionPlayerLoopSystemHandle.#ctor(System.Type)">
+            <summary/>
+        </member>
+        <member name="M:Fusion.FusionPlayerLoopSystemHandle.Dispose">
+            <summary/>
+        </member>
+        <member name="T:Fusion.FusionPlayerLoopSystemUtils">
+            <summary>
+            Utility class for manipulating Unity Player Loop System.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionPlayerLoopSystemUtils.AddToPlayerLoop(System.Type,Fusion.FusionPlayerLoopSystemAddMode,System.Type,UnityEngine.LowLevel.PlayerLoopSystem.UpdateFunction)">
+            <summary>
+            Adds a new loop system in relation to <paramref name="referenceSystemType"/>
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionPlayerLoopSystemUtils.AddToPlayerLoop(UnityEngine.LowLevel.PlayerLoopSystem@,System.Type,Fusion.FusionPlayerLoopSystemAddMode,System.Type,UnityEngine.LowLevel.PlayerLoopSystem.UpdateFunction)">
+            <summary>
+            Adds a new loop system in relation to <paramref name="referenceSystemType"/>
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionPlayerLoopSystemUtils.RemoveFromPlayerLoop(System.Type)">
+            <summary>
+            Removes a player loop system of given type.
+            </summary>
+            <returns>True if adding was successful</returns>
+        </member>
+        <member name="M:Fusion.FusionPlayerLoopSystemUtils.RemoveFromPlayerLoop(UnityEngine.LowLevel.PlayerLoopSystem@,System.Type)">
+            <summary>
+            Removes a player loop system of given type.
+            </summary>
+            <returns>True if adding was successful</returns>
+        </member>
         <member name="T:Fusion.FusionScriptableObject">
             <summary>
             Base class for all Fusion scriptable objects.
+            </summary>
+        </member>
+        <member name="T:Fusion.FusionScriptingBackend">
+            <summary>
+            Backend types.
+            </summary>
+        </member>
+        <member name="F:Fusion.FusionScriptingBackend.DotNet">
+            <summary>
+            Run by dotnet.
+            </summary>
+        </member>
+        <member name="F:Fusion.FusionScriptingBackend.Mono">
+            <summary>
+            Run by Mono.
+            </summary>
+        </member>
+        <member name="F:Fusion.FusionScriptingBackend.IL2CPP">
+            <summary>
+            Run by IL2CPP.
+            </summary>
+        </member>
+        <member name="T:Fusion.MarkPlatformAsIL2CPPIfEnableIL2CPPDefinedAttribute">
+            <summary>
+            Place this attribute on Unity side; it will be only included in assembly if the ENABLE_IL2CPP define is there.
+            </summary>
+        </member>
+        <member name="T:Fusion.MarkPlatformAsWebIfUnityWebGlDefinedAttribute">
+            <summary>
+            Place this attribute on Unity side; it will be only included in assembly if the ENABLE_IL2CPP define is there.
+            </summary>
+        </member>
+        <member name="T:Fusion.FusionPlatform">
+            <summary>
+            Current platform information. 
+            </summary>
+        </member>
+        <member name="F:Fusion.FusionPlatform.CurrentBackend">
+            <summary>
+            Current backend.
+            </summary>
+        </member>
+        <member name="F:Fusion.FusionPlatform.IsWebGL">
+            <summary/>
+        </member>
+        <member name="M:Fusion.FusionPlatform.GetLoadedAssemblies">
+            <summary/>
+        </member>
+        <member name="M:Fusion.FusionPlatform.GetAnyAssemblyAttribute``1(System.Collections.Generic.IReadOnlyList{System.Reflection.Assembly})">
+            <summary/>
+        </member>
+        <member name="M:Fusion.FusionPlatform.GetAssemblyAttributes``1(System.Collections.Generic.IReadOnlyList{System.Reflection.Assembly})">
+            <summary/>
+        </member>
+        <member name="M:Fusion.FusionPlatform.GetAnyLoadedAssemblyAttribute``1">
+            <summary/>
+        </member>
+        <member name="M:Fusion.FusionPlatform.GetLoadedAssemblyAttributes``1">
+            <summary/>
+        </member>
+        <member name="M:Fusion.FusionPlatform.GetLoadedPath(System.Reflection.Assembly)">
+            <summary/>
+        </member>
+        <member name="T:Fusion.FusionUnsafe">
+            <summary>
+            Utility methods for memory operations.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.AllocAndClearBlock(System.Int32,System.Int32,System.Void*@,System.Void*@,System.Int32)">
+            <summary>
+            Allocates a block of memory and clears it.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.AllocAndClearBlock(System.Int32,System.Int32,System.Int32,System.Void*@,System.Void*@,System.Void*@,System.Int32)">
+            <summary>
+            Allocates a block of memory and clears it.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.AllocAndClearBlock(System.Int32,System.Int32,System.Int32,System.Int32,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Int32)">
+            <summary>
+            Allocates a block of memory and clears it.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.AllocAndClearBlock(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Int32)">
+            <summary>
+            Allocates a block of memory and clears it.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.AllocAndClearBlock(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Int32)">
+            <summary>
+            Allocates a block of memory and clears it.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.AllocAndClearBlock(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Int32)">
+            <summary>
+            Allocates a block of memory and clears it.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.AllocAndClearBlock(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Int32)">
+            <summary>
+            Allocates a block of memory and clears it.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.AllocAndClearBlock(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Int32)">
+            <summary>
+            Allocates a block of memory and clears it.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.AllocAndClearBlock(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Int32)">
+            <summary>
+            Allocates a block of memory and clears it.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.AllocAndClearBlock(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Int32)">
+            <summary>
+            Allocates a block of memory and clears it.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.AllocAndClearBlock(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Void*@,System.Int32)">
+            <summary>
+            Allocates a block of memory and clears it.
+            </summary>
+        </member>
+        <member name="F:Fusion.FusionUnsafe.DefaultAlignment">
+            <summary>
+            The default alignment of allocated blocks.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.SetMemoryTrackingMode(Fusion.FusionUnsafeTrackingMode)">
+            <summary>
+            
+            </summary>
+            <param name="mode"></param>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.GetMemoryTrackingResult">
+            <summary>
+            Get the memory tracking result.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.Set(System.IntPtr,System.Byte,System.UIntPtr)">
+            <summary>
+            Initializes a block of memory with given value.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.Copy(System.IntPtr,System.IntPtr,System.UIntPtr)">
+            <summary>
+            Copies a block of memory from the source to the destination.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.Move(System.IntPtr,System.IntPtr,System.UIntPtr)">
+            <summary>
+            Moves a block of memory from the source to the destination.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.Compare(System.IntPtr,System.IntPtr,System.UIntPtr)">
+            <summary>
+            Compares two blocks of memory.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.Swap(System.Void*,System.Void*,System.Int32)">
+            <summary>
+            Swaps values between two locations in memory.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.Swap``1(``0*,``0*)">
+            <summary>
+            Swaps values between two locations in memory.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.Swap``1(``0@,``0@)">
+            <summary>
+            Swaps values between two locations in memory.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.Replace``1(``0*,``0)">
+            <summary>
+            Replaces the value at <c>x</c> with <c>value</c> and returns the replaced value.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.Replace``1(``0@,``0)">
+            <summary>
+            Replaces the value at <c>x</c> with <c>value</c> and returns the replaced value.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.Alloc(System.Int32,System.Int32,System.String,System.Int32)">
+            <summary>
+            Allocates a block of memory. The return address is 8-aligned.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.Alloc``1(System.Int32,System.String,System.Int32)">
+            <summary>
+            Allocates a block of memory. The return address is 8-aligned.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.AllocAndClear(System.Int32,System.Int32,System.String,System.Int32)">
+            <summary>
+            Allocates a block of memory. The memory is 0-initialized. The return address is 8-aligned.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.AllocAndClear``1(System.Int32,System.String,System.Int32)">
+            <summary>
+            Allocates a block of memory. The memory is 0-initialized. The return address is 8-aligned.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.AllocAndClearArray``1(System.Int32,System.Int32,System.String,System.Int32)">
+            <summary>
+            Allocates a block of memory. The memory is 0-initialized. The return address is 8-aligned.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.AllocAndClearArray(System.Int32,System.Int32,System.Int32,System.String,System.Int32)">
+            <summary>
+            Allocates a block of memory. The memory is 0-initialized. The return address is 8-aligned.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.AllocAndClearPtrArray``1(System.Int32,System.Int32,System.String,System.Int32)">
+            <summary>
+            Allocates a block of memory. The memory is 0-initialized. The return address is 8-aligned.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.Copy``1(``0*,System.ReadOnlySpan{``0})">
+            <summary>
+            Copies a block of memory from the source to the destination.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.Copy``1(System.Span{``0},``0*)">
+            <summary>
+            Copies a block of memory from the source to the destination.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.Free(System.Void*)">
+            <summary>
+            Frees <paramref name="ptr"/>. If it is null, nothing will happen.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.Free(System.Void*@)">
+            <summary>
+            Frees <paramref name="ptr"/>. If it is null, nothing will happen.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.Free``1(``0*@)">
+            <summary>
+            Frees <paramref name="ptr"/>. If it is null, nothing will happen.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.Free``1(``0**@)">
+            <summary>
+            Frees <paramref name="ptr"/>. If it is null, nothing will happen.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.ExpandArray``1(``0*,System.Int32,System.Int32,System.String,System.Int32)">
+            <summary>
+            Expands the allocated memory of the array of the type to a new size by copying the old contents and freeing the old memory.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.ExpandPtrArray``1(``0**,System.Int32,System.Int32,System.String,System.Int32)">
+            <summary>
+            Expands the allocated memory of the array of the type to a new size by copying the old contents and freeing the old memory.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.Expand(System.Void*,System.Int32,System.Int32,System.String,System.Int32)">
+            <summary>
+            Expands the allocated memory of the array of the type to a new size by copying the old contents and freeing the old memory.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.MakeAligned(System.IntPtr,System.Int32)">
+            <summary>
+            Returns <paramref name="value"/> aligned according to <paramref name="align"/>
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.MakeAligned(System.Int32,System.Int32)">
+            <summary>
+            Returns <paramref name="value"/> aligned according to <paramref name="align"/>
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.MakeAligned(System.Int32)">
+            <summary>
+            Returns <paramref name="value"/> aligned according to <see name="DefaultAlignment"/>
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.IsAligned(System.IntPtr,System.Int32)">
+            <summary>
+            Returns true if <paramref name="value"/> is aligned
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.IsAligned(System.Void*,System.Int32)">
+            <summary>
+            Returns true if <paramref name="value"/> is aligned
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.GetWordCount(System.Int32,System.Int32)">
+            <summary>
+            Returns the word count for stride and a given word size.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.Box``1(``0*)">
+            <summary>
+            Box pointer.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.GetArrayElementAlign(System.Int32)">
+            <summary>
+            Calculates the alignment for arrays.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.TryFree(System.Void*)">
+            <summary>
+            Attempts to free <paramref name="ptr"/>. If null, will return false. If alloc tracking is enabled,
+            will also return false for a pointer that has not been allocated by this class.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.TryFree(System.Void*,Fusion.FusionUnsafeAllocInfo@)">
+            <summary>
+            Attempts to free <paramref name="ptr"/>. If null, will return false. If alloc tracking is enabled,
+            will also return false for a pointer that has not been allocated by this class.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.Move(System.Void*,System.Void*,System.Int32)">
+            <summary>
+            Moves a block of memory from the source to the destination.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.Copy(System.Void*,System.Void*,System.Int32)">
+            <summary>
+            Copies a block of memory from one location to another
+            </summary>
+            <param name="destination">Do not pass a nullptr, the destination to be copied to</param>
+            <param name="source">Do not pass a nullptr, the source to be copied from</param>
+            <param name="size">The size of the data to be copied</param>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.Clear(System.Void*,System.Int32)">
+            <summary>
+            Clears a block of memory by setting it to zero.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.Set(System.Void*,System.Byte,System.Int32)">
+            <summary>
+            Initializes a block of memory with given value.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.Compare(System.Void*,System.Void*,System.Int32)">
+            <summary>
+            Compares two blocks of memory.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.Copy``1(System.Span{``0},System.ReadOnlySpan{``0})">
+            <summary>
+            Copy from source to destination, with CopyTo semantics: destination must be the same size or bigger than source.
+            If source is smaller than destination the excess part of destination is not written to.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.CopyToExact``1(System.Span{``0},System.ReadOnlySpan{``0})">
+            <summary>
+            Copy from source to destination, like CopyTo but source and destination must be the same size.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.Clear``1(System.Span{``0})">
+            <summary>
+            Clears a block of memory by setting it to zero.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.SizeOf(System.Type)">
+            <summary>
+            Gets the size of the specified type.
+            </summary>
+            <param name="t">The type to get the size of.</param>
+            <returns>The size of the specified type in bytes.</returns>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.GetFieldOffset(System.Reflection.FieldInfo)">
+            <summary>
+            Gets the offset of the specified field.
+            </summary>
+            <param name="fi">The field information.</param>
+            <returns>The offset of the specified field in bytes.</returns>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.FreeInternal(System.Void*)">
+            <summary>
+            Frees a block of memory.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.ReferenceToPointer``1(``0@)">
+            <summary>
+            Converts a reference to an unmanaged type to a pointer.
+            </summary>
+            <typeparam name="T">The type of the object.</typeparam>
+            <param name="obj">The reference to the object.</param>
+            <returns>A pointer to the object.</returns>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.ReinterpretWords``1(System.Span{System.Int32})">
+            <summary/>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.ReinterpretBytes``1(System.Span{System.Byte})">
+            <summary/>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.ReinterpretWords``1(System.Span{System.Int32},System.Int32)">
+            <summary/>
+        </member>
+        <member name="M:Fusion.FusionUnsafe.GetWordCount(System.Int32)">
+            <summary/>
+        </member>
+        <member name="T:Fusion.FusionUnsafeAllocInfo">
+            <summary>
+            Memory allocation info entry.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafeAllocInfo.#ctor(System.IntPtr,System.Int32,System.Int32,System.String,System.Int32,System.String)">
+            <summary>
+            Memory allocation info entry.
+            </summary>
+        </member>
+        <member name="F:Fusion.FusionUnsafeAllocInfo.FilePath">
+            <summary>
+            File where the alloc happened.
+            </summary>
+        </member>
+        <member name="F:Fusion.FusionUnsafeAllocInfo.LineNumber">
+            <summary>
+            Line number where the alloc happened.
+            </summary>
+        </member>
+        <member name="F:Fusion.FusionUnsafeAllocInfo.Size">
+            <summary>
+            Size of the alloc.
+            </summary>
+        </member>
+        <member name="F:Fusion.FusionUnsafeAllocInfo.Align">
+            <summary>
+            Align of the alloc.
+            </summary>
+        </member>
+        <member name="F:Fusion.FusionUnsafeAllocInfo.StackTrace">
+            <summary>
+            Stack trace of the alloc. Only set if tracking is enabled with <see cref="F:Fusion.FusionUnsafeTrackingMode.StackTrace"/>
+            </summary>
+        </member>
+        <member name="F:Fusion.FusionUnsafeAllocInfo.Ptr">
+            <summary>
+            Pointer to allocated memory.
+            </summary>
+        </member>
+        <member name="T:Fusion.FusionUnsafeAllocResult">
+            <summary>
+            Memory allocation info result.
+            </summary>
+        </member>
+        <member name="M:Fusion.FusionUnsafeAllocResult.#ctor(Fusion.FusionUnsafeAllocInfo[])">
+            <summary>
+            Memory allocation info result.
+            </summary>
+        </member>
+        <member name="F:Fusion.FusionUnsafeAllocResult.Info">
+            <summary/>
+        </member>
+        <member name="T:Fusion.FusionUnsafeTrackingMode">
+            <summary>
+            Controls how <see cref="T:Fusion.FusionUnsafe"/> traces allocs.
+            </summary>
+        </member>
+        <member name="F:Fusion.FusionUnsafeTrackingMode.None">
+            <summary>
+            No tracing.
+            </summary>
+        </member>
+        <member name="F:Fusion.FusionUnsafeTrackingMode.Simple">
+            <summary>
+            Allocs are traced without the stack trace.
+            </summary>
+        </member>
+        <member name="F:Fusion.FusionUnsafeTrackingMode.StackTrace">
+            <summary>
+            Allocs are traced with the stack trace.
+            </summary>
+        </member>
+        <member name="M:Fusion.SpanOwner`1.#ctor(System.Span{`0})">
+            <summary>
+            Rents the memory referenced by the span.
+            </summary>
+            <param name="span">The span that references the memory to rent.</param>
+        </member>
+        <member name="M:Fusion.SpanOwner`1.#ctor(System.Span{`0},System.Int32)">
+            <summary>
+            Rents the memory referenced by the span.
+            </summary>
+            <param name="span">The span that references the memory to rent.</param>
+            <param name="length">The actual length of the data.</param>
+        </member>
+        <member name="M:Fusion.SpanOwner`1.#ctor(System.Int32,System.Boolean)">
+            <summary>
+            Rents the memory from <see cref="P:System.Buffers.ArrayPool`1.Shared"/>, if <typeparamref name="T"/>
+            contains at least one field of the reference type; or use <see cref="!:NativeMemory"/>.
+            </summary>
+            <param name="minBufferSize">The minimum size of the memory to rent.</param>
+            <param name="exactSize"><see langword="true"/> to return the buffer of <paramref name="minBufferSize"/> length; otherwise, the returned buffer is at least of <paramref name="minBufferSize"/>.</param>
+            <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="minBufferSize"/> is less than or equal to zero.</exception>
+        </member>
+        <member name="P:Fusion.SpanOwner`1.Span">
+            <summary>
+            Gets the rented memory.
+            </summary>
+        </member>
+        <member name="P:Fusion.SpanOwner`1.IsEmpty">
+            <summary>
+            Gets a value indicating that this object
+            doesn't reference rented memory.
+            </summary>
+        </member>
+        <member name="M:Fusion.SpanOwner`1.op_Implicit(System.Span{`0})~Fusion.SpanOwner{`0}">
+            <summary>
+            Converts the reference to the already allocated memory
+            into the rental object.
+            </summary>
+            <param name="span">The allocated memory to convert.</param>
+        </member>
+        <member name="P:Fusion.SpanOwner`1.Length">
+            <summary>
+            Gets length of the rented memory.
+            </summary>
+        </member>
+        <member name="P:Fusion.SpanOwner`1.Item(System.Int32)">
+            <summary>
+            Gets the memory element by its index.
+            </summary>
+            <param name="index">The index of the memory element.</param>
+            <returns>The managed pointer to the memory element.</returns>
+        </member>
+        <member name="M:Fusion.SpanOwner`1.GetPinnableReference">
+            <summary>
+            Gets managed pointer to the first element of the rented array.
+            </summary>
+            <returns>The managed pointer to the first element of the rented array.</returns>
+        </member>
+        <member name="M:Fusion.SpanOwner`1.ToString">
+            <summary>
+            Gets textual representation of the rented memory.
+            </summary>
+            <returns>The textual representation of the rented memory.</returns>
+        </member>
+        <member name="M:Fusion.SpanOwner`1.Dispose">
+            <summary>
+            Returns the memory to the pool.
             </summary>
         </member>
         <member name="T:Fusion.JsonUtils">
@@ -1944,6 +4212,14 @@
             <summary>
             Math utility methods.
             </summary>
+        </member>
+        <member name="M:Fusion.Maths.RoundsEvenlyToBytesOrThrow(System.Int32)">
+            <summary>
+            Converts the number of bits to bytes, ensuring the number of bits is a multiple of 8.
+            </summary>
+            <param name="bits">The number of bits to convert.</param>
+            <returns>The number of bytes.</returns>
+            <exception cref="T:System.ArgumentException">Thrown if the number of bits is not a multiple of 8.</exception>
         </member>
         <member name="T:Fusion.Maths.FastAbs2">
             <summary>Uses fieldoffset to allow quick setting of the sign bit of floats.</summary>
@@ -2288,11 +4564,6 @@
             <param name="ptr">The pointer to the memory block.</param>
             <param name="size">The number of bytes to clear.</param>
         </member>
-        <member name="M:Fusion.Native.MemClear(System.Span{System.Int32})">
-            <summary>
-            Clears a block of memory by setting it to zero.
-            </summary>
-        </member>
         <member name="M:Fusion.Native.MemCmp(System.Void*,System.Void*,System.Int32)">
             <summary>
             Compares two blocks of memory.
@@ -2331,6 +4602,12 @@
             <returns>The offset of the specified field in bytes.</returns>
         </member>
         <member name="M:Fusion.Native.Free(System.Void*@)">
+            <summary>
+            Frees a block of memory.
+            </summary>
+            <param name="memory">The pointer to the memory block to free.</param>
+        </member>
+        <member name="M:Fusion.Native.Free(Fusion.UniquePtr@)">
             <summary>
             Frees a block of memory.
             </summary>
@@ -2796,6 +5073,53 @@
             Reset method mode.
             </summary>
         </member>
+        <member name="T:Fusion.Analyzer.GenerateIntrusiveLinkedListAttribute">
+            <summary>
+            Apply on a type with _next/_prev pointers or <see cref="T:Fusion.IntrusiveLinkedListNode`1"/> types to emit intrusive list.
+            </summary>
+        </member>
+        <member name="M:Fusion.Analyzer.GenerateIntrusiveLinkedListAttribute.#ctor(System.String)">
+            <summary>
+            Apply on a type with _next/_prev pointers or <see cref="T:Fusion.IntrusiveLinkedListNode`1"/> types to emit intrusive list.
+            </summary>
+        </member>
+        <member name="P:Fusion.Analyzer.GenerateIntrusiveLinkedListAttribute.NodeField">
+            <summary>
+            Name of the node field. Needs to start with "_node" Prefix.
+            </summary>
+        </member>
+        <member name="F:Fusion.Analyzer.GenerateIntrusiveLinkedListAttribute.GlobalAlias">
+            <summary>
+            Global alias for the list. Defaults to NodeName+List.
+            </summary>
+        </member>
+        <member name="F:Fusion.Analyzer.GenerateIntrusiveLinkedListAttribute.GenerateAsClass">
+            <summary>
+            If true, the list will be emitted as a reference type.
+            </summary>
+        </member>
+        <member name="F:Fusion.Analyzer.GenerateIntrusiveLinkedListAttribute.FreeMethod">
+            <summary>
+            Name of the method used to free the memory.
+            </summary>
+        </member>
+        <member name="T:Fusion.Analyzer.GenerateUniquePtrAttribute">
+            <summary>
+            Generates a UniquePtr-like wrapper.
+            </summary>
+        </member>
+        <member name="T:Fusion.PooledList`1">
+            <summary>
+            Struct list-like interface for an array from a pool. If the capacity is 0 or 1,
+            no array is rented. 
+            </summary>
+        </member>
+        <member name="M:Fusion.PooledList`1.#ctor(System.Buffers.ArrayPool{`0},System.Int32)">
+            <summary>
+            Struct list-like interface for an array from a pool. If the capacity is 0 or 1,
+            no array is rented. 
+            </summary>
+        </member>
         <member name="T:Fusion.Primes">
             <summary>
             Provides a set of methods to work with prime numbers.
@@ -2875,139 +5199,91 @@
             Restarts the timer, setting the elapsed time to zero and starting it.
             </summary>
         </member>
-        <member name="T:Fusion.RuntimeUnityFlagsSetup">
+        <member name="T:Fusion.UInt24">
             <summary>
-            Contains methods to setup runtime flags for Unity.
+            A 24-bit unsigned integer.
             </summary>
         </member>
-        <member name="F:Fusion.RuntimeUnityFlagsSetup.flagsBuildFlags">
+        <member name="F:Fusion.UInt24.MaxValue">
+            <summary> The maximum value of the UInt24. </summary>
+        </member>
+        <member name="F:Fusion.UInt24.MinValue">
+            <summary> The minimum value of the UInt24. </summary>
+        </member>
+        <member name="P:Fusion.UInt24.Value">
+            <summary> The value of the UInt24. </summary>
+        </member>
+        <member name="M:Fusion.UInt24.#ctor(System.UInt32)">
+            <summary> Creates a new UInt24 from a uint. </summary>
+        </member>
+        <member name="M:Fusion.UInt24.GetHashCode">
+            <summary> Returns the hash code for this UInt24. </summary>
+        </member>
+        <member name="M:Fusion.UInt24.Equals(Fusion.UInt24)">
+            <summary>Compares this UInt24 to another for equality.</summary>
+        </member>
+        <member name="M:Fusion.UInt24.Equals(System.Object)">
+            <summary>Compares this UInt24 to another for equality.</summary>
+        </member>
+        <member name="M:Fusion.UInt24.op_Equality(Fusion.UInt24,Fusion.UInt24)">
+            <summary>Compares two UInt24 instances for equality.</summary>
+        </member>
+        <member name="M:Fusion.UInt24.op_Inequality(Fusion.UInt24,Fusion.UInt24)">
+            <summary>Compares two UInt24 instances for inequality.</summary>
+        </member>
+        <member name="M:Fusion.UInt24.op_Explicit(System.UInt32)~Fusion.UInt24">
+            <summary>Converts a UInt24 to a uint.</summary>
+        </member>
+        <member name="M:Fusion.UInt24.op_Implicit(Fusion.UInt24)~System.UInt32">
+            <summary>Converts a uint to a UInt24.</summary>
+        </member>
+        <member name="M:Fusion.UInt24.ToString">
+            <summary>Returns a string that represents the current UInt24.</summary>
+        </member>
+        <member name="T:Fusion.UniquePtr">
             <summary>
-            Flags for BuildFlags
+            A type-safe wrapper around raw memory. 
+            </summary>
+            <param name="ptr"></param>
+            <param name="typeId"></param>
+        </member>
+        <member name="M:Fusion.UniquePtr.#ctor(System.Void*,System.UInt32)">
+            <summary>
+            A type-safe wrapper around raw memory. 
+            </summary>
+            <param name="ptr"></param>
+            <param name="typeId"></param>
+        </member>
+        <member name="M:Fusion.UniquePtr.MoveUniquePtr(Fusion.UniquePtr@)">
+            <summary>
+            Transfers <paramref name="ptr"/> to a new instance. <paramref name="ptr"/> is set to default after this operation.
             </summary>
         </member>
-        <member name="M:Fusion.RuntimeUnityFlagsSetup.Check_UNITY_WEBGL">
+        <member name="M:Fusion.UniquePtr.MakeUniquePtrT``1(``0*@)">
             <summary>
-            Checks if the UNITY_WEBGL flag is set and updates the flagsDotNetVersion accordingly.
+            Take ownership of <paramref name="ptr"/>. Pointer <paramref name="ptr"/> is nullified.
             </summary>
         </member>
-        <member name="M:Fusion.RuntimeUnityFlagsSetup.Check_UNITY_XBOXONE">
+        <member name="M:Fusion.UniquePtr.MakeUniquePtr``1(``0*@)">
             <summary>
-            Checks if the UNITY_XBOXONE flag is set and updates the flagsDotNetVersion accordingly.
+            Take ownership of <paramref name="ptr"/>. Pointer <paramref name="ptr"/> is nullified.
             </summary>
         </member>
-        <member name="M:Fusion.RuntimeUnityFlagsSetup.Check_UNITY_GAMECORE">
+        <member name="M:Fusion.UniquePtr.ReleaseUniquePtr``1(Fusion.UniquePtr@,``0*@)">
             <summary>
-            Checks if the UNITY_GAMECORE flag is set and updates the flagsDotNetVersion accordingly.
+            Converts <paramref name="ptr"/> to a raw pointer. The caller takes control of <paramref name="result"/>
+            lifetime.
             </summary>
         </member>
-        <member name="M:Fusion.RuntimeUnityFlagsSetup.Check_UNITY_EDITOR">
+        <member name="M:Fusion.UniquePtr.MoveUniquePtr``1(Fusion.UniquePtr{``0}@)">
             <summary>
-            Checks if the UNITY_EDITOR flag is set and updates the flagsDotNetVersion accordingly.
+            Transfers <paramref name="ptr"/> to a new instance. <paramref name="ptr"/> is set to default after this operation.
             </summary>
         </member>
-        <member name="M:Fusion.RuntimeUnityFlagsSetup.Check_UNITY_SWITCH">
+        <member name="M:Fusion.UniquePtr.ReleaseUniquePtr``1(Fusion.UniquePtr{``0}@,``0*@)">
             <summary>
-            Checks if the UNITY_SWITCH flag is set and updates the flagsDotNetVersion accordingly.
-            </summary>
-        </member>
-        <member name="M:Fusion.RuntimeUnityFlagsSetup.Check_UNITY_2019_4_OR_NEWER">
-            <summary>
-            Checks if the UNITY_2019_4_OR_NEWER flag is set and updates the flagsDotNetVersion accordingly.
-            </summary>
-        </member>
-        <member name="F:Fusion.RuntimeUnityFlagsSetup.flagsBuildTypes">
-            <summary>
-            Flags for BuildTypes
-            </summary>
-        </member>
-        <member name="M:Fusion.RuntimeUnityFlagsSetup.Check_ENABLE_MONO">
-            <summary>
-            Checks if the ENABLE_MONO flag is set and updates the flagsDotNetVersion accordingly.
-            </summary>
-        </member>
-        <member name="M:Fusion.RuntimeUnityFlagsSetup.Check_ENABLE_IL2CPP">
-            <summary>
-            Checks if the ENABLE_IL2CPP flag is set and updates the flagsDotNetVersion accordingly.
-            </summary>
-        </member>
-        <member name="F:Fusion.RuntimeUnityFlagsSetup.flagsDotNetVersion">
-            <summary>
-            Flags for DotNetVersion
-            </summary>
-        </member>
-        <member name="M:Fusion.RuntimeUnityFlagsSetup.Check_NET_4_6">
-            <summary>
-            Checks if the NET_4_6 flag is set and updates the flagsDotNetVersion accordingly.
-            </summary>
-        </member>
-        <member name="M:Fusion.RuntimeUnityFlagsSetup.Check_NETFX_CORE">
-            <summary>
-            Checks if the NETFX_CORE flag is set and updates the flagsDotNetVersion accordingly.
-            </summary>
-        </member>
-        <member name="M:Fusion.RuntimeUnityFlagsSetup.Check_NET_STANDARD_2_0">
-            <summary>
-            Checks if the NET_STANDARD_2_0 flag is set and updates the flagsDotNetVersion accordingly.
-            </summary>
-        </member>
-        <member name="M:Fusion.RuntimeUnityFlagsSetup.Reset">
-            <summary>
-            Resets all runtime flags to their default values.
-            </summary>
-        </member>
-        <member name="T:Fusion.Unsafe">
-            <summary>
-            Provides substitution for missing System.Runtime.CompilerServices.Unsafe
-            </summary>
-        </member>
-        <member name="M:Fusion.Unsafe.As``2(``0@)">
-            <summary>
-            Casts the given object to the specified type.
-            </summary>
-        </member>
-        <member name="M:Fusion.Unsafe.AsPointer``1(``0@)">
-            <summary>
-            Returns an unmanaged pointer corresponding to the original source pointer.
-            </summary>
-        </member>
-        <member name="M:Fusion.Unsafe.AsRef``1(System.Void*)">
-            <summary>
-            Returns a managed pointer to a value of type T.
-            </summary>
-        </member>
-        <member name="M:Fusion.Unsafe.AsRef``1(``0@)">
-            <summary>
-            Returns a managed pointer to a value of type T.
-            </summary>
-        </member>
-        <member name="M:Fusion.Unsafe.Read``1(System.Void*)">
-            <summary>
-            Writes a value of type T to the given location.
-            </summary>
-        </member>
-        <member name="M:Fusion.Unsafe.ReadUnaligned``1(System.Void*)">
-            <summary>
-            Writes a value of type T to the given location without assuming architecture dependent alignment of the destination address.
-            </summary>
-        </member>
-        <member name="M:Fusion.Unsafe.ReadUnaligned``1(System.Byte@)">
-            <summary>
-            Writes a value of type T to the given location without assuming architecture dependent alignment of the destination address.
-            </summary>
-        </member>
-        <member name="M:Fusion.Unsafe.Write``1(System.Void*,``0)">
-            <summary>
-            Writes a value of type T to the given location.
-            </summary>
-        </member>
-        <member name="M:Fusion.Unsafe.WriteUnaligned``1(System.Void*,``0)">
-            <summary>
-            Writes a value of type T to the given location without assuming architecture dependent alignment of the destination address.
-            </summary>
-        </member>
-        <member name="M:Fusion.Unsafe.WriteUnaligned``1(System.Byte@,``0)">
-            <summary>
-            Writes a value of type T to the given location without assuming architecture dependent alignment of the destination address.
+            Converts <paramref name="ptr"/> to a raw pointer. The caller takes control of <paramref name="result"/>
+            lifetime.
             </summary>
         </member>
         <member name="T:Fusion.UTF32Tools">
@@ -3019,27 +5295,26 @@
             <summary>
             Converts a UTF-16 encoded string to a UTF-32 encoded representation.
             </summary>
-            <param name="str">The UTF-16 encoded string to convert.</param>
-            <param name="dst">A pointer to the destination buffer where the UTF-32 encoded result will be stored.</param>
-            <param name="dstCapacity">The capacity of the destination buffer.</param>
-            <returns>A ConversionResult containing the number of characters and code points processed.</returns>
         </member>
         <member name="M:Fusion.UTF32Tools.Convert(System.Char*,System.Int32,System.UInt32*,System.Int32)">
             <summary>
             Converts a UTF-16 encoded string to a UTF-32 encoded representation.
             </summary>
-            <param name="str">A pointer to the UTF-16 encoded string to convert.</param>
-            <param name="strLength">The length of the UTF-16 encoded string.</param>
-            <param name="dst">A pointer to the destination buffer where the UTF-32 encoded result will be stored.</param>
-            <param name="dstCapacity">The capacity of the destination buffer.</param>
-            <returns>A ConversionResult containing the number of characters and code points processed.</returns>
+        </member>
+        <member name="M:Fusion.UTF32Tools.Convert(System.String,System.Span{System.UInt32})">
+            <summary>
+            Converts a UTF-16 encoded string to a UTF-32 encoded representation.
+            </summary>
+        </member>
+        <member name="M:Fusion.UTF32Tools.Convert(System.ReadOnlySpan{System.Char},System.Span{System.UInt32})">
+            <summary>
+            Converts a UTF-16 encoded string to a UTF-32 encoded representation.
+            </summary>
         </member>
         <member name="M:Fusion.UTF32Tools.GetLength(System.String)">
             <summary>
             Gets the length of a UTF-32 encoded string.
             </summary>
-            <param name="str">The UTF-16 encoded string to measure.</param>
-            <returns>The length of the UTF-32 encoded string.</returns>
         </member>
         <member name="T:Fusion.UTF32Tools.CharEnumerator">
             <summary>
@@ -3050,8 +5325,6 @@
             <summary>
             Initializes a new instance of the <see cref="T:Fusion.UTF32Tools.CharEnumerator"/> struct.
             </summary>
-            <param name="utf32">A pointer to the UTF-32 encoded string.</param>
-            <param name="length">The length of the UTF-32 encoded string.</param>
         </member>
         <member name="P:Fusion.UTF32Tools.CharEnumerator.Current">
             <summary>
@@ -3067,16 +5340,15 @@
             <summary>
             Advances the enumerator to the next character in the UTF-32 encoded string.
             </summary>
-            <returns><c>true</c> if the enumerator was successfully advanced to the next character; <c>false</c> if the enumerator has passed the end of the string.</returns>
         </member>
         <member name="M:Fusion.UTF32Tools.CharEnumerator.Reset">
             <summary>
-            Sets the enumerator to its initial position, which is before the first character in the UTF-32 encoded string.
+            Sets the enumerator to its initial position.
             </summary>
         </member>
         <member name="T:Fusion.UTF32Tools.ConversionResult">
             <summary>
-            Represents the result of a conversion operation, containing the number of characters and code points processed.
+            Represents the result of a conversion operation.
             </summary>
         </member>
         <member name="F:Fusion.UTF32Tools.ConversionResult.CharacterCount">
@@ -3090,11 +5362,7 @@
             </summary>
         </member>
         <member name="M:Fusion.UTF32Tools.ConversionResult.#ctor(System.Int32,System.Int32)">
-            <summary>
-            Initializes a new instance of the <see cref="T:Fusion.UTF32Tools.ConversionResult"/> struct.
-            </summary>
-            <param name="words">The number of code points processed.</param>
-            <param name="characters">The number of characters processed.</param>
+            <summary/>
         </member>
         <member name="T:Fusion.Versioning">
             <summary>
@@ -3122,6 +5390,166 @@
             Gets the assembly version as a string.
             </summary>
             <returns>The assembly version as a string.</returns>
+        </member>
+        <member name="T:Unity.IL2CPP.CompilerServices.Option">
+            <summary>
+            The code generation options available for IL to C++ conversion.
+            Enable or disabled these with caution.
+            </summary>
+        </member>
+        <member name="F:Unity.IL2CPP.CompilerServices.Option.NullChecks">
+             <summary>
+             Enable or disable code generation for null checks.
+            
+             Global null check support is enabled by default when il2cpp.exe
+             is launched from the Unity editor.
+            
+             Disabling this will prevent NullReferenceException exceptions from
+             being thrown in generated code. In *most* cases, code that dereferences
+             a null pointer will crash then. Sometimes the point where the crash
+             happens is later than the location where the null reference check would
+             have been emitted though.
+             </summary>
+        </member>
+        <member name="F:Unity.IL2CPP.CompilerServices.Option.ArrayBoundsChecks">
+             <summary>
+             Enable or disable code generation for array bounds checks.
+            
+             Global array bounds check support is enabled by default when il2cpp.exe
+             is launched from the Unity editor.
+            
+             Disabling this will prevent IndexOutOfRangeException exceptions from
+             being thrown in generated code. This will allow reading and writing to
+             memory outside of the bounds of an array without any runtime checks.
+             Disable this check with extreme caution.
+             </summary>
+        </member>
+        <member name="F:Unity.IL2CPP.CompilerServices.Option.DivideByZeroChecks">
+             <summary>
+             Enable or disable code generation for divide by zero checks.
+            
+             Global divide by zero check support is disabled by default when il2cpp.exe
+             is launched from the Unity editor.
+            
+             Enabling this will cause DivideByZeroException exceptions to be
+             thrown in generated code. Most code doesn't need to handle this
+             exception, so it is probably safe to leave it disabled.
+             </summary>
+        </member>
+        <member name="T:Unity.IL2CPP.CompilerServices.Il2CppSetOptionAttribute">
+             <summary>
+             Use this attribute on an assembly, struct, class, method, or property to inform the IL2CPP code conversion utility to override the
+             global setting for one of a few different runtime checks.
+            
+             Example:
+            
+                 [Il2CppSetOption(Option.NullChecks, false)]
+                 public static string MethodWithNullChecksDisabled()
+                 {
+                     var tmp = new Object();
+                     return tmp.ToString();
+                 }
+             </summary>
+        </member>
+        <member name="T:System.Runtime.CompilerServices.Unsafe">
+            <summary>
+            Provides substitution for missing System.Runtime.CompilerServices.Unsafe
+            </summary>
+        </member>
+        <member name="M:System.Runtime.CompilerServices.Unsafe.Add``1(``0@,System.Int32)">
+            <summary>
+            Adds an element offset to the given reference.
+            </summary>
+        </member>
+        <member name="M:System.Runtime.CompilerServices.Unsafe.As``2(``0@)">
+            <summary>
+            Casts the given object to the specified type.
+            </summary>
+        </member>
+        <member name="M:System.Runtime.CompilerServices.Unsafe.AsPointer``1(``0@)">
+            <summary>
+            Returns an unmanaged pointer corresponding to the original source pointer.
+            </summary>
+        </member>
+        <member name="M:System.Runtime.CompilerServices.Unsafe.AsRef``1(System.Void*)">
+            <summary>
+            Returns a managed pointer to a value of type T.
+            </summary>
+        </member>
+        <member name="M:System.Runtime.CompilerServices.Unsafe.AsRef``1(``0@)">
+            <summary>
+            Returns a managed pointer to a value of type T.
+            </summary>
+        </member>
+        <member name="M:System.Runtime.CompilerServices.Unsafe.Read``1(System.Void*)">
+            <summary>
+            Writes a value of type T to the given location.
+            </summary>
+        </member>
+        <member name="M:System.Runtime.CompilerServices.Unsafe.ReadUnaligned``1(System.Void*)">
+            <summary>
+            Writes a value of type T to the given location without assuming architecture dependent alignment of the destination address.
+            </summary>
+        </member>
+        <member name="M:System.Runtime.CompilerServices.Unsafe.ReadUnaligned``1(System.Byte@)">
+            <summary>
+            Writes a value of type T to the given location without assuming architecture dependent alignment of the destination address.
+            </summary>
+        </member>
+        <member name="M:System.Runtime.CompilerServices.Unsafe.Write``1(System.Void*,``0)">
+            <summary>
+            Writes a value of type T to the given location.
+            </summary>
+        </member>
+        <member name="M:System.Runtime.CompilerServices.Unsafe.WriteUnaligned``1(System.Void*,``0)">
+            <summary>
+            Writes a value of type T to the given location without assuming architecture dependent alignment of the destination address.
+            </summary>
+        </member>
+        <member name="M:System.Runtime.CompilerServices.Unsafe.WriteUnaligned``1(System.Byte@,``0)">
+            <summary>
+            Writes a value of type T to the given location without assuming architecture dependent alignment of the destination address.
+            </summary>
+        </member>
+        <member name="M:System.Runtime.CompilerServices.Unsafe.SkipInit``1(``0@)">
+            <summary>
+            Bypasses definite assignment rules for a given reference.
+            </summary>
+        </member>
+        <member name="M:System.Runtime.CompilerServices.Unsafe.InitBlock(System.Void*,System.Byte,System.UInt32)">
+            <summary>
+            Initializes a block of memory at the given location with a given initial value.
+            </summary>
+        </member>
+        <member name="M:System.Runtime.CompilerServices.Unsafe.InitBlockUnaligned(System.Void*,System.Byte,System.UInt32)">
+            <summary>
+            Initializes a block of memory at the given location with a given initial value without assuming architecture dependent alignment of the address.
+            </summary>
+        </member>
+        <member name="M:System.Runtime.CompilerServices.Unsafe.CopyBlock(System.Void*,System.Void*,System.UInt32)">
+            <summary>
+            Copies bytes from the source address to the destination address.
+            </summary>
+        </member>
+        <member name="M:System.Runtime.CompilerServices.Unsafe.CopyBlock(System.Byte@,System.Byte@,System.UInt32)">
+            <summary>
+            Copies bytes from the source address to the destination address.
+            </summary>
+        </member>
+        <member name="M:System.Runtime.CompilerServices.Unsafe.CopyBlockUnaligned(System.Void*,System.Void*,System.UInt32)">
+            <summary>
+            Copies bytes from the source address to the destination address without assuming architecture dependent alignment of the addresses.
+            </summary>
+        </member>
+        <member name="M:System.Runtime.CompilerServices.Unsafe.CopyBlockUnaligned(System.Byte@,System.Byte@,System.UInt32)">
+            <summary>
+            Copies bytes from the source address to the destination address without assuming architecture dependent alignment of the addresses.
+            </summary>
+        </member>
+        <member name="M:System.Runtime.CompilerServices.Unsafe.SizeOf``1">
+            <summary>
+            Returns the size of an object of the given type parameter.
+            </summary>
         </member>
     </members>
 </doc>

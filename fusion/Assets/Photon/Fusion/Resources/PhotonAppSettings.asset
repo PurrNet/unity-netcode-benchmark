@@ -13,18 +13,22 @@ MonoBehaviour:
   m_Name: PhotonAppSettings
   m_EditorClassIdentifier: Fusion.Realtime.dll::Fusion.Photon.Realtime.PhotonAppSettings
   AppSettings:
-    AppIdFusion: 0062cb7e-2315-431d-93f7-3d9f556a4c20
+    AppIdRealtime: 
+    AppIdFusion: 2e71d6db-d6ae-4abe-ad00-b66bc350108a
+    AppIdQuantum: 
     AppIdChat: 
     AppIdVoice: 
     AppVersion: 
     UseNameServer: 1
-    FixedRegion: eu
+    FixedRegion: 
     Server: 
     Port: 0
     ProxyServer: 
     Protocol: 0
     EnableProtocolFallback: 1
-    AuthMode: 0
+    AuthMode: 2
     EnableLobbyStatistics: 0
+    NetworkLogging: 0
+    ClientLogging: 0
     encryptionMode: 0
     emptyRoomTtl: 0

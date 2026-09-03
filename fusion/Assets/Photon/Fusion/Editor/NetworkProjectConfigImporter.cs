@@ -9,8 +9,8 @@ namespace Fusion.Editor {
   using UnityEditor.PackageManager;
   using UnityEngine;
 
-  [ScriptedImporter(3, ExtensionWithoutDot, ImportQueueOffset)]
-  [HelpURL("https://doc.photonengine.com/fusion/current/manual/network-project-config")]
+  [ScriptedImporter(4, ExtensionWithoutDot, ImportQueueOffset)]
+  [HelpURL("https://doc.photonengine.com/fusion/v2/manual/network-project-config")]
   public class NetworkProjectConfigImporter : ScriptedImporter {
     public const string ExtensionWithoutDot = "fusion";
     public const string Extension = "." + ExtensionWithoutDot;
@@ -61,6 +61,7 @@ namespace Fusion.Editor {
         }
 
         EditorJsonUtility.FromJsonOverwrite(text, config);
+        config.Simulation.TickRateSelection.ConvertObsoleteIndicesToIntervals();
       } catch (System.ArgumentException ex) {
         throw new System.ArgumentException($"Failed to parse {path}: {ex.Message}");
       }

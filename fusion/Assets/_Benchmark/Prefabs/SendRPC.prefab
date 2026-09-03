@@ -228,8 +228,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Fusion.Runtime.dll::Fusion.NetworkObject
   SortKey: 3425169079
-  ObjectInterest: 1
-  Flags: 262145
+  SendPriority: 1
+  EnableInterpolation: 1
+  Flags: 262146
   NestedObjects: []
   NetworkedBehaviours:
   - {fileID: 7178767877661324548}
@@ -246,4 +247,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10901e471b639b9439045642419c6d52, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SendRPCBehabiour
+  _SpawnPos: {x: 0, y: 0, z: 0}
+  _SpawnRot: {x: 0, y: 0, z: 0, w: 0}
   _text: {fileID: 7225011871701845522}
