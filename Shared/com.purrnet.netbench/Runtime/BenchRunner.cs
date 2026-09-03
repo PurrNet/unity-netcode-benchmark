@@ -277,7 +277,7 @@ namespace PurrNet.NetBench
             else
                 Debug.Log($"[NetBench] All {connected} clients connected.");
 
-            _run.tickRate = _adapter.TickRate;
+            ReadTickRate();
 
             yield return Window(0, _idleSeconds);
 
@@ -344,7 +344,7 @@ namespace PurrNet.NetBench
 
             Debug.Log("[NetBench] Connected.");
             _run.connectedAtStart = 1;
-            _run.tickRate = _adapter.TickRate;
+            ReadTickRate();
 
             if (BenchRegistry.ActiveSlot() == 0)
                 yield return Window(0, _idleSeconds);
@@ -398,6 +398,34 @@ namespace PurrNet.NetBench
             Finish(_run.error == null ? 0 : 1);
         }
 
+        private void ReadTickRate()
+        {
+            if (_run.tickRate > 0)
+                return;
+
+            // Adapters may not know the tick rate until the connection has settled; never let that abort a run.
+            try
+            {
+                _run.tickRate = _adapter.TickRate;
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[NetBench] TickRate unavailable yet: {e.Message}");
+            }
+        }
+
+        private void EnforceFrameCap()
+        {
+            // Several netcodes set their own cap when they start (Mirror: sendRate on headless servers,
+            // FishNet: its TimeManager frame rate). Re-assert ours so CPU numbers stay comparable.
+            QualitySettings.vSyncCount = 0;
+            if (Application.targetFrameRate != _fps)
+            {
+                Debug.Log($"[NetBench] Frame cap was {Application.targetFrameRate}, re-applying {_fps}");
+                Application.targetFrameRate = _fps;
+            }
+        }
+
         private IEnumerator Window(int test, float seconds)
         {
             var load = new LoadSampler();
@@ -407,6 +435,8 @@ namespace PurrNet.NetBench
             bool churn = _isServer && test == TestSpawnChurn;
             int churnCount = Mathf.Max(1, _objects / 50);
 
+            EnforceFrameCap();
+            ReadTickRate();
             load.Begin(_iface);
             markers.Begin(_adapter.ProfilerMarkerPrefixes);
             long inputs0 = BenchRegistry.ServerInputsReceived;

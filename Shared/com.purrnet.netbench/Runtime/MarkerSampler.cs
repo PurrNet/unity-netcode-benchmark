@@ -27,6 +27,13 @@ namespace PurrNet.NetBench
             _calls.Clear();
             _frames = 0;
 
+            // Release builds have no profiler; enabling it there only logs a warning per window.
+            if (!UnityEngine.Debug.isDebugBuild)
+            {
+                _available = false;
+                return;
+            }
+
             Profiler.enabled = true;
 
             var all = new List<string>();

@@ -80,16 +80,28 @@ CPU-by-profiler-marker table), `runner` (`runs-on` label, see below) and `region
 
 Caveats worth keeping in mind when reading results:
 
-- **Fusion is relay-based.** Its dedicated server talks to Photon Cloud, so its *server*
-  downstream is one stream to the relay rather than `N` client streams; compare Fusion on the
-  per-client tables. Its Photon plan is capped at 100 CCU and the server counts as one, so the
-  100-connection point runs with 99 clients.
+- **Fusion is relay-based.** Its dedicated server and its clients all talk to Photon Cloud
+  instead of to each other, so its RTT includes the relay hop and its traffic is measured on the
+  public interface (`eth0`) rather than the tailnet. The server still sends one stream per
+  client through the relay, so server-side downstream is comparable with the others. Its Photon
+  plan is capped at 100 CCU and the server counts as one, so the 100-connection point runs with
+  99 clients.
 - **Machines.** Jobs default to Blacksmith's `blacksmith-4vcpu-ubuntu-2404` pool (fixed hardware
   generation, so CPU numbers are comparable across runs). Set `runner: ubuntu-latest` to fall
   back to GitHub-hosted runners, whose CPU model varies; the summary prints the server CPU model
   per datapoint either way.
 - Release builds are the default; development builds (`profiling`) enable the marker table but
   add profiler overhead.
+- **Frame cap.** Every process is capped at 60 fps and the cap is re-applied at each measurement
+  window, because Mirror (headless server: `sendRate`) and FishNet (`TimeManager` frame rate,
+  500 by default) otherwise override it and CPU % would not be comparable.
+- **FishNet packet size.** The tailnet interface has a 1280-byte MTU and LiteNetLib sends with the
+  don't-fragment flag. Tugboat hard-codes a 1350-byte maximum packet (no inspector setting), so
+  every full packet was silently dropped in CI; the vendored constant in
+  `fishnet/Assets/FishNet/Runtime/Transporting/Transports/Tugboat/Tugboat.cs` is lowered to 1200
+  (the same value Mirror's KCP uses). PurrNet's LiteNetLib discovers the path MTU and settles at
+  1204 on its own; Unity Transport fragments at the IP layer. All FishNet-project changes are
+  listed in [fishnet/BENCHMARK_CHANGES.md](fishnet/BENCHMARK_CHANGES.md).
 
 ### Running a build locally
 

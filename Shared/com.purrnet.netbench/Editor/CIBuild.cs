@@ -70,6 +70,37 @@ namespace PurrNet.NetBench.Editor
             EditorApplication.Exit(summary.result == BuildResult.Succeeded ? 0 : 1);
         }
 
+        // Local debugging aid: a Mono Windows player of the current project (no IL2CPP, fast).
+        //   Unity.exe -batchmode -quit -projectPath <proj> -executeMethod PurrNet.NetBench.Editor.CIBuild.BuildWindowsPlayer -buildOutput build/Win/NetBench.exe
+        public static void BuildWindowsPlayer()
+        {
+            bool dev = Array.IndexOf(Environment.GetCommandLineArgs(), "-devBuild") >= 0;
+            string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            string output = GetCommandLineValue("-buildOutput") ?? Path.Combine("build", "Win", "NetBench.exe");
+            if (!Path.IsPathRooted(output))
+                output = Path.GetFullPath(Path.Combine(projectRoot, output));
+
+            var scenes = EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray();
+            if (scenes.Length == 0)
+            {
+                scenes = AssetDatabase.FindAssets("t:Scene", new[] { "Assets/_Benchmark" })
+                    .Select(AssetDatabase.GUIDToAssetPath).OrderBy(p => p).Take(1).ToArray();
+            }
+
+            PlayerSettings.SetScriptingBackend(NamedBuildTarget.Standalone, ScriptingImplementation.Mono2x);
+            PlayerSettings.runInBackground = true;
+
+            var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+            {
+                scenes = scenes,
+                locationPathName = output,
+                target = BuildTarget.StandaloneWindows64,
+                options = dev ? BuildOptions.Development : BuildOptions.None
+            });
+            Debug.Log($"[CIBuild] Windows result={report.summary.result} -> {output}");
+            EditorApplication.Exit(report.summary.result == BuildResult.Succeeded ? 0 : 1);
+        }
+
         private static string GetCommandLineValue(string key)
         {
             var args = Environment.GetCommandLineArgs();

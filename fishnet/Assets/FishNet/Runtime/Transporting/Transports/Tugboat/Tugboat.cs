@@ -111,8 +111,11 @@ namespace FishNet.Transporting.Tugboat
         private const ushort MAX_TIMEOUT_SECONDS = 1800;
         /// <summary>
         /// Maximum UDP packet size allowed.
+        /// Benchmark note: lowered from FishNet's 1350 to 1200. LiteNetLib sends with DontFragment and
+        /// the benchmark runs over a 1280-byte-MTU overlay (Tailscale); 1350-byte packets were dropped
+        /// by the kernel without any log, stalling replication. 1200 matches Mirror's KCP default.
         /// </summary>
-        private const int MAXIMUM_UDP_MTU = 1350;
+        private const int MAXIMUM_UDP_MTU = 1200;
         #endregion
 
         #region Initialization and unity.

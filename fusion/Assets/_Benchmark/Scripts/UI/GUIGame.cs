@@ -83,7 +83,21 @@ namespace StinkySteak.FusionBenchmark
 
         public string NetcodeName => "fusion";
 
-        public int TickRate => _runner != null && _runner.IsRunning ? (int)_runner.TickRate : 0;
+        public int TickRate
+        {
+            get
+            {
+                // Throws on a client until the first state update (RuntimeConfig) has arrived.
+                try
+                {
+                    return _runner != null && _runner.IsRunning ? (int)_runner.TickRate : 0;
+                }
+                catch (System.InvalidOperationException)
+                {
+                    return 0;
+                }
+            }
+        }
 
         public string[] ProfilerMarkerPrefixes => new[] { "Fusion", "NetworkRunner", "Simulation", "NetworkObject", "NetworkBehaviour" };
 

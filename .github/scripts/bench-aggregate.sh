@@ -20,9 +20,11 @@ OUT_DIR="${7:-scaling}"
 SUMMARY="${GITHUB_STEP_SUMMARY:-/dev/stdout}"
 mkdir -p "$OUT_DIR"
 
-SERVER_FILE="$RESULTS_DIR/server.json"
-shopt -s nullglob
-CLIENT_FILES=("$RESULTS_DIR"/client-*.json)
+# Artifacts may nest their files (an artifact with several paths keeps its directory structure),
+# so locate the result files recursively rather than assuming a flat layout.
+SERVER_FILE=$(find "$RESULTS_DIR" -type f -name server.json | head -n1)
+[ -z "$SERVER_FILE" ] && SERVER_FILE="$RESULTS_DIR/server.json"
+mapfile -t CLIENT_FILES < <(find "$RESULTS_DIR" -type f -name 'client-*.json' | sort)
 
 JQ_LIB='
 def hbR:
@@ -95,17 +97,26 @@ if [ ${#CLIENT_FILES[@]} -gt 0 ]; then
   echo "" >> "$SUMMARY"
 fi
 
-# Datapoint for the cross-netcode scaling table.
-SERVER_JSON="null"
-[ -f "$SERVER_FILE" ] && SERVER_JSON=$(cat "$SERVER_FILE")
-CLIENTS_JSON="[]"
-[ ${#CLIENT_FILES[@]} -gt 0 ] && CLIENTS_JSON=$(jq -s '[ .[] | select(.measured == true) ]' "${CLIENT_FILES[@]}")
+# Datapoint for the cross-netcode scaling table. Inputs go through files (--slurpfile), not
+# arguments: with 25+ clients the concatenated JSON exceeds the exec argument limit.
+TMP_DIR=$(mktemp -d)
+if [ -f "$SERVER_FILE" ]; then
+  cp "$SERVER_FILE" "$TMP_DIR/server.json"
+else
+  echo "null" > "$TMP_DIR/server.json"
+fi
+if [ ${#CLIENT_FILES[@]} -gt 0 ]; then
+  jq -s '[ .[] | select(.measured == true) ]' "${CLIENT_FILES[@]}" > "$TMP_DIR/clients.json"
+else
+  echo "[]" > "$TMP_DIR/clients.json"
+fi
 
 jq -n \
   --arg netcode "$NETCODE" --argjson connections "$TOTAL" --arg tag "$TAG" \
-  --argjson server "$SERVER_JSON" --argjson clients "$CLIENTS_JSON" \
+  --slurpfile serverFile "$TMP_DIR/server.json" --slurpfile clientsFile "$TMP_DIR/clients.json" \
   "$JQ_LIB"'
-  ($server.tests // [] | byName) as $st
+  $serverFile[0] as $server | $clientsFile[0] as $clients
+  | ($server.tests // [] | byName) as $st
   | {
       netcode: $netcode,
       connections: $connections,
