@@ -132,15 +132,19 @@ TEMPLATE = r"""<meta charset="utf-8">
   .card .cv { position: relative; height: 210px; }
   .card canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; }
 
-  .best { display: grid; gap: 12px; }
-  .best h2 small { font-weight: 400; margin-left: 6px; }
-  .best-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
-  .best-card { border: 1px solid var(--ring); border-radius: 8px; padding: 10px 12px; background: var(--surface); display: grid; gap: 4px; }
-  .best-card .t { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; }
-  .best-card .w { font-weight: 600; font-size: 16px; display: flex; align-items: center; gap: 8px; }
-  .best-card .w .sw { width: 10px; height: 10px; border-radius: 2px; }
-  .best-card .d { font-size: 12px; color: var(--ink-2); }
-  .best-card .r { font-size: 11px; color: var(--muted); }
+  .best summary { cursor: pointer; font-size: 15px; font-weight: 600; list-style: none; display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: baseline; margin-bottom: 10px; }
+  .best summary::-webkit-details-marker { display: none; }
+  .best summary::before { content: "\25BE"; font-size: 12px; color: var(--muted); margin-right: 2px; }
+  .best:not([open]) summary::before { content: "\25B8"; }
+  .best summary .hint { font-weight: 400; }
+  .winners td { font-family: "Instrument Sans", system-ui, sans-serif; text-align: left; }
+  .winners th { text-align: left; }
+  .winners td.test { color: var(--ink-2); }
+  .winners .w { display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; font-weight: 500; }
+  .winners .w .sw { width: 9px; height: 9px; border-radius: 2px; }
+  .winners .v { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .winners tfoot td { color: var(--ink); border-top: 1px solid var(--axis); }
+  .winners tfoot .w { font-weight: 400; }
   section h2 { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
   section p { margin: 0; color: var(--ink-2); max-width: 70ch; }
   .tablewrap { overflow-x: auto; border: 1px solid var(--ring); border-radius: 8px; background: var(--surface); }
@@ -167,12 +171,10 @@ TEMPLATE = r"""<meta charset="utf-8">
     <div class="chips" id="versions"></div>
   </header>
 
-  <section class="best">
-    <h2>Best overall <small id="best-size" class="hint"></small></h2>
-    <p class="hint">Per test, netcodes are ranked on five metrics at the largest connection count (server downstream, per-client downstream, server CPU minus idle, frame p95, GC collections; lower is better) and the mean rank decides; ties go to the lower server downstream. The leaderboard counts test wins and averages the per-test mean rank.</p>
-    <div class="best-grid" id="best-cards"></div>
-    <div class="tablewrap"><table id="leaderboard"></table></div>
-  </section>
+  <details class="best" open>
+    <summary><span>Winners by goal</span> <span id="best-size" class="hint"></span> <span class="hint">&middot; server downstream, server CPU minus idle and GC collections judged separately; lower is better; ties share the win</span></summary>
+    <div class="tablewrap"><table id="winners" class="winners"></table></div>
+  </details>
 
   <div class="controls" role="region" aria-label="Chart controls">
     <div class="row"><span class="lbl">Metric</span><div class="seg" id="metrics" role="group" aria-label="Metric"></div></div>
@@ -416,58 +418,40 @@ function buildNotes() {
   ul.hidden = items.length === 0;
 }
 
-// ---- Best overall: rank per test on a fixed metric set at the largest size, then a leaderboard.
-const SCORE = ["srvDown", "cliDown", "cpu", "p95", "gc"];
+// ---- Winners by goal: bandwidth, CPU and GC judged separately per test at the largest size.
+const GOALS = [
+  { id: "srvDown", label: "Bandwidth", fmt: v => (v >= 100 ? v.toFixed(0) : v.toFixed(1)) + " KB/s" },
+  { id: "cpu", label: "CPU", fmt: v => v.toFixed(1) + " %" },
+  { id: "gc", label: "GC", fmt: v => v + (v === 1 ? " collection" : " collections") }
+];
 function metricById(id) { return METRICS.find(m => m.id === id); }
 function rawM(mid, n, s, t) { const r = byKey[n + "@" + s]; if (!r) return null; const v = metricById(mid).get(r, t); return (v == null || Number.isNaN(v)) ? null : v; }
-function rankIn(vals) {
-  const present = vals.filter(x => x.v != null).sort((a, b) => a.v - b.v);
-  const ranks = {};
-  present.forEach((x, i) => { ranks[x.n] = (i > 0 && x.v === present[i - 1].v) ? ranks[present[i - 1].n] : i + 1; });
-  return ranks;
-}
 function buildBest() {
   const s = sizes[sizes.length - 1];
-  const overall = {};
-  netcodes.forEach(n => { overall[n] = { wins: 0, sum: 0, count: 0, bw: 0, cpu: 0 }; });
-  const fmtv = (mid, n, t) => {
-    const m = metricById(mid); const v = rawM(mid, n, s, t);
-    if (v == null) return "–";
-    return m.unit === "KB/s" ? (v >= 100 ? v.toFixed(0) : v.toFixed(1)) + " KB/s" : v.toFixed(1) + " " + m.unit;
-  };
-  const cards = TESTS.map(t => {
-    const scores = {};
-    netcodes.forEach(n => { scores[n] = { sum: 0, cnt: 0 }; });
-    SCORE.forEach(mid => {
-      const ranks = rankIn(netcodes.map(n => ({ n, v: rawM(mid, n, s, t) })));
-      Object.keys(ranks).forEach(n => { scores[n].sum += ranks[n]; scores[n].cnt++; });
-    });
-    const ordered = netcodes.filter(n => scores[n].cnt > 0)
-      .map(n => ({ n, mean: scores[n].sum / scores[n].cnt, bw: rawM("srvDown", n, s, t) }))
-      .sort((a, b) => (a.mean - b.mean) || ((a.bw == null ? Infinity : a.bw) - (b.bw == null ? Infinity : b.bw)));
-    if (!ordered.length) return "";
-    const w = ordered[0];
-    overall[w.n].wins++;
-    ordered.forEach(o => { overall[o.n].sum += o.mean; overall[o.n].count++; });
-    const bwRanks = rankIn(netcodes.map(n => ({ n, v: rawM("srvDown", n, s, t) })));
-    const cpuRanks = rankIn(netcodes.map(n => ({ n, v: rawM("cpu", n, s, t) })));
-    Object.keys(bwRanks).forEach(n => { if (bwRanks[n] === 1) overall[n].bw++; });
-    Object.keys(cpuRanks).forEach(n => { if (cpuRanks[n] === 1) overall[n].cpu++; });
-    const runnerUp = ordered[1] ? ` · next ${NAMES[ordered[1].n]} (${ordered[1].mean.toFixed(1)})` : "";
-    return `<div class="best-card"><div class="t">${t}</div>`
-      + `<div class="w"><span class="sw" style="background:var(--s-${w.n})"></span>${NAMES[w.n]}</div>`
-      + `<div class="d">${fmtv("srvDown", w.n, t)} down · ${fmtv("cpu", w.n, t)} CPU</div>`
-      + `<div class="r">mean rank ${w.mean.toFixed(1)}${runnerUp}</div></div>`;
+  const wins = {};
+  GOALS.forEach(g => { wins[g.id] = {}; netcodes.forEach(n => { wins[g.id][n] = 0; }); });
+  const chip = n => `<span class="w"><span class="sw" style="background:var(--s-${n})"></span>${NAMES[n]}</span>`;
+  let body = "";
+  TESTS.forEach(t => {
+    body += `<tr><td class="test">${t}</td>` + GOALS.map(g => {
+      const vals = netcodes.map(n => ({ n, v: rawM(g.id, n, s, t) })).filter(x => x.v != null);
+      if (!vals.length) return `<td class="na">–</td>`;
+      // GC counts are small integers and CPU-minus-idle sits inside its noise band near zero, so
+      // treat values within a small tolerance as tied rather than crowning a winner on noise.
+      const tol = g.id === "cpu" ? 0.5 : 0;
+      const best = Math.min(...vals.map(x => x.v));
+      const winners = vals.filter(x => x.v - best <= tol).map(x => x.n);
+      winners.forEach(n => { wins[g.id][n]++; });
+      return `<td>${winners.map(chip).join("")}<span class="v">${g.fmt(best)}</span></td>`;
+    }).join("") + "</tr>";
   });
+  const foot = "<tr><td class=\"test\">Wins</td>" + GOALS.map(g => {
+    const ranked = netcodes.map(n => ({ n, w: wins[g.id][n] })).filter(x => x.w > 0).sort((a, b) => b.w - a.w);
+    return "<td>" + ranked.map(x => `${chip(x.n)}<span class="v">${x.w}</span>&nbsp;&nbsp;&nbsp;`).join("") + "</td>";
+  }).join("") + "</tr>";
   document.getElementById("best-size").textContent = `at ${s} connections`;
-  document.getElementById("best-cards").innerHTML = cards.join("");
-  const board = netcodes.map(n => Object.assign({ n, mean: overall[n].count ? overall[n].sum / overall[n].count : null }, overall[n]))
-    .sort((a, b) => (b.wins - a.wins) || ((a.mean == null ? Infinity : a.mean) - (b.mean == null ? Infinity : b.mean)));
-  const sw = n => `<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--s-${n});margin-right:8px;vertical-align:middle"></span>`;
-  document.getElementById("leaderboard").innerHTML =
-    "<thead><tr><th>#</th><th style=\"text-align:left\">Netcode</th><th>Tests won</th><th>Mean rank</th><th>Bandwidth wins</th><th>CPU wins</th></tr></thead><tbody>"
-    + board.map((b, i) => `<tr><td>${i + 1}</td><td style="text-align:left">${sw(b.n)}${NAMES[b.n]}</td><td>${b.wins}</td><td>${b.mean == null ? "–" : b.mean.toFixed(2)}</td><td>${b.bw}</td><td>${b.cpu}</td></tr>`).join("")
-    + "</tbody>";
+  document.getElementById("winners").innerHTML =
+    "<thead><tr><th>Test</th>" + GOALS.map(g => `<th>${g.label}</th>`).join("") + "</tr></thead><tbody>" + body + "</tbody><tfoot>" + foot + "</tfoot>";
 }
 
 buildHeader();
