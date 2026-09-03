@@ -157,9 +157,13 @@ jobs:
     needs: [prep, bench]
     if: always()
     runs-on: blacksmith-2vcpu-ubuntu-2404
+    permissions:
+      contents: write
     steps:
       - name: Checkout (for aggregation scripts)
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
 
       - name: Download scaling datapoints
         uses: actions/download-artifact@v4
@@ -179,6 +183,28 @@ jobs:
             all/versions.json \
             results-out
 
+      - name: Render interactive report
+        id: report
+        run: |
+          set -eu
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          PAGES_URL="https://$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]').github.io/${{ github.event.repository.name }}/"
+          COUNT=$(jq 'length' results-out/scaling.json 2>/dev/null || echo 0)
+          EXPECTED=$(echo '${{ needs.prep.outputs.bench_matrix }}' | jq '.include | length')
+          COMPLETE=false
+          [ "$COUNT" -ge "$EXPECTED" ] && [ "$COUNT" -gt 0 ] && COMPLETE=true
+          echo "Datapoints: $COUNT of $EXPECTED planned (complete=$COMPLETE)"
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "complete=$COMPLETE" >> "$GITHUB_OUTPUT"
+          echo "run_url=$RUN_URL" >> "$GITHUB_OUTPUT"
+          echo "pages_url=$PAGES_URL" >> "$GITHUB_OUTPUT"
+          [ "$COUNT" -gt 0 ] || { echo "No datapoints; skipping report"; exit 0; }
+          python3 .github/scripts/render-report.py results-out/scaling.json results-out/report.html \
+            --versions all/versions.json --run-url "$RUN_URL" --title "Netcode Scaling Report"
+          python3 .github/scripts/render-summary.py results-out/scaling.json \
+            --versions all/versions.json --run-url "$RUN_URL" --report-url "$PAGES_URL" > results-out/latest.md
+          cat results-out/latest.md
+
       - name: Upload combined results
         if: always()
         uses: actions/upload-artifact@v4
@@ -189,3 +215,40 @@ jobs:
             results-out/
           if-no-files-found: warn
           retention-days: 90
+
+      # Commit the latest report + README block on the default branch only, and only when every
+      # planned datapoint exists (a partial run must not overwrite a complete one). A datapoint
+      # still exists when a few client jobs failed, so flaky clients do not block the update.
+      - name: Commit latest results to the repository
+        if: ${{ steps.report.outputs.complete == 'true' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+        run: |
+          set -eu
+          mkdir -p docs
+          cp results-out/report.html docs/index.html
+          cp results-out/scaling.json docs/latest.json
+          cp results-out/latest.md docs/latest.md
+          python3 - <<'EOF'
+          import re, pathlib
+          readme = pathlib.Path("README.md")
+          text = readme.read_text(encoding="utf-8")
+          block = pathlib.Path("docs/latest.md").read_text(encoding="utf-8").strip()
+          new = re.sub(r"<!-- BENCH:START -->.*?<!-- BENCH:END -->",
+                       "<!-- BENCH:START -->\n" + block + "\n<!-- BENCH:END -->", text, flags=re.S)
+          if new == text and "<!-- BENCH:START -->" not in text:
+              new = text.rstrip() + "\n\n## Latest results\n\n<!-- BENCH:START -->\n" + block + "\n<!-- BENCH:END -->\n"
+          readme.write_text(new, encoding="utf-8")
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md docs/
+          if git diff --cached --quiet; then
+            echo "Nothing to commit"
+            exit 0
+          fi
+          git commit -m "bench: latest results from run ${{ github.run_id }} [skip ci]"
+          for i in 1 2 3; do
+            git pull --rebase origin "${{ github.event.repository.default_branch }}" && git push origin HEAD:"${{ github.event.repository.default_branch }}" && exit 0
+            sleep 5
+          done
+          echo "::error::Could not push results commit"
+          exit 1
