@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 #if UNITASK_PURRNET_SUPPORT
 using Cysharp.Threading.Tasks;
 #else
@@ -17,6 +18,14 @@ namespace PurrNet
     [UsedByIL]
     public static class UnityProxy
     {
+        public delegate void AsyncInstantiateCompleted(Object original, Object instance);
+
+        /// <summary>
+        /// Invoked once for each network prefab instance successfully produced by
+        /// <c>Object.InstantiateAsync</c>. Async instantiation always bypasses PurrNet pooling.
+        /// </summary>
+        public static event AsyncInstantiateCompleted onAsyncInstantiateCompleted;
+
         static GameObject GetGameObject<T>(T obj) where T : Object
         {
             return obj switch
@@ -27,7 +36,7 @@ namespace PurrNet
             };
         }
 
-        static T OnPreInstantiate<T>(PrefabData prefabData, InstantiateData<T> instantiateData)
+        static T OnPreInstantiate<T>(PrefabData prefabData, InstantiateData<T> instantiateData, bool notifyCreated = true)
             where T : Object
         {
             var prefab = prefabData.prefab;
@@ -38,16 +47,22 @@ namespace PurrNet
             if (!prefabData.pooled)
             {
                 var instance = instantiateData.Instantiate();
-                var go = GetGameObject(instance);
-                PurrNetGameObjectUtils.NotifyGameObjectCreated(go, prefab);
+                if (notifyCreated)
+                {
+                    var go = GetGameObject(instance);
+                    PurrNetGameObjectUtils.NotifyGameObjectCreated(go, prefab);
+                }
                 return instance;
             }
 
-            if (!HierarchyPool.TryGetPrefabPrototype(prefab, out var prototype))
+            if (!HierarchyPool.TryGetPrefabPrototype(prefabData.prefabId, out var prototype))
             {
                 var instance = instantiateData.Instantiate();
-                var go = GetGameObject(instance);
-                PurrNetGameObjectUtils.NotifyGameObjectCreated(go, prefab);
+                if (notifyCreated)
+                {
+                    var go = GetGameObject(instance);
+                    PurrNetGameObjectUtils.NotifyGameObjectCreated(go, prefab);
+                }
                 return instance;
             }
 
@@ -64,7 +79,9 @@ namespace PurrNet
             }
 
             instantiateData.ApplyToExisting(result, prefab);
-            PurrNetGameObjectUtils.NotifyGameObjectCreated(result, prefab);
+
+            if (notifyCreated)
+                PurrNetGameObjectUtils.NotifyGameObjectCreated(result, prefab);
 
             if (result.TryGetComponent(out T component))
                 return component;
@@ -104,6 +121,8 @@ namespace PurrNet
             return shouldDestroy;
         }
 
+        static readonly HashSet<string> _warnedUnresolvedPrefabs = new();
+
         static bool TryGetPrefabData(Object prefab, out PrefabData prefabData)
         {
             var prefabGo = GetGameObject(prefab);
@@ -116,14 +135,303 @@ namespace PurrNet
 
             var manager = NetworkManager.main;
 
-            if (!manager || manager.prefabProvider == null)
+            if (!manager)
             {
                 prefabData = default;
                 return false;
             }
 
-            return manager.prefabProvider.TryGetPrefabData(prefabGo, out prefabData);
+            if (manager.prefabResolver.TryGetPrefabData(prefabGo, out prefabData))
+                return true;
+
+            if (prefabGo.GetComponentInChildren<NetworkIdentity>(true) &&
+                _warnedUnresolvedPrefabs.Add(prefabGo.name))
+            {
+                PurrLogger.LogWarning(
+                    $"Instantiating `{prefabGo.name}` without networking: it has a NetworkIdentity but isn't a registered network prefab, so it won't be spawned.\n" +
+                    "If this prefab is registered, the given reference is a different copy of the asset. " +
+                    "This commonly happens when an addressable scene references a non-addressable prefab, duplicating it into the scene bundle; " +
+                    "make the prefab addressable and register it via AddressableNetworkPrefabs.", prefabGo);
+            }
+
+            return false;
         }
+
+#if PURRNET_UNITY_INSTANTIATE_ASYNC
+        static AsyncInstantiateOperation<T> TrackAsyncInstantiate<T>(
+            T original,
+            AsyncInstantiateOperation<T> operation)
+            where T : Object
+        {
+            // Non-network prefabs are a pure native pass-through. Network prefabs deliberately
+            // do not consult HierarchyPool: choosing InstantiateAsync opts this instance out of pooling.
+            if (!TryGetPrefabData(original, out _))
+                return operation;
+
+            operation.completed += _ =>
+            {
+                T[] results;
+                try
+                {
+                    results = operation.Result;
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+                catch (Exception e)
+                {
+                    // Cancellation/failure can leave the operation without readable results.
+                    PurrLogger.LogException(e);
+                    return;
+                }
+
+                if (results == null)
+                    return;
+
+                for (var i = 0; i < results.Length; i++)
+                {
+                    var instance = results[i];
+                    if (instance)
+                        onAsyncInstantiateCompleted?.Invoke(original, instance);
+                }
+            };
+
+            return operation;
+        }
+
+        /// <summary>
+        /// Native async instantiation without registering a local-spawn notification.
+        /// Intended for replicated receiver-side creation.
+        /// </summary>
+        public static AsyncInstantiateOperation<T> InstantiateAsyncDirectly<T>(T original)
+            where T : Object
+            => Object.InstantiateAsync(original);
+
+        public static AsyncInstantiateOperation<T> InstantiateAsyncDirectly<T>(
+            T original,
+            Vector3 position,
+            Quaternion rotation)
+            where T : Object
+            => Object.InstantiateAsync(original, position, rotation);
+
+        public static AsyncInstantiateOperation<T> InstantiateAsyncDirectly<T>(T original, Transform parent)
+            where T : Object
+            => Object.InstantiateAsync(original, parent);
+
+        public static AsyncInstantiateOperation<T> InstantiateAsyncDirectly<T>(
+            T original,
+            Transform parent,
+            Vector3 position,
+            Quaternion rotation)
+            where T : Object
+            => Object.InstantiateAsync(original, parent, position, rotation);
+
+        [UsedByIL]
+        public static AsyncInstantiateOperation<T> InstantiateAsync<T>(T original)
+            where T : Object
+            => TrackAsyncInstantiate(original, Object.InstantiateAsync(original));
+
+        [UsedByIL]
+        public static AsyncInstantiateOperation<T> InstantiateAsync<T>(T original, Transform parent)
+            where T : Object
+            => TrackAsyncInstantiate(original, Object.InstantiateAsync(original, parent));
+
+        [UsedByIL]
+        public static AsyncInstantiateOperation<T> InstantiateAsync<T>(
+            T original,
+            Vector3 position,
+            Quaternion rotation)
+            where T : Object
+            => TrackAsyncInstantiate(original, Object.InstantiateAsync(original, position, rotation));
+
+        [UsedByIL]
+        public static AsyncInstantiateOperation<T> InstantiateAsync<T>(
+            T original,
+            Transform parent,
+            Vector3 position,
+            Quaternion rotation)
+            where T : Object
+            => TrackAsyncInstantiate(original, Object.InstantiateAsync(original, parent, position, rotation));
+
+        [UsedByIL]
+        public static AsyncInstantiateOperation<T> InstantiateAsync<T>(T original, int count)
+            where T : Object
+            => TrackAsyncInstantiate(original, Object.InstantiateAsync(original, count));
+
+        [UsedByIL]
+        public static AsyncInstantiateOperation<T> InstantiateAsync<T>(T original, int count, Transform parent)
+            where T : Object
+            => TrackAsyncInstantiate(original, Object.InstantiateAsync(original, count, parent));
+
+        [UsedByIL]
+        public static AsyncInstantiateOperation<T> InstantiateAsync<T>(
+            T original,
+            int count,
+            Vector3 position,
+            Quaternion rotation)
+            where T : Object
+            => TrackAsyncInstantiate(original, Object.InstantiateAsync(original, count, position, rotation));
+
+        [UsedByIL]
+        public static AsyncInstantiateOperation<T> InstantiateAsync<T>(
+            T original,
+            int count,
+            ReadOnlySpan<Vector3> positions,
+            ReadOnlySpan<Quaternion> rotations)
+            where T : Object
+            => TrackAsyncInstantiate(original, Object.InstantiateAsync(original, count, positions, rotations));
+
+        [UsedByIL]
+        public static AsyncInstantiateOperation<T> InstantiateAsync<T>(
+            T original,
+            int count,
+            Transform parent,
+            Vector3 position,
+            Quaternion rotation)
+            where T : Object
+            => TrackAsyncInstantiate(original,
+                Object.InstantiateAsync(original, count, parent, position, rotation));
+
+        [UsedByIL]
+        public static AsyncInstantiateOperation<T> InstantiateAsync<T>(
+            T original,
+            int count,
+            Transform parent,
+            ReadOnlySpan<Vector3> positions,
+            ReadOnlySpan<Quaternion> rotations)
+            where T : Object
+            => TrackAsyncInstantiate(original,
+                Object.InstantiateAsync(original, count, parent, positions, rotations));
+
+#if PURRNET_UNITY_INSTANTIATE_ASYNC_CANCELLATION
+        [UsedByIL]
+        public static AsyncInstantiateOperation<T> InstantiateAsync<T>(
+            T original,
+            int count,
+            Transform parent,
+            Vector3 position,
+            Quaternion rotation,
+            System.Threading.CancellationToken cancellationToken)
+            where T : Object
+            => TrackAsyncInstantiate(original,
+                Object.InstantiateAsync(original, count, parent, position, rotation, cancellationToken));
+
+        [UsedByIL]
+        public static AsyncInstantiateOperation<T> InstantiateAsync<T>(
+            T original,
+            int count,
+            Transform parent,
+            ReadOnlySpan<Vector3> positions,
+            ReadOnlySpan<Quaternion> rotations,
+            System.Threading.CancellationToken cancellationToken)
+            where T : Object
+            => TrackAsyncInstantiate(original,
+                Object.InstantiateAsync(original, count, parent, positions, rotations, cancellationToken));
+#endif
+
+#if PURRNET_UNITY_INSTANTIATE_ASYNC_PARAMETERS_CANCELLATION
+        [UsedByIL]
+        public static AsyncInstantiateOperation<T> InstantiateAsync<T>(
+            T original,
+            InstantiateParameters parameters,
+            System.Threading.CancellationToken cancellationToken = default)
+            where T : Object
+            => TrackAsyncInstantiate(original, Object.InstantiateAsync(original, parameters, cancellationToken));
+
+        [UsedByIL]
+        public static AsyncInstantiateOperation<T> InstantiateAsync<T>(
+            T original,
+            int count,
+            InstantiateParameters parameters,
+            System.Threading.CancellationToken cancellationToken = default)
+            where T : Object
+            => TrackAsyncInstantiate(original,
+                Object.InstantiateAsync(original, count, parameters, cancellationToken));
+
+        [UsedByIL]
+        public static AsyncInstantiateOperation<T> InstantiateAsync<T>(
+            T original,
+            Vector3 position,
+            Quaternion rotation,
+            InstantiateParameters parameters,
+            System.Threading.CancellationToken cancellationToken = default)
+            where T : Object
+            => TrackAsyncInstantiate(original,
+                Object.InstantiateAsync(original, position, rotation, parameters, cancellationToken));
+
+        [UsedByIL]
+        public static AsyncInstantiateOperation<T> InstantiateAsync<T>(
+            T original,
+            int count,
+            Vector3 position,
+            Quaternion rotation,
+            InstantiateParameters parameters,
+            System.Threading.CancellationToken cancellationToken = default)
+            where T : Object
+            => TrackAsyncInstantiate(original,
+                Object.InstantiateAsync(original, count, position, rotation, parameters, cancellationToken));
+
+        [UsedByIL]
+        public static AsyncInstantiateOperation<T> InstantiateAsync<T>(
+            T original,
+            int count,
+            ReadOnlySpan<Vector3> positions,
+            ReadOnlySpan<Quaternion> rotations,
+            InstantiateParameters parameters,
+            System.Threading.CancellationToken cancellationToken = default)
+            where T : Object
+            => TrackAsyncInstantiate(original,
+                Object.InstantiateAsync(original, count, positions, rotations, parameters, cancellationToken));
+#endif
+
+#if PURRNET_UNITY_INSTANTIATE_ASYNC_PARAMETERS_LEGACY
+        [UsedByIL]
+        public static AsyncInstantiateOperation<T> InstantiateAsync<T>(T original, InstantiateParameters parameters)
+            where T : Object
+            => TrackAsyncInstantiate(original, Object.InstantiateAsync(original, parameters));
+
+        [UsedByIL]
+        public static AsyncInstantiateOperation<T> InstantiateAsync<T>(
+            T original,
+            int count,
+            InstantiateParameters parameters)
+            where T : Object
+            => TrackAsyncInstantiate(original, Object.InstantiateAsync(original, count, parameters));
+
+        [UsedByIL]
+        public static AsyncInstantiateOperation<T> InstantiateAsync<T>(
+            T original,
+            Vector3 position,
+            Quaternion rotation,
+            InstantiateParameters parameters)
+            where T : Object
+            => TrackAsyncInstantiate(original,
+                Object.InstantiateAsync(original, position, rotation, parameters));
+
+        [UsedByIL]
+        public static AsyncInstantiateOperation<T> InstantiateAsync<T>(
+            T original,
+            int count,
+            Vector3 position,
+            Quaternion rotation,
+            InstantiateParameters parameters)
+            where T : Object
+            => TrackAsyncInstantiate(original,
+                Object.InstantiateAsync(original, count, position, rotation, parameters));
+
+        [UsedByIL]
+        public static AsyncInstantiateOperation<T> InstantiateAsync<T>(
+            T original,
+            int count,
+            ReadOnlySpan<Vector3> positions,
+            ReadOnlySpan<Quaternion> rotations,
+            InstantiateParameters parameters)
+            where T : Object
+            => TrackAsyncInstantiate(original,
+                Object.InstantiateAsync(original, count, positions, rotations, parameters));
+#endif
+#endif
 
         [UsedByIL]
         public static void DontDestroyOnLoadDirectly(Object target) => Object.DontDestroyOnLoad(target);
@@ -162,6 +470,13 @@ namespace PurrNet
         [UsedByIL]
         public static Object InstantiateDirectly(Object original) => Object.Instantiate(original);
 
+        public static Object InstantiateDirectlyFromPool(Object original)
+        {
+            if (!TryGetPrefabData(original, out var prefabData))
+                return Object.Instantiate(original);
+            return OnPreInstantiate(prefabData, new InstantiateData<Object>(original), false);
+        }
+
         [UsedByIL]
         public static Object Instantiate(Object original)
         {
@@ -182,6 +497,15 @@ namespace PurrNet
         public static Object InstantiateDirectly(Object original, Transform parent, bool instantiateInWorldSpace)
             => Object.Instantiate(original, parent, instantiateInWorldSpace);
 
+        public static Object InstantiateDirectlyFromPool(Object original, Transform parent, bool instantiateInWorldSpace)
+        {
+            if (!TryGetPrefabData(original, out var prefabData))
+                return Object.Instantiate(original, parent, instantiateInWorldSpace);
+
+            return OnPreInstantiate(prefabData, new InstantiateData<Object>(original, parent, instantiateInWorldSpace),
+                false);
+        }
+
         [UsedByIL]
         public static Object Instantiate(Object original, Vector3 position, Quaternion rotation)
         {
@@ -193,6 +517,14 @@ namespace PurrNet
 
         public static Object InstantiateDirectly(Object original, Vector3 position, Quaternion rotation)
             => Object.Instantiate(original, position, rotation);
+
+        public static Object InstantiateDirectlyFromPool(Object original, Vector3 position, Quaternion rotation)
+        {
+            if (!TryGetPrefabData(original, out var prefabData))
+                return Object.Instantiate(original, position, rotation);
+
+            return OnPreInstantiate(prefabData, new InstantiateData<Object>(original, position, rotation), false);
+        }
 
         [UsedByIL]
         public static Object Instantiate(
@@ -216,7 +548,20 @@ namespace PurrNet
             return Object.Instantiate(original, position, rotation, parent);
         }
 
-#if UNITY_2023_1_OR_NEWER
+        public static Object InstantiateDirectlyFromPool(
+            Object original,
+            Vector3 position,
+            Quaternion rotation,
+            Transform parent)
+        {
+            if (!TryGetPrefabData(original, out var prefabData))
+                return Object.Instantiate(original, position, rotation, parent);
+
+            return OnPreInstantiate(prefabData, new InstantiateData<Object>(original, position, rotation, parent),
+                false);
+        }
+
+#if UNITY_6000_0_OR_NEWER
         [UsedByIL]
         public static Object Instantiate(Object original, Scene scene)
         {
@@ -229,8 +574,24 @@ namespace PurrNet
         public static Object InstantiateDirectly(Object original, Scene scene)
             => Object.Instantiate(original, scene);
 
+        public static Object InstantiateDirectlyFromPool(Object original, Scene scene)
+        {
+            if (!TryGetPrefabData(original, out var prefabData))
+                return Object.Instantiate(original, scene);
+
+            return OnPreInstantiate(prefabData, new InstantiateData<Object>(original, scene), false);
+        }
+
         public static T InstantiateDirectly<T>(T original, Scene scene) where T : Object
             => (T)Object.Instantiate(original, scene);
+
+        public static T InstantiateDirectlyFromPool<T>(T original, Scene scene) where T : Object
+        {
+            if (!TryGetPrefabData(original, out var prefabData))
+                return InstantiateDirectly(original, scene);
+
+            return OnPreInstantiate(prefabData, new InstantiateData<T>(original, scene), false);
+        }
 #endif
 
         [UsedByIL]
@@ -245,6 +606,14 @@ namespace PurrNet
         public static Object InstantiateDirectly(Object original, Transform parent)
             => Object.Instantiate(original, parent);
 
+        public static Object InstantiateDirectlyFromPool(Object original, Transform parent)
+        {
+            if (!TryGetPrefabData(original, out var prefabData))
+                return Object.Instantiate(original, parent);
+
+            return OnPreInstantiate(prefabData, new InstantiateData<Object>(original, parent), false);
+        }
+
         [UsedByIL]
         public static T Instantiate<T>(T original) where T : Object
         {
@@ -254,7 +623,7 @@ namespace PurrNet
             return OnPreInstantiate(prefabData, new InstantiateData<T>(original));
         }
 
-#if UNITY_6000_0_35
+#if PURRNET_UNITY_INSTANTIATE_PARAMETERS
         [UsedByIL]
         public static T Instantiate<T>(T original, InstantiateParameters parameters) where T : Object
         {
@@ -275,13 +644,37 @@ namespace PurrNet
         public static T InstantiateDirectly<T>(T original, InstantiateParameters parameters) where T : Object
             => Object.Instantiate(original, parameters);
 
+        public static T InstantiateDirectlyFromPool<T>(T original, InstantiateParameters parameters) where T : Object
+        {
+            if (!TryGetPrefabData(original, out var prefabData))
+                return Object.Instantiate(original, parameters);
+
+            return OnPreInstantiate(prefabData, new InstantiateData<T>(original, parameters), false);
+        }
+
         [UsedByIL]
         public static T InstantiateDirectly<T>(T original, Vector3 pos, Quaternion rot, InstantiateParameters parameters) where T : Object
             => Object.Instantiate(original, pos, rot, parameters);
+
+        public static T InstantiateDirectlyFromPool<T>(T original, Vector3 pos, Quaternion rot, InstantiateParameters parameters) where T : Object
+        {
+            if (!TryGetPrefabData(original, out var prefabData))
+                return Object.Instantiate(original, pos, rot, parameters);
+
+            return OnPreInstantiate(prefabData, new InstantiateData<T>(original, pos, rot, parameters), false);
+        }
 #endif
 
         public static T InstantiateDirectly<T>(T original) where T : Object
             => Object.Instantiate(original);
+
+        public static T InstantiateDirectlyFromPool<T>(T original) where T : Object
+        {
+            if (!TryGetPrefabData(original, out var prefabData))
+                return Object.Instantiate(original);
+
+            return OnPreInstantiate(prefabData, new InstantiateData<T>(original), false);
+        }
 
         [UsedByIL]
         public static T Instantiate<T>(T original, Vector3 position, Quaternion rotation) where T : Object
@@ -294,6 +687,14 @@ namespace PurrNet
 
         public static T InstantiateDirectly<T>(T original, Vector3 position, Quaternion rotation) where T : Object
             => Object.Instantiate(original, position, rotation);
+
+        public static T InstantiateDirectlyFromPool<T>(T original, Vector3 position, Quaternion rotation) where T : Object
+        {
+            if (!TryGetPrefabData(original, out var prefabData))
+                return Object.Instantiate(original, position, rotation);
+
+            return OnPreInstantiate(prefabData, new InstantiateData<T>(original, position, rotation), false);
+        }
 
         [UsedByIL]
         public static T Instantiate<T>(T original, Vector3 position, Quaternion rotation, Scene scene) where T : Object
@@ -321,6 +722,15 @@ namespace PurrNet
             return obj;
         }
 
+        public static T InstantiateDirectlyFromPool<T>(T original, Vector3 position, Quaternion rotation, Scene scene)
+            where T : Object
+        {
+            if (!TryGetPrefabData(original, out var prefabData))
+                return InstantiateDirectly(original, position, rotation, scene);
+
+            return OnPreInstantiate(prefabData, new InstantiateData<T>(original, position, rotation, scene), false);
+        }
+
         [UsedByIL]
         public static T Instantiate<T>(
             T original,
@@ -343,6 +753,19 @@ namespace PurrNet
             where T : Object
             => Object.Instantiate(original, position, rotation, parent);
 
+        public static T InstantiateDirectlyFromPool<T>(
+            T original,
+            Vector3 position,
+            Quaternion rotation,
+            Transform parent)
+            where T : Object
+        {
+            if (!TryGetPrefabData(original, out var prefabData))
+                return Object.Instantiate(original, position, rotation, parent);
+
+            return OnPreInstantiate(prefabData, new InstantiateData<T>(original, position, rotation, parent), false);
+        }
+
         [UsedByIL]
         public static T Instantiate<T>(T original, Transform parent) where T : Object
         {
@@ -355,6 +778,14 @@ namespace PurrNet
         public static T InstantiateDirectly<T>(T original, Transform parent) where T : Object
             => Object.Instantiate(original, parent);
 
+        public static T InstantiateDirectlyFromPool<T>(T original, Transform parent) where T : Object
+        {
+            if (!TryGetPrefabData(original, out var prefabData))
+                return Object.Instantiate(original, parent);
+
+            return OnPreInstantiate(prefabData, new InstantiateData<T>(original, parent), false);
+        }
+
         [UsedByIL]
         public static T Instantiate<T>(T original, Transform parent, bool worldPositionStays) where T : Object
         {
@@ -366,6 +797,15 @@ namespace PurrNet
 
         public static T InstantiateDirectly<T>(T original, Transform parent, bool worldPositionStays) where T : Object
             => Object.Instantiate(original, parent, worldPositionStays);
+
+        public static T InstantiateDirectlyFromPool<T>(T original, Transform parent, bool worldPositionStays)
+            where T : Object
+        {
+            if (!TryGetPrefabData(original, out var prefabData))
+                return Object.Instantiate(original, parent, worldPositionStays);
+
+            return OnPreInstantiate(prefabData, new InstantiateData<T>(original, parent, worldPositionStays), false);
+        }
 
         [UsedByIL]
         public static void Destroy(Object obj)
@@ -387,7 +827,13 @@ namespace PurrNet
 #else
                 await Task.Delay(TimeSpan.FromSeconds(t));
 #endif
-                Destroy(obj);
+#if UNITY_EDITOR
+                if (!Application.isPlaying)
+                    return;
+#endif
+
+                if (obj)
+                    Destroy(obj);
             }
             catch (Exception e)
             {

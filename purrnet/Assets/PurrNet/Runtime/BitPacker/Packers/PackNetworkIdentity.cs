@@ -71,7 +71,7 @@ namespace PurrNet
         {
             try
             {
-                if (inversedPath.list == null || inversedPath.Count == 0)
+                if (inversedPath.rawList == null || inversedPath.Count == 0)
                     return parent;
 
                 int len = inversedPath.Count;
@@ -101,7 +101,7 @@ namespace PurrNet
         {
             if (!trs)
             {
-                Packer<bool>.Write(packer, false);
+                packer.WriteBit(false);
                 return;
             }
 
@@ -109,33 +109,33 @@ namespace PurrNet
 
             if (!parent || !parent.isSpawned || !parent.id.HasValue)
             {
-                Packer<bool>.Write(packer, true);
-                Packer<bool>.Write(packer, false);
+                packer.WriteBit(true);
+                packer.WriteBit(false);
 
-                if (NetworkManager.main == null || NetworkManager.main.prefabProvider == null || !NetworkManager.main.prefabProvider.TryGetPrefabData(trs.gameObject, out var data))
+                if (NetworkManager.main == null || !NetworkManager.main.prefabResolver.TryGetPrefabData(trs.gameObject, out var data))
                 {
-                    Packer<bool>.Write(packer, true);
-                    if (NetworkManager.main != null && NetworkManager.main.networkAssets != null && NetworkManager.main.networkAssets.TryGetId(trs, out var tid))
+                    packer.WriteBit(true);
+                    if (NetworkManager.main != null && NetworkManager.main.networkAssetResolver.TryGetId(trs, out _))
                     {
-                        Packer<bool>.Write(packer, true);
+                        packer.WriteBit(true);
                         Packer.WriteAsNetworkAsset(packer, trs);
                     }
-                    else if (NetworkManager.main != null && NetworkManager.main.networkAssets != null && NetworkManager.main.networkAssets.TryGetId(trs.gameObject, out var gid))
+                    else if (NetworkManager.main != null && NetworkManager.main.networkAssetResolver.TryGetId(trs.gameObject, out _))
                     {
-                        Packer<bool>.Write(packer, false);
+                        packer.WriteBit(false);
                         Packer.WriteAsNetworkAsset(packer, trs.gameObject);
                     }
 
                     return;
                 }
 
-                Packer<bool>.Write(packer, false);
-                Packer<int>.Write(packer, data.prefabId);
+                packer.WriteBit(false);
+                Packer<PrefabID>.Write(packer, data.prefabId);
                 return;
             }
 
-            Packer<bool>.Write(packer, true);
-            Packer<bool>.Write(packer, true);
+            packer.WriteBit(true);
+            packer.WriteBit(true);
             using var invPath = HierarchyPool.GetInvPath(parent.transform, trs);
 
             Packer<SceneID>.Write(packer, parent.sceneId);
@@ -146,11 +146,7 @@ namespace PurrNet
         [UsedByIL]
         public static void ReadTransform(this BitPacker packer, ref Transform trs)
         {
-            bool hasValue = false;
-
-            Packer<bool>.Read(packer, ref hasValue);
-
-            if (!hasValue)
+            if (!packer.ReadBit())
             {
                 trs = null;
                 return;
@@ -176,8 +172,8 @@ namespace PurrNet
                     return;
                 }
 
-                var prefabId = Packer<int>.Read(packer);
-                if (NetworkManager.main && NetworkManager.main.prefabProvider != null && NetworkManager.main.prefabProvider.TryGetPrefabData(prefabId, out var prefabData))
+                var prefabId = Packer<PrefabID>.Read(packer);
+                if (NetworkManager.main && NetworkManager.main.prefabResolver.TryGetPrefabData(prefabId, out var prefabData))
                     trs = prefabData.prefab.transform;
                 return;
             }
@@ -222,11 +218,11 @@ namespace PurrNet
         {
             if (value == null || !value.id.HasValue)
             {
-                Packer<bool>.Write(packer, false);
+                packer.WriteBit(false);
                 return;
             }
 
-            Packer<bool>.Write(packer, true);
+            packer.WriteBit(true);
             Packer<NetworkID>.Write(packer, value.id.Value);
             Packer<SceneID>.Write(packer, value.sceneId);
         }

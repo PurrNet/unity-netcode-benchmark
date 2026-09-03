@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using PurrNet.Modules;
+using PurrNet.Packing;
 using PurrNet.Transports;
 using PurrNet.Utils;
 
@@ -11,7 +12,7 @@ namespace PurrNet
     {
         bool IsSame(object callback);
 
-        void TriggerCallback(PlayerID playerId, object data, bool asServer);
+        void TriggerCallback(PlayerID playerId, BitPacker data, bool asServer);
     }
 
     internal readonly struct PlayerBroadcastCallback<T> : IPlayerBroadcastCallback
@@ -28,10 +29,11 @@ namespace PurrNet
             return callbackToCmp is PlayerBroadcastDelegate<T> action && action == callback;
         }
 
-        public void TriggerCallback(PlayerID playerId, object data, bool asServer)
+        public void TriggerCallback(PlayerID playerId, BitPacker data, bool asServer)
         {
-            if (data is T value)
-                callback?.Invoke(playerId, value, asServer);
+            var result = default(T);
+            Packer<T>.Read(data, ref result);
+            callback?.Invoke(playerId, result, asServer);
         }
     }
 
@@ -69,15 +71,19 @@ namespace PurrNet
             _broadcastModule.onRawDataReceived += OnRawDataReceived;
         }
 
-        private void OnRawDataReceived(Connection conn, uint hash, object data)
+        private void OnRawDataReceived(Connection conn, uint hash, BitPacker data)
         {
             if (!_playersManager.TryGetPlayer(conn, out var player))
                 player = default;
 
+            var bitpos = data.positionInBits;
             if (_actions.TryGetValue(hash, out var actions))
             {
                 for (int i = 0; i < actions.Count; i++)
+                {
                     actions[i].TriggerCallback(player, data, _asServer);
+                    data.SetBitPosition(bitpos);
+                }
             }
         }
 
@@ -120,37 +126,12 @@ namespace PurrNet
             }
         }
 
-        public void SendRaw(PlayerID player, ByteData data, Channel method = Channel.ReliableOrdered)
-        {
-            if (player.isBot)
-                return;
-
-            if (_playersManager.TryGetConnection(player, out var conn))
-                _broadcastModule.SendRaw(conn, data, method);
-        }
-
-        public void SendRaw(IReadOnlyList<PlayerID> players, ByteData data, Channel method = Channel.ReliableOrdered)
-        {
-            _connections.Clear();
-
-            for (var i = 0; i < players.Count; i++)
-            {
-                var player = players[i];
-                if (player.isBot)
-                    continue;
-
-                if (_playersManager.TryGetConnection(player, out var conn))
-                    _connections.Add(conn);
-            }
-
-            _broadcastModule.Send(_connections, data, method);
-        }
-
-        public void Send<T>(PlayerID player, T data, Channel method = Channel.ReliableOrdered)
+        public void Send<T>(PlayerID player, T data, Channel method = Channel.ReliableOrdered,
+            MTUExceededBehaviour? mtuOverride = null)
         {
             if (player == PlayerID.Server)
             {
-                SendToServer(data, method);
+                SendToServer(data, method, mtuOverride);
                 return;
             }
 
@@ -158,10 +139,11 @@ namespace PurrNet
                 return;
 
             if (_playersManager.TryGetConnection(player, out var conn))
-                _broadcastModule.Send(conn, data, method);
+                _broadcastModule.Send(conn, data, method, mtuOverride);
         }
 
-        public void Send<T>(IEnumerable<PlayerID> players, T data, Channel method = Channel.ReliableOrdered)
+        public void Send<T>(IEnumerable<PlayerID> players, T data, Channel method = Channel.ReliableOrdered,
+            MTUExceededBehaviour? mtuOverride = null)
         {
             _connections.Clear();
 
@@ -174,10 +156,11 @@ namespace PurrNet
                     _connections.Add(conn);
             }
 
-            _broadcastModule.Send(_connections, data, method);
+            _broadcastModule.Send(_connections, data, method, mtuOverride);
         }
 
-        public void Send<T>(IReadOnlyList<PlayerID> players, T data, Channel method = Channel.ReliableOrdered)
+        public void Send<T>(IReadOnlyList<PlayerID> players, T data, Channel method = Channel.ReliableOrdered,
+            MTUExceededBehaviour? mtuOverride = null)
         {
             _connections.Clear();
 
@@ -191,10 +174,11 @@ namespace PurrNet
                     _connections.Add(conn);
             }
 
-            _broadcastModule.Send(_connections, data, method);
+            _broadcastModule.Send(_connections, data, method, mtuOverride);
         }
 
-        public void Send<T>(IList<PlayerID> players, T data, Channel method = Channel.ReliableOrdered)
+        public void Send<T>(IList<PlayerID> players, T data, Channel method = Channel.ReliableOrdered,
+            MTUExceededBehaviour? mtuOverride = null)
         {
             _connections.Clear();
 
@@ -208,17 +192,19 @@ namespace PurrNet
                     _connections.Add(conn);
             }
 
-            _broadcastModule.Send(_connections, data, method);
+            _broadcastModule.Send(_connections, data, method, mtuOverride);
         }
 
-        public void SendToAll<T>(T data, Channel method = Channel.ReliableOrdered)
+        public void SendToAll<T>(T data, Channel method = Channel.ReliableOrdered,
+            MTUExceededBehaviour? mtuOverride = null)
         {
-            _broadcastModule.SendToAll(data, method);
+            _broadcastModule.SendToAll(data, method, mtuOverride);
         }
 
-        public void SendToServer<T>(T data, Channel method = Channel.ReliableOrdered)
+        public void SendToServer<T>(T data, Channel method = Channel.ReliableOrdered,
+            MTUExceededBehaviour? mtuOverride = null)
         {
-            _broadcastModule.SendToServer(data, method);
+            _broadcastModule.SendToServer(data, method, mtuOverride);
         }
     }
 }

@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using PurrNet.Logging;
 using PurrNet.Modules;
 using PurrNet.Transports;
 
@@ -6,6 +8,8 @@ namespace PurrNet
 {
     public readonly struct ModulesCollection
     {
+        private readonly Dictionary<Type, INetworkModule> _modulesMap;
+
         private readonly List<INetworkModule> _modules;
         private readonly List<IConnectionListener> _connectionListeners;
         private readonly List<IConnectionStateListener> _connectionStateListeners;
@@ -19,6 +23,7 @@ namespace PurrNet
         private readonly List<IUpdate> _updateListeners;
         private readonly List<ICleanup> _cleanupListeners;
         private readonly List<IFlushBatchedRPCs> _preBroadcastSentListeners;
+        private readonly List<IFlushImmediateRPCs> _immediateFlushListeners;
         private readonly List<IPromoteToServerModule> _IPromoteToServerModule;
         private readonly List<ITransferToNewServer> _ITransferToNewServer;
         private readonly List<IPostTransferToNewServer> _IPostTransferToNewServer;
@@ -41,15 +46,23 @@ namespace PurrNet
             _batchListeners = new List<IBatch>();
             _postBatchListeners = new List<IPostBatch>();
             _preBroadcastSentListeners = new List<IFlushBatchedRPCs>();
+            _immediateFlushListeners = new List<IFlushImmediateRPCs>();
             _IPromoteToServerModule = new List<IPromoteToServerModule>();
             _ITransferToNewServer = new List<ITransferToNewServer>();
             _IPostTransferToNewServer = new List<IPostTransferToNewServer>();
+            _modulesMap = new Dictionary<Type, INetworkModule>();
             _manager = manager;
             _asServer = asServer;
         }
 
         public bool TryGetModule<T>(out T module) where T : INetworkModule
         {
+            if (_modulesMap != null && _modulesMap.TryGetValue(typeof(T), out var moduleResult) && moduleResult is T castedMod)
+            {
+                module = castedMod;
+                return true;
+            }
+
             if (_modules == null)
             {
                 module = default;
@@ -69,11 +82,21 @@ namespace PurrNet
             return false;
         }
 
+        internal bool hasModules => _modules != null && _modules.Count > 0;
+
         public void RegisterModules()
         {
-            bool isClientTransfering = !_asServer && _manager.isTranferingToNewServer;
+            if (_manager == null)
+            {
+                PurrLogger.LogError(
+                    $"NetworkManager is null, cannot register modules as {(_asServer ? "Server" : "Client")}.");
+                return;
+            }
 
-            if (!isClientTransfering)
+            bool isClientTransfering = !_asServer && _manager.isTranferingToNewServer;
+            bool transferExistingClientModules = isClientTransfering && hasModules;
+
+            if (!transferExistingClientModules)
                 UnregisterModules();
 
             _manager.RegisterModules(this, _asServer);
@@ -81,7 +104,7 @@ namespace PurrNet
             if (_manager.isPromotingToServer)
                 return;
 
-            if (_manager.isTranferingToNewServer)
+            if (transferExistingClientModules)
                 return;
 
             for (int i = 0; i < _modules.Count; i++)
@@ -124,6 +147,9 @@ namespace PurrNet
                 if (_modules[i] is IFlushBatchedRPCs preBroadcastSent)
                     _preBroadcastSentListeners.Add(preBroadcastSent);
 
+                if (_modules[i] is IFlushImmediateRPCs immediateFlush)
+                    _immediateFlushListeners.Add(immediateFlush);
+
                 if (_modules[i] is IPromoteToServerModule promoteToServerModule)
                     _IPromoteToServerModule.Add(promoteToServerModule);
 
@@ -133,6 +159,9 @@ namespace PurrNet
                 if (_modules[i] is IPostTransferToNewServer PostTransferToNewServer)
                     _IPostTransferToNewServer.Add(PostTransferToNewServer);
             }
+
+            if (isClientTransfering)
+                TransferToNewServer();
         }
 
         public void OnNewConnection(Connection conn, bool asServer)
@@ -207,6 +236,16 @@ namespace PurrNet
                 _preBroadcastSentListeners[i].FlushBatchedRPCs();
         }
 
+        public bool FlushImmediateRPCs()
+        {
+            bool flushedAny = false;
+
+            for (int i = 0; i < _immediateFlushListeners.Count; i++)
+                flushedAny |= _immediateFlushListeners[i].FlushImmediateRPCs();
+
+            return flushedAny;
+        }
+
         public void PromoteToServer()
         {
             for (int i = 0; i < _IPromoteToServerModule.Count; i++)
@@ -256,6 +295,7 @@ namespace PurrNet
 
         private void Clear()
         {
+            _modulesMap.Clear();
             _modules.Clear();
             _connectionListeners.Clear();
             _connectionStateListeners.Clear();
@@ -269,6 +309,7 @@ namespace PurrNet
             _batchListeners.Clear();
             _postBatchListeners.Clear();
             _preBroadcastSentListeners.Clear();
+            _immediateFlushListeners.Clear();
             _IPromoteToServerModule.Clear();
             _ITransferToNewServer.Clear();
             _IPostTransferToNewServer.Clear();
@@ -276,11 +317,14 @@ namespace PurrNet
 
         public void AddModule(INetworkModule module)
         {
+            _modulesMap[module.GetType()] = module;
             _modules.Add(module);
         }
 
         public void MigrateFrom(ModulesCollection other)
         {
+            foreach (var (key, val) in other._modulesMap)
+                _modulesMap.Add(key, val);
             _modules.AddRange(other._modules);
             _connectionListeners.AddRange(other._connectionListeners);
             _connectionStateListeners.AddRange(other._connectionStateListeners);
@@ -294,6 +338,7 @@ namespace PurrNet
             _batchListeners.AddRange(other._batchListeners);
             _postBatchListeners.AddRange(other._postBatchListeners);
             _preBroadcastSentListeners.AddRange(other._preBroadcastSentListeners);
+            _immediateFlushListeners.AddRange(other._immediateFlushListeners);
             _IPromoteToServerModule.AddRange(other._IPromoteToServerModule);
             _ITransferToNewServer.AddRange(other._ITransferToNewServer);
             _IPostTransferToNewServer.AddRange(other._IPostTransferToNewServer);

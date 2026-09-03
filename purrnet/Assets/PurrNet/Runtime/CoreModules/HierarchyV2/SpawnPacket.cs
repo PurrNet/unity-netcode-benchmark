@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using PurrNet.Logging;
+using PurrNet.Packing;
 using PurrNet.Pooling;
 using UnityEngine;
 
@@ -10,7 +11,10 @@ namespace PurrNet.Modules
     {
         public SceneID sceneId;
         public SpawnID packetIdx;
+        public bool bypassPool;
+        public bool isAsync;
         public GameObjectPrototype prototype;
+        public BitData customData;
 
         [DontPack]
         internal List<NetworkIdentity> localcache;
@@ -32,9 +36,9 @@ namespace PurrNet.Modules
                 return false;
             }
 
-            int rootPrefabId = prototype.framework[0].pid.prefabId;
+            var rootPrefabId = prototype.framework[0].pid.prefabId;
 
-            if (!manager.prefabProvider.TryGetPrefabData(rootPrefabId, out var prefabData))
+            if (!manager.prefabResolver.TryGetPrefabData(rootPrefabId, out var prefabData))
             {
                 PurrLogger.LogError($"Prefab with ID {rootPrefabId} not found in prefab provider.");
                 return false;
@@ -75,6 +79,8 @@ namespace PurrNet.Modules
 
         public void Dispose()
         {
+            if (customData.packer is { isWrapper: false })
+                customData.Dispose();
             prototype.Dispose();
             if (localcache != null)
             {

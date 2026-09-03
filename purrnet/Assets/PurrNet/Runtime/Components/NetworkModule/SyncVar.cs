@@ -2,7 +2,6 @@ using UnityEngine;
 using PurrNet.Logging;
 using PurrNet.Modules;
 using System;
-using System.Collections.Generic;
 using JetBrains.Annotations;
 using PurrNet.Packing;
 using PurrNet.Transports;
@@ -11,7 +10,7 @@ using PurrNet.Utils;
 namespace PurrNet
 {
     [Serializable]
-    public class SyncVar<T> : NetworkModule
+    public class SyncVar<T> : NetworkModule, ISerializationCallbackReceiver, ITickListener
     {
         private TickManager _tickManager;
 
@@ -22,9 +21,13 @@ namespace PurrNet
         [SerializeField, Space(-5), Header("Sync Settings"), PurrLock]
         private bool _ownerAuth;
 
+        [SerializeField, PurrLock] private bool _ownerOnly;
+
         [SerializeField, Min(0)] private float _sendIntervalInSeconds;
 
         public bool ownerAuth => _ownerAuth;
+
+        public override bool ownerOnly => _ownerOnly;
 
         public float sendIntervalInSeconds
         {
@@ -41,25 +44,31 @@ namespace PurrNet
 
         private bool _isSubscribedToTickManager;
 
-        static readonly IEqualityComparer<T> _cmp = EqualityComparer<T>.Default;
+        private bool _ignoreServerUpdates;
 
         public T value
         {
             get => _value;
             set
             {
-                if (_cmp.Equals(value, _value)) return;
-
-                if (isSpawned && !parent.IsController(_ownerAuth))
-                {
-                    PurrLogger.LogError(
-                        $"Invalid permissions when setting `<b>SyncVar<{typeof(T).Name}> {name}</b>` on `{parent.name}`." +
-                        $"\n{GetPermissionErrorDetails(_ownerAuth, this)}", parent);
+                if (PurrEquality<T>.Default.Equals(value, _value))
                     return;
+
+                if (isSpawned && !isControllingSyncVar)
+                {
+                    InvalidateIsController(); // Re-check controller status in case it changed since last check.
+                    if (!isControllingSyncVar)
+                    {
+                        PurrLogger.LogError(
+                            $"Invalid permissions when setting `<b>SyncVar<{typeof(T).Name}> {name}</b>` on `{parent.name}`." +
+                            $"\n{GetPermissionErrorDetails(_ownerAuth, this)}", parent);
+                        return;
+                    }
                 }
 
                 var oldValue = _value;
                 _value = value;
+                _ignoreServerUpdates = true;
 
                 SetDirty();
                 TriggerEvents(oldValue);
@@ -71,6 +80,11 @@ namespace PurrNet
             onChanged = null;
             onChangedWithOld = null;
             isControllingSyncVar = false;
+            _isDirty = false;
+            _wasLastDirty = false;
+            _id = 0;
+            _ignoreServerUpdates = false;
+            _value = _initialValue;
         }
 
         public override void OnOwnerDisconnected(PlayerID ownerId)
@@ -81,6 +95,9 @@ namespace PurrNet
         public override void OnOwnerReconnected(PlayerID ownerId)
         {
             InvalidateIsController();
+
+            if (_ownerAuth && isServer)
+                SendLatestState(ownerId, _id, _value);
         }
 
         public override void OnOwnerChanged(PlayerID? oldOwner, PlayerID? newOwner, bool isSpawnEvent, bool asServer)
@@ -92,12 +109,15 @@ namespace PurrNet
 
             if (_ownerAuth)
             {
-                _id = 0;
+                if (asServer || !isOwner)
+                    _id = 0;
 
                 if (isOwner)
                     SetDirty();
             }
         }
+
+        private TickManager _subscribedTicker;
 
         private void SubscribeToTickManager()
         {
@@ -105,7 +125,8 @@ namespace PurrNet
                 return;
 
             _isSubscribedToTickManager = true;
-            networkManager.tickModule.onTick += OnTick;
+            _subscribedTicker = networkManager.tickModule;
+            _subscribedTicker.AddTickListener(this);
         }
 
         private void UnsubscribeFromTickManager()
@@ -114,7 +135,31 @@ namespace PurrNet
                 return;
 
             _isSubscribedToTickManager = false;
-            networkManager.tickModule.onTick -= OnTick;
+            _subscribedTicker.RemoveTickListener(this);
+        }
+
+        public override void OnInitializeModules()
+        {
+            InvalidateIsController();
+        }
+
+        public override void OnEarlySpawn()
+        {
+            InvalidateIsController();
+        }
+
+        public override void OnSpawn()
+        {
+            InvalidateIsController();
+        }
+
+        public override void OnSpawnSent()
+        {
+            if (isServer || !isControllingSyncVar)
+                return;
+
+            if (_isDirty || !PurrEquality<T>.Default.Equals(_value, _initialValue))
+                FlushImmediately();
         }
 
         public override void OnObserverAdded(PlayerID player, bool isSpawner)
@@ -125,28 +170,40 @@ namespace PurrNet
             SendLatestState(player, _id, _value);
         }
 
-        public override void OnSpawn()
-        {
-            InvalidateIsController();
-        }
-
         private void InvalidateIsController()
         {
-            isControllingSyncVar = parent.IsController(_ownerAuth);
+            bool old = isControllingSyncVar;
+            bool @new = parent && parent.IsController(_ownerAuth);
+
+            isControllingSyncVar = @new;
+
+            if (old != @new && !@new)
+                _ignoreServerUpdates = false;
         }
 
         public override void OnDespawned()
         {
-            if (isControllingSyncVar)
+            InvalidateIsController();
+
+            try
             {
-                _id += 1;
-                FlushImmediately();
+                if (isControllingSyncVar && parent)
+                {
+                    ForceSendReliable();
+                    _lastSendTime = Time.time;
+                }
+            }
+            finally
+            {
+                _wasLastDirty = false;
+                _isDirty = false;
+                UnsubscribeFromTickManager();
             }
         }
 
         public void SetDirty()
         {
-            if (_isDirty || !isControllingSyncVar)
+            if (!isControllingSyncVar)
                 return;
 
             _isDirty = true;
@@ -158,15 +215,15 @@ namespace PurrNet
         private void ForceSendUnreliable()
         {
             if (isServer)
-                SendToAll(_id++, _value);
-            else SendToServer(_id++, _value);
+                SendToAll(++_id, _value);
+            else SendToServer(++_id, _value);
         }
 
         private void ForceSendReliable()
         {
             if (isServer)
-                SendToAllReliably(_id++, _value);
-            else SendToServerReliably(_id++, _value);
+                SendToAllReliably(++_id, _value);
+            else SendToServerReliably(++_id, _value);
         }
 
         public void FlushImmediately()
@@ -180,7 +237,13 @@ namespace PurrNet
 
         public void OnTick()
         {
-            if (!isControllingSyncVar)
+            if (!isControllingSyncVar || !parent)
+            {
+                UnsubscribeFromTickManager();
+                return;
+            }
+
+            if (!parent.isFullySpawned)
                 return;
 
             if (_isDirty)
@@ -205,122 +268,98 @@ namespace PurrNet
 
         private ulong _id;
         private bool _wasLastDirty;
+        [SerializeField, HideInInspector]
+        private T _initialValue;
 
-        public SyncVar(T initialValue = default, float sendIntervalInSeconds = 0f, bool ownerAuth = false)
+        public SyncVar(T initialValue = default, float sendIntervalInSeconds = 0f, bool ownerAuth = false, bool ownerOnly = false)
         {
+            _initialValue = initialValue;
             _value = initialValue;
             _sendIntervalInSeconds = sendIntervalInSeconds;
             _ownerAuth = ownerAuth;
+            _ownerOnly = ownerOnly;
         }
 
         [TargetRpc, UsedImplicitly]
         private void SendLatestState(PlayerID player, PackedULong packetId, T newValue)
         {
             if (isServer)
+                return;
+
+            if (_ignoreServerUpdates)
             {
-                DisposeOf(newValue);
+                if (packetId.value > _id)
+                    _id = packetId.value;
                 return;
             }
 
-            _id = packetId;
+            _id = packetId.value;
 
             var oldValue = _value;
 
             if (!Packer.Transform(ref _value, newValue))
-            {
-                DisposeOf(newValue);
                 return;
-            }
 
             TriggerEvents(oldValue);
-            DisposeOf(newValue);
-        }
-
-        private static void DisposeOf(T newValue)
-        {
-            if (newValue is IDisposable disposable)
-                disposable.Dispose();
         }
 
         [ServerRpc(Channel.Unreliable, requireOwnership: true)]
         private void SendToServer(PackedULong packetId, T newValue)
         {
             if (!_ownerAuth)
-            {
-                if (newValue is IDisposable disposable)
-                    disposable.Dispose();
                 return;
-            }
 
             OnReceivedValue(packetId, newValue);
             SendToOthers(packetId, newValue);
-
-            if (newValue is IDisposable newValDisp)
-                newValDisp.Dispose();
         }
 
         [ServerRpc(Channel.ReliableOrdered, requireOwnership: true)]
         private void SendToServerReliably(PackedULong packetId, T newValue)
         {
             if (!_ownerAuth)
-            {
-                if (newValue is IDisposable disposable)
-                    disposable.Dispose();
                 return;
-            }
 
             OnReceivedValue(packetId, newValue);
             SendToOthersReliably(packetId, newValue);
-
-            if (newValue is IDisposable newValDisp)
-                newValDisp.Dispose();
         }
 
         [ObserversRpc(Channel.Unreliable, excludeOwner: true)]
         private void SendToOthers(PackedULong packetId, T newValue)
         {
-            if (!isServer) OnReceivedValue(packetId, newValue);
-            if (newValue is IDisposable disposable)
-                disposable.Dispose();
+            if (!isServer)
+                OnReceivedValue(packetId, newValue);
         }
 
         [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true)]
         private void SendToOthersReliably(PackedULong packetId, T newValue)
         {
-            if (!isHost) OnReceivedValue(packetId, newValue);
-            if (newValue is IDisposable disposable)
-                disposable.Dispose();
+            if (!isHost)
+                OnReceivedValue(packetId, newValue);
         }
 
         [ObserversRpc(Channel.Unreliable)]
         private void SendToAll(PackedULong packetId, T newValue)
         {
-            if (!isHost) OnReceivedValue(packetId, newValue);
-            if (newValue is IDisposable disposable)
-                disposable.Dispose();
+            if (!isHost)
+                OnReceivedValue(packetId, newValue);
         }
 
         [ObserversRpc(Channel.ReliableOrdered)]
         private void SendToAllReliably(PackedULong packetId, T newValue)
         {
-            if (!isHost) OnReceivedValue(packetId, newValue);
-            if (newValue is IDisposable disposable)
-                disposable.Dispose();
+            if (!isHost)
+                OnReceivedValue(packetId, newValue);
         }
 
         private void OnReceivedValue(PackedULong packetId, T newValue)
         {
             if (isControllingSyncVar)
-            {
                 return;
-            }
 
-            if (packetId <= _id)
-            {
+            if (packetId.value <= _id)
                 return;
-            }
 
-            _id = packetId;
+            _id = packetId.value;
             var oldValue = _value;
 
             if (!Packer.Transform(ref _value, newValue))
@@ -358,6 +397,15 @@ namespace PurrNet
         public override string ToString()
         {
             return value.ToString();
+        }
+
+        public void OnBeforeSerialize()
+        {
+        }
+
+        public void OnAfterDeserialize()
+        {
+            _initialValue = _value;
         }
     }
 }

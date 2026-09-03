@@ -11,9 +11,12 @@ namespace PurrNet.Codegen
 {
     public static class RegisterSerializersProcessor
     {
-        static bool IsDeltaWriteMethod(MethodDefinition method, out TypeReference type)
+        public static bool IsDeltaWriteMethod(MethodDefinition method, out TypeReference type)
         {
             type = null;
+
+            if (method.ReturnType.MetadataType != MetadataType.Boolean)
+                return false;
 
             if (method.Parameters.Count != 3)
                 return false;
@@ -34,9 +37,12 @@ namespace PurrNet.Codegen
             return true;
         }
 
-        static bool IsDeltaReadMethod(MethodDefinition method, out TypeReference type)
+        public static bool IsDeltaReadMethod(MethodDefinition method, out TypeReference type)
         {
             type = null;
+
+            if (method.ReturnType.MetadataType != MetadataType.Void)
+                return false;
 
             if (method.Parameters.Count != 3)
                 return false;
@@ -55,9 +61,12 @@ namespace PurrNet.Codegen
             return true;
         }
 
-        static bool IsWriteMethod(MethodDefinition method, out TypeReference type)
+        public static bool IsWriteMethod(MethodDefinition method, out TypeReference type)
         {
             type = null;
+
+            if (method.ReturnType.MetadataType != MetadataType.Void)
+                return false;
 
             if (method.Parameters.Count != 2)
                 return false;
@@ -72,9 +81,12 @@ namespace PurrNet.Codegen
             return true;
         }
 
-        static bool IsReadMethod(MethodDefinition method, out TypeReference type)
+        public static bool IsReadMethod(MethodDefinition method, out TypeReference type)
         {
             type = null;
+
+            if (method.ReturnType.MetadataType != MetadataType.Void)
+                return false;
 
             if (method.Parameters.Count != 2)
                 return false;
@@ -87,6 +99,9 @@ namespace PurrNet.Codegen
 
             type = method.Parameters[1].ParameterType;
 
+            if (type is ByReferenceType byRefType)
+                type = byRefType.ElementType;
+
             return true;
         }
 
@@ -97,7 +112,32 @@ namespace PurrNet.Codegen
             public MethodDefinition method;
         }
 
-        public static void HandleType(ModuleDefinition module, TypeDefinition type,
+        public static void EnsureCoreClrAccessible(TypeReference typeRef, ModuleDefinition module)
+        {
+            switch (typeRef)
+            {
+                case null: return;
+                case GenericInstanceType git:
+                    EnsureCoreClrAccessible(git.ElementType, module);
+                    foreach (var arg in git.GenericArguments)
+                        EnsureCoreClrAccessible(arg, module);
+                    return;
+                case ByReferenceType byRef: EnsureCoreClrAccessible(byRef.ElementType, module); return;
+                case ArrayType arr:         EnsureCoreClrAccessible(arr.ElementType, module);   return;
+                case PointerType ptr:       EnsureCoreClrAccessible(ptr.ElementType, module);   return;
+            }
+
+            var resolved = typeRef.Resolve();
+
+            while (resolved != null && resolved.IsNested && resolved.Module == module)
+            {
+                if (!resolved.IsNestedPublic)
+                    resolved.IsNestedPublic = true;
+                resolved = resolved.DeclaringType?.Resolve();
+            }
+        }
+
+        public static void HandleType(TypeReference actualType, ModuleDefinition module, TypeDefinition type,
             HashSet<TypeReference> toIgnoreForDelta, HashSet<TypeReference> toIgnoreForSerialization)
         {
             if (type.FullName == typeof(Packer).FullName)
@@ -166,6 +206,7 @@ namespace PurrNet.Codegen
                     });
 
                     toIgnoreForDelta?.Add(deltaWriteType);
+                    GenerateDeltaSerializersProcessor.CacheDeltaWrite(deltaWriteType, method);
                 }
                 else if (IsDeltaReadMethod(method, out var deltaReadType))
                 {
@@ -180,10 +221,13 @@ namespace PurrNet.Codegen
                     });
 
                     toIgnoreForDelta?.Add(deltaReadType);
+                    GenerateDeltaSerializersProcessor.CacheDeltaRead(deltaReadType, method);
                 }
             }
 
-            if (writeTypes.Count == 0 && readTypes.Count == 0)
+            bool hasIDuplicate = DuplicateHelpers.HasDuplicateInterface(actualType);
+            bool hasIPurrEquatable = EquatableHelpers.HasEquatableInterface(actualType);
+            if (writeTypes.Count == 0 && readTypes.Count == 0 && !hasIDuplicate && !hasIPurrEquatable)
                 return;
 
             var writeFuncDelegate = module.GetTypeDefinition(typeof(WriteFunc<>)).Import(module);
@@ -221,9 +265,11 @@ namespace PurrNet.Codegen
             for (int i = 0; i < writeTypes.Count; i++)
             {
                 var writeType = writeTypes[i];
+                EnsureCoreClrAccessible(writeType.type, module);
                 var writeMethod = writeType.method.Import(module);
-
-                writeMethod.Resolve().AggressiveInlining = true;
+                var resolved = writeMethod.Resolve();
+                resolved.IsPublic = true;
+                resolved.AggressiveInlining = true;
 
                 var nonDeltaPackerType = module.GetTypeDefinition(typeof(Packer<>)).Import(module);
                 var deltaPackerType = module.GetTypeDefinition(typeof(DeltaPacker<>)).Import(module);
@@ -267,15 +313,41 @@ namespace PurrNet.Codegen
                     genericWrite.Parameters.Add(new ParameterDefinition(param.Name, param.Attributes,
                         param.ParameterType));
 
+                if (writeType.isDelta)
+                    il.Emit(OpCodes.Dup);
+
                 il.Emit(OpCodes.Call, genericWrite);
+
+                if (writeType.isDelta)
+                {
+                    var nativeDeltaPackerType = module.GetTypeDefinition(typeof(NativeDeltaPacker<>)).Import(module);
+                    var genNativePackerType = new GenericInstanceType(nativeDeltaPackerType);
+                    genNativePackerType.GenericArguments.Add(writeType.type.Import(module));
+
+                    var nativeWrite = genNativePackerType.GetMethod("RegisterWriter", false).Import(module);
+                    var genericNativeWrite = new MethodReference("RegisterWriter", module.TypeSystem.Void, genNativePackerType)
+                    {
+                        HasThis = nativeWrite.HasThis,
+                        ExplicitThis = nativeWrite.ExplicitThis,
+                        CallingConvention = nativeWrite.CallingConvention
+                    };
+
+                    foreach (var param in nativeWrite.Parameters)
+                        genericNativeWrite.Parameters.Add(new ParameterDefinition(param.Name, param.Attributes,
+                            param.ParameterType));
+
+                    il.Emit(OpCodes.Call, genericNativeWrite);
+                }
             }
 
             for (int i = 0; i < readTypes.Count; i++)
             {
                 var readType = readTypes[i];
                 var readMethod = readType.method.Import(module);
+                var resolved = readMethod.Resolve();
 
-                readMethod.Resolve().AggressiveInlining = true;
+                resolved.IsPublic = true;
+                resolved.AggressiveInlining = true;
 
                 // Create a GenericInstanceMethod for Packer.RegisterReader<T>
 
@@ -286,6 +358,8 @@ namespace PurrNet.Codegen
                 {
                     typeArgument = byRefType.ElementType; // Use the base type (e.g., int from ref int)
                 }
+
+                EnsureCoreClrAccessible(typeArgument, module);
 
                 var packerType = module.GetTypeDefinition(typeof(Packer<>)).Import(module);
                 var deltaPackerType = module.GetTypeDefinition(typeof(DeltaPacker<>)).Import(module);
@@ -336,8 +410,38 @@ namespace PurrNet.Codegen
                     genericread.Parameters.Add(new ParameterDefinition(param.Name, param.Attributes,
                         param.ParameterType));
 
+                if (readType.isDelta)
+                    il.Emit(OpCodes.Dup);
+
                 il.Emit(OpCodes.Call, genericread);
+
+                if (readType.isDelta)
+                {
+                    var nativeDeltaPackerType = module.GetTypeDefinition(typeof(NativeDeltaPacker<>)).Import(module);
+                    var genNativePackerType = new GenericInstanceType(nativeDeltaPackerType);
+                    genNativePackerType.GenericArguments.Add(typeArgument);
+
+                    var nativeRead = genNativePackerType.GetMethod("RegisterReader", false).Import(module);
+                    var genericNativeRead = new MethodReference("RegisterReader", module.TypeSystem.Void, genNativePackerType)
+                    {
+                        HasThis = nativeRead.HasThis,
+                        ExplicitThis = nativeRead.ExplicitThis,
+                        CallingConvention = nativeRead.CallingConvention
+                    };
+
+                    foreach (var param in nativeRead.Parameters)
+                        genericNativeRead.Parameters.Add(new ParameterDefinition(param.Name, param.Attributes,
+                            param.ParameterType));
+
+                    il.Emit(OpCodes.Call, genericNativeRead);
+                }
             }
+
+            if (hasIDuplicate)
+                DuplicateHelpers.InjectRegistration(type, actualType, il);
+
+            if (hasIPurrEquatable)
+                EquatableHelpers.InjectRegistration(type, actualType, il);
 
             il.Emit(OpCodes.Ret);
         }

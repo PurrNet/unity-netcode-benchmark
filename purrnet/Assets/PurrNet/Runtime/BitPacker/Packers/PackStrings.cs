@@ -1,3 +1,4 @@
+using System.Buffers;
 using PurrNet.Modules;
 
 namespace PurrNet.Packing
@@ -23,6 +24,12 @@ namespace PurrNet.Packing
                 packer.Write(value[i]);
         }
 
+        /// <summary>
+        /// Maximum allowed string length during deserialization to guard against
+        /// corrupted or malicious packets that could cause excessive allocations.
+        /// </summary>
+        private const int MAX_STRING_LENGTH = 64 * 1024;
+
         [UsedByIL]
         public static void Read(this BitPacker packer, ref string value)
         {
@@ -40,14 +47,31 @@ namespace PurrNet.Packing
 
             packer.Read(ref strLen);
 
-            var chars = new char[strLen];
-
-            for (int i = 0; i < strLen; i++)
+            if (strLen is < 0 or > MAX_STRING_LENGTH)
             {
-                packer.Read(ref chars[i]);
+                throw new System.Runtime.Serialization.SerializationException(
+                    $"Invalid string length during deserialization: {strLen}. " +
+                    $"This likely indicates a corrupted or truncated network packet.");
             }
 
-            value = new string(chars);
+            if (strLen == 0)
+            {
+                value = string.Empty;
+                return;
+            }
+
+            var chars = ArrayPool<char>.Shared.Rent(strLen);
+            try
+            {
+                for (int i = 0; i < strLen; i++)
+                    packer.Read(ref chars[i]);
+
+                value = new string(chars, 0, strLen);
+            }
+            finally
+            {
+                ArrayPool<char>.Shared.Return(chars);
+            }
         }
 
         [UsedByIL]

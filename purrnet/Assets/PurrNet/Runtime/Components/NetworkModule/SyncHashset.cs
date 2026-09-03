@@ -3,7 +3,6 @@ using PurrNet.Logging;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using PurrNet.Transports;
 
 namespace PurrNet
@@ -43,6 +42,8 @@ namespace PurrNet
     public class SyncHashSet<T> : NetworkModule, ISet<T>
     {
         [SerializeField] private bool _ownerAuth;
+
+        [SerializeField] private bool _ownerOnly;
         [SerializeField] private List<T> _serializedSet = new List<T>();
         private HashSet<T> _set = new HashSet<T>();
 
@@ -58,6 +59,8 @@ namespace PurrNet
         /// </summary>
         public bool ownerAuth => _ownerAuth;
 
+        public override bool ownerOnly => _ownerOnly;
+
         /// <summary>
         /// The amount of entries in the hash set
         /// </summary>
@@ -65,9 +68,10 @@ namespace PurrNet
 
         public bool IsReadOnly => false;
 
-        public SyncHashSet(bool ownerAuth = false)
+        public SyncHashSet(bool ownerAuth = false, bool ownerOnly = false)
         {
             _ownerAuth = ownerAuth;
+            _ownerOnly = ownerOnly;
 
 #if UNITY_EDITOR
             onChanged += UpdateSerializedSet;
@@ -96,7 +100,7 @@ namespace PurrNet
 
         public override void OnObserverAdded(PlayerID player)
         {
-            HandleInitialStateTarget(player, _serializedSet.ToHashSet());
+            HandleInitialStateTarget(player, _set);
         }
 
         [TargetRpc(Channel.ReliableOrdered)]
@@ -118,19 +122,16 @@ namespace PurrNet
             SendInitialStateToOthers(initialState);
         }
 
-        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true)]
+        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true, runLocally: true)]
         private void SendInitialStateToOthers(HashSet<T> initialState)
         {
-            if (!isServer || isHost)
+            _set = initialState;
+
+            InvokeChange(new SyncHashSetChange<T>(SyncHashSetOperation.Cleared));
+
+            foreach (var value in _set)
             {
-                _set = initialState;
-
-                InvokeChange(new SyncHashSetChange<T>(SyncHashSetOperation.Cleared));
-
-                foreach (var value in _set)
-                {
-                    InvokeChange(new SyncHashSetChange<T>(SyncHashSetOperation.Added, value));
-                }
+                InvokeChange(new SyncHashSetChange<T>(SyncHashSetOperation.Added, value));
             }
         }
 
@@ -308,15 +309,12 @@ namespace PurrNet
             SendAddToOthers(item);
         }
 
-        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true)]
+        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true, runLocally: true)]
         private void SendAddToOthers(T item)
         {
-            if (!isServer || isHost)
+            if (_set.Add(item))
             {
-                if (_set.Add(item))
-                {
-                    InvokeChange(new SyncHashSetChange<T>(SyncHashSetOperation.Added, item));
-                }
+                InvokeChange(new SyncHashSetChange<T>(SyncHashSetOperation.Added, item));
             }
         }
 
@@ -339,15 +337,12 @@ namespace PurrNet
             SendRemoveToOthers(item);
         }
 
-        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true)]
+        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true, runLocally: true)]
         private void SendRemoveToOthers(T item)
         {
-            if (!isServer || isHost)
+            if (_set.Remove(item))
             {
-                if (_set.Remove(item))
-                {
-                    InvokeChange(new SyncHashSetChange<T>(SyncHashSetOperation.Removed, item));
-                }
+                InvokeChange(new SyncHashSetChange<T>(SyncHashSetOperation.Removed, item));
             }
         }
 
@@ -370,14 +365,11 @@ namespace PurrNet
             SendClearToOthers();
         }
 
-        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true)]
+        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true, runLocally: true)]
         private void SendClearToOthers()
         {
-            if (!isServer || isHost)
-            {
-                _set.Clear();
-                InvokeChange(new SyncHashSetChange<T>(SyncHashSetOperation.Cleared));
-            }
+            _set.Clear();
+            InvokeChange(new SyncHashSetChange<T>(SyncHashSetOperation.Cleared));
         }
 
         [ObserversRpc(Channel.ReliableOrdered)]

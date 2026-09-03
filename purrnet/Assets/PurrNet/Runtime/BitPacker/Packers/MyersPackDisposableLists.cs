@@ -1,4 +1,5 @@
-﻿using PurrNet.Modules;
+﻿using System.Runtime.CompilerServices;
+using PurrNet.Modules;
 using PurrNet.Pooling;
 
 namespace PurrNet.Packing
@@ -10,7 +11,7 @@ namespace PurrNet.Packing
         {
             var scope = new DeltaWritingScope(packer);
 
-            if (Packer.AreEqual(old, value))
+            if (old.Equals(value))
                 return scope.Complete();
 
             if (value.isDisposed)
@@ -38,7 +39,14 @@ namespace PurrNet.Packing
             }
 
             scope.Write(DiffOp<T>.FinalOperation());
-            return scope.Complete();
+
+            var result = scope.Complete();
+
+            for (int i = 0; i < changes.Count; i++)
+                changes[i].values.Dispose();
+            changes.Dispose();
+
+            return result;
         }
 
         [UsedByIL]
@@ -47,21 +55,30 @@ namespace PurrNet.Packing
             if (!DeltaReadingScope.Continue(packer, old, ref value))
                 return;
 
-            bool hasValue = Packer<bool>.Read(packer);
-
-            if (!hasValue)
+            if (!packer.ReadBit())
             {
                 value.Dispose();
                 return;
             }
 
-            if (value.isDisposed || (!old.isDisposed && old.list == value.list))
+            if (value.isDisposed)
+            {
                 value = DisposableList<T>.Create();
+            }
+            else if (!old.isDisposed && old.rawList == value.rawList)
+            {
+                value = DisposableList<T>.Create();
+            }
 
             if (!old.isDisposed)
             {
                 value.Clear();
-                value.AddRange(old);
+                if (RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+                {
+                    for (int i = 0; i < old.Count; i++)
+                        value.Add(PurrCopy<T>.Copy(old[i]));
+                }
+                else value.AddRange(old);
             }
 
             var changes = DisposableList<DiffOp<T>>.Create();

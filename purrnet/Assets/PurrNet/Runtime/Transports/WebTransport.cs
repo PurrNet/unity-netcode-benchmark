@@ -8,6 +8,7 @@ using UnityEngine;
 
 namespace PurrNet.Transports
 {
+    [AddComponentMenu("PurrNet/Transport/Web Transport")]
     public partial class WebTransport : GenericTransport, ITransport
     {
         [SerializeField] private AutomaticCloudSetups _automaticCloudSetups;
@@ -33,9 +34,6 @@ namespace PurrNet.Transports
         [SerializeField] private float _timeoutInSeconds = 5f;*/
 
         [Header("Shared Settings")]
-        [Tooltip("When enabled, the transport will poll events in the Update method instead of per Tick.")]
-        [SerializeField]
-        private bool _pollEventsInUpdate;
 
         [Header("SSL Settings")] [SerializeField]
         private bool _enableSSL;
@@ -250,20 +248,14 @@ namespace PurrNet.Transports
 
         public void ReceiveMessages(float delta)
         {
-            if (!_pollEventsInUpdate)
-            {
-                _server?.ProcessMessageQueue();
-                _client?.ProcessMessageQueue();
-            }
+            _server?.ProcessMessageQueue();
+            _client?.ProcessMessageQueue();
         }
 
         public void UnityUpdate(float delta)
         {
-            if (_pollEventsInUpdate)
-            {
-                _server?.ProcessMessageQueue();
-                _client?.ProcessMessageQueue();
-            }
+            _server?.ProcessMessageQueue();
+            _client?.ProcessMessageQueue();
         }
 
         public void Listen(ushort port)

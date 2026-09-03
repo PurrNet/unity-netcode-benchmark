@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using K4os.Compression.LZ4;
 using PurrNet.Logging;
 using PurrNet.Packing;
@@ -8,14 +9,15 @@ using PurrNet.Pooling;
 using PurrNet.Profiler;
 using PurrNet.Transports;
 using PurrNet.Utils;
+using Unity.Profiling;
 
 namespace PurrNet.Modules
 {
-    public class RPCModule : INetworkModule, IBatch, IFlushBatchedRPCs, IPromoteToServerModule
+    public class RPCModule : INetworkModule, IBatch, IFlushBatchedRPCs, IFlushImmediateRPCs, IPromoteToServerModule, ITransferToNewServer
     {
-        public delegate void RPCPreProcessDelegate(ref ByteData rpcData, RPCSignature signature, ref BitPacker packer);
+        public delegate void RPCPreProcessDelegate(RPCSignature signature, ref BitPacker packer);
 
-        public delegate void RPCPostProcessDelegate(ByteData rpcData, RPCInfo info, ref BitPacker packer);
+        public delegate void RPCPostProcessDelegate(RPCInfo info, ref BitData packer);
 
         public static event RPCPreProcessDelegate onPreProcessRpc;
 
@@ -27,9 +29,9 @@ namespace PurrNet.Modules
         readonly GlobalOwnershipModule _ownership;
         readonly NetworkManager _manager;
 
-        private readonly RPCBatch<NetworkIdentityRPCHeader> _normalRpcBatch;
-        private readonly RPCBatch<NetworkModuleRPCHeader> _childRpcBatch;
-        private readonly RPCBatch<StaticRPCHeader> _staticRpcBatch;
+        private RPCBatch _unionBatch;
+        private RPCBatch _immediateBatch;
+        private bool _immediateContentFlushed;
 
         public RPCModule(NetworkManager manager, PlayersManager playersManager, HierarchyFactory hierarchyModule,
             GlobalOwnershipModule ownerships, ScenesModule scenes)
@@ -39,46 +41,57 @@ namespace PurrNet.Modules
             _hierarchyModule = hierarchyModule;
             _scenes = scenes;
             _ownership = ownerships;
+        }
 
-            _normalRpcBatch = new RPCBatch<NetworkIdentityRPCHeader>(_playersManager, ReceivedNormalBatchedRPC);
-            _childRpcBatch = new RPCBatch<NetworkModuleRPCHeader>(_playersManager, ReceivedChildBatchedRPC);
-            _staticRpcBatch = new RPCBatch<StaticRPCHeader>(_playersManager, ReiceStaticBatchedRPC);
+        private void ReceivedUnionBatchedRPC(PlayerID sender, UnionRPCHeader header, BitData content, bool asServer)
+        {
+            try
+            {
+                if (header.moduleRpc.HasValue)
+                {
+                    ReceiveChildRPC(sender, new ChildRPCPacket
+                    {
+                        header = header.ToModuleHeader(),
+                        data = content
+                    }, asServer);
+                }
+                else if (header.identityRpc.HasValue)
+                {
+                    ReceiveRPC(sender, new RPCPacket
+                    {
+                        header = header.ToIdentityHeader(),
+                        data = content
+                    }, asServer);
+                }
+                else
+                {
+                    ReceiveStaticRPC(sender, new StaticRPCPacket
+                    {
+                        header = header.ToStaticHeader(),
+                        data = content
+                    }, asServer);
+                }
+            }
+            catch (Exception e)
+            {
+                PurrLogger.LogException(e);
+            }
         }
 
         public void PromoteToServerModule()
         {
-            _normalRpcBatch.Clear();
-            _childRpcBatch.Clear();
-            _staticRpcBatch.Clear();
+            _unionBatch.Clear();
+            _immediateBatch.Clear();
+            _immediateContentFlushed = false;
         }
 
         public void PostPromoteToServerModule() { }
 
-        private void ReiceStaticBatchedRPC(PlayerID sender, StaticRPCHeader header, ByteData content, bool asServer)
+        public void TransferToNewServer()
         {
-            ReceiveStaticRPC(sender, new StaticRPCPacket
-            {
-                header = header,
-                data = content
-            }, asServer);
-        }
-
-        private void ReceivedChildBatchedRPC(PlayerID sender, NetworkModuleRPCHeader header, ByteData content, bool asServer)
-        {
-            ReceiveChildRPC(sender, new ChildRPCPacket
-            {
-                header = header,
-                data = content
-            }, asServer);
-        }
-
-        private void ReceivedNormalBatchedRPC(PlayerID sender, NetworkIdentityRPCHeader header, ByteData content, bool asServer)
-        {
-            ReceiveRPC(sender, new RPCPacket
-            {
-                header = header,
-                data = content
-            }, asServer);
+            _unionBatch.Clear();
+            _immediateBatch.Clear();
+            _immediateContentFlushed = false;
         }
 
         public void Enable(bool asServer)
@@ -92,6 +105,30 @@ namespace PurrNet.Modules
 
             _hierarchyModule.onSentSpawnPacket += OnObserverAdded;
             _hierarchyModule.onIdentityRemoved += OnIdentityRemoved;
+
+            _unionBatch = new RPCBatch(_playersManager, ReceivedUnionBatchedRPC);
+            _immediateBatch = new RPCBatch(_playersManager, ReceivedUnionBatchedRPC, subscribeToReceives: false,
+                sendAsImmediate: true);
+            _immediateBatch.onImmediateAutoFlush = MarkImmediateContentPending;
+
+            _playersManager.RegisterImmediateType<ImmediateRPCBatchPacket>();
+            _playersManager.Subscribe<ImmediateRPCBatchPacket>(OnImmediateBatchReceived);
+        }
+
+        private bool _receivingImmediateLane;
+
+        private void OnImmediateBatchReceived(PlayerID player, ImmediateRPCBatchPacket packet, bool asServer)
+        {
+            _receivingImmediateLane = true;
+
+            try
+            {
+                _immediateBatch.ProcessReceivedBatch(player, packet.count, packet.data, asServer);
+            }
+            finally
+            {
+                _receivingImmediateLane = false;
+            }
         }
 
         public void Disable(bool asServer)
@@ -99,12 +136,18 @@ namespace PurrNet.Modules
             _playersManager.Unsubscribe<RPCPacket>(ReceiveRPC);
             _playersManager.Unsubscribe<StaticRPCPacket>(ReceiveStaticRPC);
             _playersManager.Unsubscribe<ChildRPCPacket>(ReceiveChildRPC);
+            _playersManager.Unsubscribe<ImmediateRPCBatchPacket>(OnImmediateBatchReceived);
+            _playersManager.UnregisterImmediateType<ImmediateRPCBatchPacket>();
 
             _playersManager.onPlayerJoined -= OnPlayerJoined;
             _scenes.onSceneUnloaded -= OnSceneUnloaded;
 
             _hierarchyModule.onSentSpawnPacket -= OnObserverAdded;
             _hierarchyModule.onIdentityRemoved -= OnIdentityRemoved;
+
+            _unionBatch.Dispose();
+            _immediateBatch.Dispose();
+            _immediateContentFlushed = false;
         }
 
         private void OnObserverAdded(PlayerID player, SceneID scene, NetworkID id)
@@ -126,7 +169,7 @@ namespace PurrNet.Modules
                 if (data.rpcid.sceneId != identity.sceneId) continue;
                 if (data.rpcid.networkId != identity.id) continue;
 
-                FreeStream(data.stream);
+                data.stream.Dispose();
 
                 _bufferedRpcsKeys.Remove(data.rpcid);
                 _bufferedRpcsDatas.RemoveAt(i--);
@@ -139,7 +182,7 @@ namespace PurrNet.Modules
                 if (data.rpcid.sceneId != identity.sceneId) continue;
                 if (data.rpcid.networkId != identity.id) continue;
 
-                FreeStream(data.stream);
+                data.stream.Dispose();
 
                 _bufferedChildRpcsKeys.Remove(data.rpcid);
                 _bufferedChildRpcsDatas.RemoveAt(i--);
@@ -156,7 +199,7 @@ namespace PurrNet.Modules
                 if (data.rpcid.sceneId != scene) continue;
 
                 var key = data.rpcid;
-                FreeStream(data.stream);
+                data.stream.Dispose();
 
                 _bufferedRpcsKeys.Remove(key);
                 _bufferedRpcsDatas.RemoveAt(i--);
@@ -169,7 +212,7 @@ namespace PurrNet.Modules
                 if (data.rpcid.sceneId != scene) continue;
 
                 var key = data.rpcid;
-                FreeStream(data.stream);
+                data.stream.Dispose();
 
                 _bufferedChildRpcsKeys.Remove(key);
                 _bufferedChildRpcsDatas.RemoveAt(i--);
@@ -213,6 +256,8 @@ namespace PurrNet.Modules
         [UsedByIL]
         public static void SendStaticRPC(StaticRPCPacket packet, RPCSignature signature)
         {
+            NetworkAssetResolver.serializationSceneHint = null;
+
             var nm = NetworkManager.main;
 
             if (!nm)
@@ -237,7 +282,8 @@ namespace PurrNet.Modules
                 return;
             }
 
-            module.AppendToBufferedRPCs(packet, signature);
+            if (signature.bufferLast)
+                module.AppendToBufferedRPCs(packet, signature);
 
             switch (signature.type)
             {
@@ -249,52 +295,100 @@ namespace PurrNet.Modules
                     if (signature.runLocally && nm.isServer)
                         break;
 
+                    var serverRpcModule = module;
+
+                    if (nm.isServer && !nm.TryGetModule<RPCModule>(false, out serverRpcModule))
+                    {
+                        PurrLogger.LogError("Failed to get client-side RPC module while sending ServerRPC from host.", nm);
+                        break;
+                    }
+
 #if UNITY_EDITOR || PURR_RUNTIME_PROFILING
-                    if (Hasher.TryGetType(packet.header.typeHash, out var type))
-                        Statistics.SentRPC(type, signature.type, signature.rpcName, packet.data.segment, null);
+                    if (Statistics.shouldTrack && Hasher.TryGetType(packet.header.typeHash, out var type))
+                        Statistics.SentRPC(type, signature.type, signature.rpcName, packet.data, null);
 #endif
-                    module.BatchToServer(packet, signature.channel);
+                    serverRpcModule.BatchToServer(packet, signature.channel, signature.mtuExceeded, signature.immediate);
                     break;
                 }
                 case RPCType.ObserversRPC:
                 {
                     if (nm.isServer)
                     {
-                        using var players = GetObservers(signature);
+                        if (signature.targetPlayer != null)
+                        {
+#if UNITY_EDITOR || PURR_RUNTIME_PROFILING
+                            if (Statistics.shouldTrack && Hasher.TryGetType(packet.header.typeHash, out var type))
+                                Statistics.SentRPC(type, signature.type, signature.rpcName, packet.data, null);
+#endif
+                            module.BatchToTarget(signature.targetPlayer.Value, packet, signature.channel, signature.mtuExceeded, signature.immediate);
+                        }
+                        else if (signature.targetPlayerList is IReadOnlyList<PlayerID> groupTargets)
+                        {
+#if UNITY_EDITOR || PURR_RUNTIME_PROFILING
+                            if (Statistics.shouldTrack && Hasher.TryGetType(packet.header.typeHash, out var type))
+                            {
+                                for (var i = groupTargets.Count - 1; i >= 0; --i)
+                                    Statistics.SentRPC(type, signature.type, signature.rpcName, packet.data, null);
+                            }
+#endif
+                            module.BatchToTargets(groupTargets, packet, signature.channel, default, signature.mtuExceeded, signature.immediate);
+                        }
+                        else
+                        {
+                            var all = module._playersManager.players;
 
-                        if (players.Count == 0)
-                            break;
+                            if (all.Count == 0)
+                                break;
+
+                            bool skipLocal = signature.runLocally || signature.excludeSender;
+                            var filter = new ObserverFilter(
+                                nm.localPlayer, skipLocal,
+                                default, false
+                            );
 
 #if UNITY_EDITOR || PURR_RUNTIME_PROFILING
-                        for (var i = players.Count - 1; i >= 0; --i)
-                        {
-                            if (Hasher.TryGetType(packet.header.typeHash, out var type))
-                                Statistics.SentRPC(type, signature.type, signature.rpcName, packet.data.segment, null);
-                        }
+                            if (Statistics.shouldTrack)
+                            {
+                                for (var i = all.Count - 1; i >= 0; --i)
+                                {
+                                    if (!filter.ShouldSkip(all[i]))
+                                        if (Hasher.TryGetType(packet.header.typeHash, out var type))
+                                            Statistics.SentRPC(type, signature.type, signature.rpcName, packet.data, null);
+                                }
+                            }
 #endif
 
-                        module.BatchToTargets(players, packet, signature.channel);
+                            module.BatchToTargets(all, packet, signature.channel, filter, signature.mtuExceeded, signature.immediate);
+                        }
                     }
                     else
                     {
 #if UNITY_EDITOR || PURR_RUNTIME_PROFILING
-                        if (Hasher.TryGetType(packet.header.typeHash, out var type))
-                            Statistics.SentRPC(type, signature.type, signature.rpcName, packet.data.segment, null);
+                        if (Statistics.shouldTrack && Hasher.TryGetType(packet.header.typeHash, out var type))
+                            Statistics.SentRPC(type, signature.type, signature.rpcName, packet.data, null);
 #endif
-                        module.BatchToServer(packet, signature.channel);
+                        module.BatchToServer(packet, signature.channel, signature.mtuExceeded, signature.immediate);
                     }
                     break;
                 }
                 case RPCType.TargetRPC:
                 {
 #if UNITY_EDITOR || PURR_RUNTIME_PROFILING
-                    if (Hasher.TryGetType(packet.header.typeHash, out var type))
-                        Statistics.SentRPC(type, signature.type, signature.rpcName, packet.data.segment, null);
+                    if (Statistics.shouldTrack && Hasher.TryGetType(packet.header.typeHash, out var type))
+                        Statistics.SentRPC(type, signature.type, signature.rpcName, packet.data, null);
 #endif
                     if (nm.isServer)
                     {
+                        if (nm.isHost && signature.targetPlayer == PlayerID.Server &&
+                            nm.TryGetModule<RPCModule>(false, out var hostClientModule))
+                        {
+                            packet.targetPlayerId = PlayerID.Server;
+                            hostClientModule.BatchToServer(packet, signature.channel, signature.mtuExceeded, signature.immediate);
+                            break;
+                        }
+
                         using var targets = signature.GetTargets();
-                        module.BatchToTargets(targets, packet, signature.channel);
+                        module.BatchToTargets(targets, packet, signature.channel, signature.mtuExceeded, signature.immediate);
                     }
                     else
                     {
@@ -302,7 +396,7 @@ namespace PurrNet.Modules
                         for (int i = 0; i < targets.Count; i++)
                         {
                             packet.targetPlayerId = targets[i];
-                            module.BatchToServer(packet, signature.channel);
+                            module.BatchToServer(packet, signature.channel, signature.mtuExceeded, signature.immediate);
                         }
                     }
                     break;
@@ -312,20 +406,31 @@ namespace PurrNet.Modules
         }
 
         [UsedByIL]
-        public static bool ValidateReceivingStaticRPC(RPCInfo info, RPCSignature signature, IRpc data, bool asServer)
+        public static bool ValidateReceivingStaticRPC<T>(RPCInfo info, RPCSignature signature, T data, bool asServer, uint requestId, bool isAwaitable) where T : struct, IRpc
         {
+            if (info.receivedImmediate && !signature.immediate)
+            {
+                PurrLogger.LogError(
+                    $"Rejected static RPC '{signature.rpcName}': it arrived on the immediate lane but is not marked immediate.");
+                return false;
+            }
+
             var networkManager = NetworkManager.main;
 
             if (!networkManager)
             {
                 PurrLogger.LogError($"Aborted RPC '{signature.rpcName}'. NetworkManager not found.");
+                TrySendRejection(networkManager, info, signature, requestId, isAwaitable, asServer, RpcError.Unknown);
                 return false;
             }
 
             var rules = networkManager.networkRules;
 
             if (!networkManager.TryGetModule<RPCModule>(networkManager.isServer, out var module))
+            {
+                TrySendRejection(networkManager, info, signature, requestId, isAwaitable, asServer, RpcError.Unknown);
                 return false;
+            }
 
             if (signature.type == RPCType.ServerRPC)
             {
@@ -346,9 +451,11 @@ namespace PurrNet.Modules
 
             if (!shouldIgnore && signature.requireServer)
             {
-                PurrLogger.LogError(
-                    $"Trying to receive static client RPC '{signature.rpcName}' on server. " +
-                    "If you want automatic forwarding use 'requireServer: false'.");
+                if (!isAwaitable)
+                    PurrLogger.LogError(
+                        $"Trying to receive static client RPC '{signature.rpcName}' on server. " +
+                        "If you want automatic forwarding use 'requireServer: false'.");
+                TrySendRejection(networkManager, info, signature, requestId, isAwaitable, true, RpcError.ServerRequired);
                 return false;
             }
 
@@ -359,6 +466,7 @@ namespace PurrNet.Modules
                 case RPCType.ObserversRPC:
                 {
                     var playersManager = networkManager.GetModule<PlayersManager>(true);
+                    var finalList = DisposableList<PlayerID>.Create(playersManager.players.Count);
 
                     for (var i = 0; i < networkManager.players.Count; ++i)
                     {
@@ -369,9 +477,14 @@ namespace PurrNet.Modules
                         if (ignoreSender)
                             continue;
 
-                        var rawData = BroadcastModule.GetImmediateData(data);
-                        playersManager.Send(observer, rawData, signature.channel);
+                        finalList.Add(observer);
                     }
+
+                    if (signature.immediate && data is StaticRPCPacket immediateStatic)
+                        module.BatchToTargets(finalList, immediateStatic, signature.channel, signature.mtuExceeded, true);
+                    else
+                        playersManager.Send(finalList, data, signature.channel, signature.mtuExceeded.AsOverride());
+                    finalList.Dispose();
 
                     if (data is StaticRPCPacket staticRpc)
                         module.AppendToBufferedRPCs(staticRpc, signature);
@@ -379,14 +492,26 @@ namespace PurrNet.Modules
                 }
                 case RPCType.TargetRPC:
                 {
-                    var rawData = BroadcastModule.GetImmediateData(data);
                     var playersManager = networkManager.GetModule<PlayersManager>(true);
 
                     bool isTargetingServer = data.targetPlayerId == PlayerID.Server;
-                    bool shouldExecute = isTargetingServer && rules.CanTargetServerWithTargetRpc();
+                    bool canTargetServer = rules.CanTargetServerWithTargetRpc();
+                    bool shouldExecute = isTargetingServer && canTargetServer;
 
-                    if (!isTargetingServer)
-                        playersManager.Send(data.targetPlayerId, rawData, signature.channel);
+                    if (isTargetingServer && !canTargetServer)
+                    {
+                        if (!isAwaitable)
+                            PurrLogger.LogError(
+                                $"Trying to send TargetRPC '{signature.rpcName}' to server but `NetworkRules` don't allow for this.");
+                        TrySendRejection(networkManager, info, signature, requestId, isAwaitable, true, RpcError.TargetServerNotAllowed);
+                    }
+                    else if (!isTargetingServer)
+                    {
+                        if (signature.immediate && data is StaticRPCPacket immediateStatic)
+                            module.BatchToTarget(data.targetPlayerId, immediateStatic, signature.channel, signature.mtuExceeded, true);
+                        else
+                            playersManager.Send(data.targetPlayerId, data, signature.channel, signature.mtuExceeded.AsOverride());
+                    }
 
                     if (data is StaticRPCPacket staticRpc)
                         module.AppendToBufferedRPCs(staticRpc, signature);
@@ -394,6 +519,17 @@ namespace PurrNet.Modules
                 }
                 default: throw new ArgumentOutOfRangeException(nameof(signature.type));
             }
+        }
+
+        internal static void TrySendRejection(NetworkManager networkManager, RPCInfo info, RPCSignature signature, uint requestId, bool isAwaitable, bool asServer, RpcError error)
+        {
+            if (!isAwaitable || !asServer || networkManager == null)
+                return;
+
+            if (!networkManager.TryGetModule<RpcRequestResponseModule>(true, out var rpcModule))
+                return;
+
+            rpcModule.SendRejection(info.sender, requestId, error, signature.channel, signature.immediate);
         }
 
         static readonly Dictionary<StaticGenericKey, MethodInfo> _staticGenericHandlers =
@@ -411,7 +547,7 @@ namespace PurrNet.Modules
                     BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
                 gmethod = method?.MakeGenericMethod(rpcHeader.types);
 
-                _staticGenericHandlers[key] = gmethod;
+                _staticGenericHandlers[key.CloneForStorage()] = gmethod;
             }
 
             if (gmethod == null)
@@ -456,32 +592,31 @@ namespace PurrNet.Modules
                 if (data.sig.excludeOwner && _ownership.TryGetOwner(identity, out var owner) && owner == player)
                     continue;
 
+                if (identity.TryGetModule((int)data.header.childId.value, out var module) && module is { ownerOnly: true } &&
+                    (!_ownership.TryGetOwner(identity, out var moduleOwner) || moduleOwner != player))
+                {
+                    continue;
+                }
+
                 switch (data.sig.type)
                 {
                     case RPCType.ObserversRPC:
                     {
-                        var packet = data.packet;
-                        packet.data = data.stream.ToByteData();
-                        _playersManager.Send(player, packet);
-
+                        _unionBatch.Queue(player, new UnionRPCHeader(data.header), new BitData(data.stream), Channel.ReliableOrdered);
                         break;
                     }
 
                     case RPCType.TargetRPC:
                     {
                         if (data.sig.targetPlayer == player)
-                        {
-                            var packet = data.packet;
-                            packet.data = data.stream.ToByteData();
-                            _playersManager.Send(player, packet);
-                        }
-
+                            _unionBatch.Queue(player, new UnionRPCHeader(data.header), new BitData(data.stream), Channel.ReliableOrdered);
                         break;
                     }
                     case RPCType.ServerRPC:
                         break;
                     default:
-                        throw new ArgumentOutOfRangeException();
+                        PurrLogger.LogError($"Unexpected RPC type {data.sig.type} in SendAnyChildRPCs (rpcId={data.rpcid}, name={data.sig.rpcName}).");
+                        break;
                 }
             }
         }
@@ -505,24 +640,21 @@ namespace PurrNet.Modules
                 {
                     case RPCType.ObserversRPC:
                     {
-                        var packet = data.packet;
-                        packet.data = data.stream.ToByteData();
-                        _playersManager.Send(player, packet);
-
+                        _unionBatch.Queue(player, new UnionRPCHeader(data.header), new BitData(data.stream), Channel.ReliableOrdered);
                         break;
                     }
 
                     case RPCType.TargetRPC:
                     {
                         if (data.sig.targetPlayer == player)
-                        {
-                            var packet = data.packet;
-                            packet.data = data.stream.ToByteData();
-                            _playersManager.Send(player, packet);
-                        }
-
+                            _unionBatch.Queue(player, new UnionRPCHeader(data.header), new BitData(data.stream), Channel.ReliableOrdered);
                         break;
                     }
+                    case RPCType.ServerRPC:
+                        break;
+                    default:
+                        PurrLogger.LogError($"Unexpected RPC type {data.sig.type} in SendAnyInstanceRPCs (rpcId={data.rpcid}, name={data.sig.rpcName}).");
+                        break;
                 }
             }
         }
@@ -537,141 +669,195 @@ namespace PurrNet.Modules
                 {
                     case RPCType.ObserversRPC:
                     {
-                        var packet = data.packet;
-                        packet.data = data.stream.ToByteData();
-                        _playersManager.Send(player, packet);
-
+                        _unionBatch.Queue(player, new UnionRPCHeader(data.header), new BitData(data.stream), Channel.ReliableOrdered);
                         break;
                     }
 
                     case RPCType.TargetRPC:
                     {
                         if (data.sig.targetPlayer == player)
-                        {
-                            var packet = data.packet;
-                            packet.data = data.stream.ToByteData();
-                            _playersManager.Send(player, packet);
-                        }
-
+                            _unionBatch.Queue(player, new UnionRPCHeader(data.header), new BitData(data.stream), Channel.ReliableOrdered);
                         break;
                     }
+                    case RPCType.ServerRPC:
+                        break;
+                    default:
+                        PurrLogger.LogError($"Unexpected RPC type {data.sig.type} in SendAnyStaticRPCs (rpcId={data.rpcid}, name={data.sig.rpcName}).");
+                        break;
                 }
             }
         }
 
         [UsedByIL]
-        public static BitPacker AllocStream(bool reading)
-        {
-            return BitPackerPool.Get(reading);
-        }
+        public static BitPacker AllocStream(bool reading) => BitPackerPool.Get(reading);
 
         [UsedByIL]
-        public static void FreeStream(BitPacker stream)
+        public static void FreeStream(BitPacker stream) => stream.Dispose();
+
+        readonly Dictionary<RPC_ID, RPC_DATA_BASE<NetworkIdentityRPCHeader>> _bufferedRpcsKeys = new ();
+        readonly Dictionary<RPC_ID, RPC_DATA_BASE<StaticRPCHeader>> _bufferedStaticRpcsKeys = new ();
+        readonly Dictionary<RPC_ID, RPC_DATA_BASE<NetworkModuleRPCHeader>> _bufferedChildRpcsKeys = new ();
+
+        readonly List<RPC_DATA_BASE<NetworkIdentityRPCHeader>> _bufferedRpcsDatas = new ();
+        readonly List<RPC_DATA_BASE<StaticRPCHeader>> _bufferedStaticRpcsDatas = new ();
+        readonly List<RPC_DATA_BASE<NetworkModuleRPCHeader>> _bufferedChildRpcsDatas = new ();
+
+        static readonly ProfilerMarker _bufferRPCMarker = new ProfilerMarker($"RPCModule.AppendToBufferedRPCs");
+
+        private static bool IsMultiTargetTargetRpc(in RPCSignature signature)
         {
-            stream.Dispose();
+            return signature.type == RPCType.TargetRPC && !signature.targetPlayer.HasValue
+                && (signature.targetPlayerList != null || signature.targetPlayerEnumerable != null);
         }
 
-        readonly Dictionary<RPC_ID, RPC_DATA> _bufferedRpcsKeys = new Dictionary<RPC_ID, RPC_DATA>();
-
-        readonly Dictionary<RPC_ID, STATIC_RPC_DATA>
-            _bufferedStaticRpcsKeys = new Dictionary<RPC_ID, STATIC_RPC_DATA>();
-
-        readonly Dictionary<RPC_ID, CHILD_RPC_DATA> _bufferedChildRpcsKeys = new Dictionary<RPC_ID, CHILD_RPC_DATA>();
-
-        readonly List<RPC_DATA> _bufferedRpcsDatas = new List<RPC_DATA>();
-        readonly List<STATIC_RPC_DATA> _bufferedStaticRpcsDatas = new List<STATIC_RPC_DATA>();
-        readonly List<CHILD_RPC_DATA> _bufferedChildRpcsDatas = new List<CHILD_RPC_DATA>();
+        private static RPCSignature WithSingleTarget(RPCSignature signature, PlayerID target)
+        {
+            signature.targetPlayer = target;
+            signature.targetPlayerList = null;
+            signature.targetPlayerEnumerable = null;
+            return signature;
+        }
 
         private void AppendToBufferedRPCs(StaticRPCPacket packet, RPCSignature signature)
         {
             if (!signature.bufferLast) return;
+            _bufferRPCMarker.Begin();
 
-            var rpcid = new RPC_ID(packet);
-
-            if (_bufferedStaticRpcsKeys.TryGetValue(rpcid, out var data))
+            if (IsMultiTargetTargetRpc(signature))
             {
-                data.stream.ResetPosition();
-                data.stream.WriteBytes(packet.data);
+                using var targets = signature.GetTargets();
+                for (int i = 0; i < targets.Count; i++)
+                {
+                    var target = targets[i];
+                    AppendToBufferedRPCs(_bufferedStaticRpcsKeys,
+                        _bufferedStaticRpcsDatas,
+                        packet.header,
+                        new RPC_ID(packet, target),
+                        packet.data,
+                        WithSingleTarget(signature, target));
+                }
             }
             else
             {
-                var newStream = AllocStream(false);
-                newStream.WriteBytes(packet.data);
-
-                var newdata = new STATIC_RPC_DATA
-                {
-                    rpcid = rpcid,
-                    packet = packet,
-                    sig = signature,
-                    stream = newStream
-                };
-
-                _bufferedStaticRpcsKeys.Add(rpcid, newdata);
-                _bufferedStaticRpcsDatas.Add(newdata);
+                var target = signature.type == RPCType.TargetRPC && signature.targetPlayer.HasValue
+                    ? signature.targetPlayer.Value : default;
+                AppendToBufferedRPCs(_bufferedStaticRpcsKeys,
+                    _bufferedStaticRpcsDatas,
+                    packet.header,
+                    new RPC_ID(packet, target),
+                    packet.data,
+                    signature);
             }
+
+            _bufferRPCMarker.End();
         }
 
         public void AppendToBufferedRPCs(ChildRPCPacket packet, RPCSignature signature)
         {
             if (!signature.bufferLast) return;
+            _bufferRPCMarker.Begin();
 
-            var rpcid = new RPC_ID(packet);
-
-            if (_bufferedChildRpcsKeys.TryGetValue(rpcid, out var data))
+            if (IsMultiTargetTargetRpc(signature))
             {
-                data.stream.ResetPosition();
-                data.stream.WriteBytes(packet.data);
+                using var targets = signature.GetTargets();
+                for (int i = 0; i < targets.Count; i++)
+                {
+                    var target = targets[i];
+                    AppendToBufferedRPCs(_bufferedChildRpcsKeys,
+                        _bufferedChildRpcsDatas,
+                        packet.header,
+                        new RPC_ID(packet, target),
+                        packet.data,
+                        WithSingleTarget(signature, target));
+                }
             }
             else
             {
-                var newStream = AllocStream(false);
-                newStream.WriteBytes(packet.data);
-
-                var newdata = new CHILD_RPC_DATA
-                {
-                    rpcid = rpcid,
-                    packet = packet,
-                    sig = signature,
-                    stream = newStream
-                };
-
-                _bufferedChildRpcsKeys.Add(rpcid, newdata);
-                _bufferedChildRpcsDatas.Add(newdata);
+                var target = signature.type == RPCType.TargetRPC && signature.targetPlayer.HasValue
+                    ? signature.targetPlayer.Value : default;
+                AppendToBufferedRPCs(_bufferedChildRpcsKeys,
+                    _bufferedChildRpcsDatas,
+                    packet.header,
+                    new RPC_ID(packet, target),
+                    packet.data,
+                    signature);
             }
+
+            _bufferRPCMarker.End();
         }
 
         public void AppendToBufferedRPCs(RPCPacket packet, RPCSignature signature)
         {
             if (!signature.bufferLast) return;
+            _bufferRPCMarker.Begin();
 
-            var rpcid = new RPC_ID(packet);
+            if (IsMultiTargetTargetRpc(signature))
+            {
+                using var targets = signature.GetTargets();
+                for (int i = 0; i < targets.Count; i++)
+                {
+                    var target = targets[i];
+                    AppendToBufferedRPCs(_bufferedRpcsKeys,
+                        _bufferedRpcsDatas,
+                        packet.header,
+                        new RPC_ID(packet, target),
+                        packet.data,
+                        WithSingleTarget(signature, target));
+                }
+            }
+            else
+            {
+                var target = signature.type == RPCType.TargetRPC && signature.targetPlayer.HasValue
+                    ? signature.targetPlayer.Value : default;
+                AppendToBufferedRPCs(_bufferedRpcsKeys,
+                    _bufferedRpcsDatas,
+                    packet.header,
+                    new RPC_ID(packet, target),
+                    packet.data,
+                    signature);
+            }
 
-            if (_bufferedRpcsKeys.TryGetValue(rpcid, out var data))
+            _bufferRPCMarker.End();
+        }
+
+        private static void AppendToBufferedRPCs<T>(
+            Dictionary<RPC_ID, RPC_DATA_BASE<T>> keys,
+            List<RPC_DATA_BASE<T>> datas,
+            T header,
+            RPC_ID rpcid,
+            BitData bitData,
+            in RPCSignature signature)
+        {
+            if (!signature.bufferLast) return;
+
+            if (keys.TryGetValue(rpcid, out var data))
             {
                 data.stream.ResetPosition();
-                data.stream.WriteBytes(packet.data);
+                data.stream.WriteBitDataWithoutConsumingIt(bitData);
             }
             else
             {
                 var newStream = AllocStream(false);
-                newStream.WriteBytes(packet.data);
+                newStream.WriteBitDataWithoutConsumingIt(bitData);
 
-                var newdata = new RPC_DATA
+                var newdata = new RPC_DATA_BASE<T>
                 {
                     rpcid = rpcid,
-                    packet = packet,
+                    header = header,
                     sig = signature,
                     stream = newStream
                 };
 
-                _bufferedRpcsKeys.Add(rpcid, newdata);
-                _bufferedRpcsDatas.Add(newdata);
+                keys.Add(rpcid, newdata);
+                datas.Add(newdata);
             }
         }
 
         [UsedByIL]
         public static RPCPacket BuildRawRPC(NetworkID? networkId, SceneID id, int rpcId, BitPacker data)
         {
+            NetworkAssetResolver.serializationSceneHint = id;
+
             var rpc = new RPCPacket
             {
                 header = new NetworkIdentityRPCHeader
@@ -681,7 +867,7 @@ namespace PurrNet.Modules
                     sceneId = id,
                     senderId = GetLocalPlayer()
                 },
-                data = data.ToByteData(),
+                data = new BitData(data)
             };
 
             return rpc;
@@ -690,6 +876,8 @@ namespace PurrNet.Modules
         [UsedByIL]
         public static StaticRPCPacket BuildStaticRawRPC<T>(uint rpcId, BitPacker data)
         {
+            NetworkAssetResolver.serializationSceneHint = null;
+
             var hash = Hasher.GetStableHashU32<T>();
 
             var rpc = new StaticRPCPacket
@@ -699,7 +887,7 @@ namespace PurrNet.Modules
                     typeHash = hash,
                     senderId = GetLocalPlayer()
                 },
-                data = data.ToByteData(),
+                data = new BitData(data)
             };
 
             return rpc;
@@ -707,7 +895,7 @@ namespace PurrNet.Modules
 
         static readonly Dictionary<RPCKey, StaticRPCHandler> _rpcHandlers = new ();
 
-        delegate void StaticRPCHandler(BitPacker stream, StaticRPCPacket packet, RPCInfo info, bool asServer);
+        delegate void StaticRPCHandler(StaticRPCPacket packet, RPCInfo info, bool asServer);
 
         static StaticRPCHandler GetStaticRPCHandler(Type type, Size rpcId)
         {
@@ -739,33 +927,38 @@ namespace PurrNet.Modules
         {
             if (!Hasher.TryGetType(data.header.typeHash, out var type))
             {
-                PurrLogger.LogError($"Failed to resolve type with hash {data.header.typeHash}.");
+                Hasher.PrintHashError(data.header.typeHash);
                 return;
             }
-
-            using var stream = BitPackerPool.Get(data.data);
 
             var rpcHandlerPtr = GetStaticRPCHandler(type, data.header.rpcId);
             var info = new RPCInfo
             {
                 manager = _manager,
-                sender = player,
-                asServer = asServer
+                sender = data.header.senderId,
+                asServer = asServer,
+                receivedImmediate = _receivingImmediateLane
             };
 
             if (rpcHandlerPtr != null)
             {
-                try
+                using (data.data.AutoScope())
                 {
-                    rpcHandlerPtr(stream, data, info, asServer);
-                }
-                catch (BypassLoggingException)
-                {
-                    // ignore
-                }
-                catch (Exception e)
-                {
-                    PurrLogger.LogException(e);
+                    try
+                    {
+                        rpcHandlerPtr(data, info, asServer);
+                    }
+                    catch (BypassLoggingException)
+                    {
+                        // ignore
+                    }
+                    catch (Exception e)
+                    {
+                        PurrLogger.LogException(
+                            Manifest.TryGet(type, data.header.rpcId, out var entry)
+                                ? new RpcDispatchException(entry, e)
+                                : new RpcDispatchException(type, data.header.rpcId, e));
+                    }
                 }
             }
             else PurrLogger.LogError($"Can't find RPC handler for id {data.header.rpcId} on '{type.Name}'.");
@@ -773,13 +966,12 @@ namespace PurrNet.Modules
 
         void ReceiveChildRPC(PlayerID player, ChildRPCPacket packet, bool asServer)
         {
-            using var stream = BitPackerPool.Get(packet.data);
-
             var info = new RPCInfo
             {
                 manager = _manager,
-                sender = player,
-                asServer = asServer
+                sender = packet.header.senderId,
+                asServer = asServer,
+                receivedImmediate = _receivingImmediateLane
             };
 
             if (_hierarchyModule.TryGetIdentity(packet.header.sceneId, packet.header.networkId, out var identity) && identity)
@@ -790,21 +982,29 @@ namespace PurrNet.Modules
                 if (!identity.TryGetModule(packet.header.childId, out var networkClass))
                 {
                     PurrLogger.LogError(
-                        $"Can't find child with id {packet.header.childId} in identity {identity.GetType().Name}.", identity);
+                        $"Can't find child with id {packet.header.childId} (rpcId={packet.header.rpcId}) in identity {identity.GetType().Name}.", identity);
                 }
                 else
                 {
-                    try
+                    using (packet.data.AutoScope())
                     {
-                        networkClass.OnReceivedRpc(packet.header.rpcId, stream, packet, info, asServer);
-                    }
-                    catch (BypassLoggingException)
-                    {
-                        // ignore
-                    }
-                    catch (Exception e)
-                    {
-                        PurrLogger.LogException(e);
+                        try
+                        {
+                            networkClass.OnReceivedRpc(packet.header.rpcId, packet, info, asServer);
+                        }
+                        catch (BypassLoggingException)
+                        {
+                            // ignore
+                        }
+                        catch (Exception e)
+                        {
+                            var moduleType = networkClass.GetType();
+                            PurrLogger.LogException(
+                                Manifest.TryGet(moduleType, packet.header.rpcId, out var entry)
+                                    ? new RpcDispatchException(entry, e)
+                                    : new RpcDispatchException(moduleType, packet.header.rpcId, e),
+                                networkClass.parent);
+                        }
                     }
                 }
             }
@@ -854,6 +1054,25 @@ namespace PurrNet.Modules
         }
 
         [UsedByIL]
+        public static void ModifyManyToGroup(ref RPCSignature signature, DeltaFanoutGrouper grouper, int group)
+        {
+            var members = grouper.GetMembers(group);
+
+            signature.targetPlayerEnumerable = null;
+
+            if (members.Count == 1)
+            {
+                signature.targetPlayer = members[0];
+                signature.targetPlayerList = null;
+            }
+            else
+            {
+                signature.targetPlayer = null;
+                signature.targetPlayerList = members;
+            }
+        }
+
+        [UsedByIL]
         public static void ModifyManyToOne(ref RPCSignature signature, PlayerID target)
         {
             if (signature.type != RPCType.TargetRPC)
@@ -870,13 +1089,12 @@ namespace PurrNet.Modules
 
         void ReceiveRPC(PlayerID player, RPCPacket packet, bool asServer)
         {
-            using var stream = BitPackerPool.Get(packet.data);
-
             var info = new RPCInfo
             {
                 manager = _manager,
                 sender = packet.header.senderId,
-                asServer = asServer
+                asServer = asServer,
+                receivedImmediate = _receivingImmediateLane
             };
 
             if (_hierarchyModule.TryGetIdentity(packet.header.sceneId, packet.header.networkId, out var identity) && identity)
@@ -886,167 +1104,215 @@ namespace PurrNet.Modules
                     return;
                 }
 
-                try
+                using (packet.data.AutoScope())
                 {
-                    identity.OnReceivedRpc((int)packet.header.rpcId.value, stream, packet, info, asServer);
-                }
-                catch (BypassLoggingException)
-                {
-                    // ignore
-                }
-                catch (Exception e)
-                {
-                    PurrLogger.LogException(e);
+                    try
+                    {
+                        identity.OnReceivedRpc((int)packet.header.rpcId.value, packet, info, asServer);
+                    }
+                    catch (BypassLoggingException)
+                    {
+                        // ignore
+                    }
+                    catch (Exception e)
+                    {
+                        var identityType = identity.GetType();
+                        PurrLogger.LogException(
+                            Manifest.TryGet(identityType, packet.header.rpcId, out var entry)
+                                ? new RpcDispatchException(entry, e)
+                                : new RpcDispatchException(identityType, packet.header.rpcId, e),
+                            identity);
+                    }
                 }
             }
         }
 
         [UsedByIL]
-        public static void PreProcessRpc(ref ByteData rpcData, RPCSignature signature, ref BitPacker packer)
+        public static void PreProcessRpc(RPCSignature signature, ref BitPacker packer, ref BitData rpcData)
         {
-            rpcData = packer.ToByteData();
-            onPreProcessRpc?.Invoke(ref rpcData, signature, ref packer);
+            bool hasCompression = signature.compressionLevel != CompressionLevel.None;
+            bool hasCustomPostProcessor = onPreProcessRpc != null;
 
-            if (signature.compressionLevel == CompressionLevel.None)
-                return;
-
-            var level = signature.compressionLevel switch
+            if (hasCompression || hasCustomPostProcessor)
             {
-                CompressionLevel.None => default,
-                CompressionLevel.Fast => LZ4Level.L00_FAST,
-                CompressionLevel.Balanced => LZ4Level.L06_HC,
-                CompressionLevel.Best => LZ4Level.L12_MAX,
-                _ => throw new ArgumentOutOfRangeException()
-            };
+                if (hasCompression)
+                {
+                    var level = signature.compressionLevel switch
+                    {
+                        CompressionLevel.None => default,
+                        CompressionLevel.Fast => LZ4Level.L00_FAST,
+                        CompressionLevel.Balanced => LZ4Level.L06_HC,
+                        CompressionLevel.Best => LZ4Level.L12_MAX,
+                        _ => throw new ArgumentOutOfRangeException()
+                    };
 
-            var newPacker = packer.Pickle(level);
-            rpcData = newPacker.ToByteData();
-            packer.Dispose();
-            packer = newPacker;
+                    var newPacker = packer.Pickle(level);
+                    packer.Dispose();
+                    packer = newPacker;
+                }
+
+                if (hasCustomPostProcessor)
+                    onPreProcessRpc?.Invoke(signature, ref packer);
+            }
+
+            rpcData = new BitData(packer);
         }
 
         [UsedByIL]
-        public static void PostProcessRpc(ByteData rpcData, RPCInfo info, ref BitPacker packer)
+        public static void PostProcessRpc(RPCInfo info, ref BitData data)
         {
-            onPostProcessRpc?.Invoke(rpcData, info, ref packer);
+            bool hasCompression = info.compileTimeSignature.compressionLevel != CompressionLevel.None;
+            bool hasCustomPostProcessor = onPostProcessRpc != null;
 
-            if (info.compileTimeSignature.compressionLevel == CompressionLevel.None)
-                return;
-
-            var newPacker = BitPackerPool.Get();
-            newPacker.UnpickleFrom(rpcData);
-            newPacker.ResetPositionAndMode(true);
-
-            packer.Dispose();
-            packer = newPacker;
-        }
-
-
-        private void BatchToTargets(DisposableList<PlayerID> players, RPCPacket packet, Channel signatureChannel)
-        {
-            for (int i = 0; i < players.Count; i++)
-                _normalRpcBatch.Queue(players[i], packet.header, packet.data, signatureChannel);
-        }
-
-        private void BatchToTargets(DisposableList<PlayerID> players, ChildRPCPacket packet, Channel signatureChannel)
-        {
-            for (int i = 0; i < players.Count; i++)
-                _childRpcBatch.Queue(players[i], packet.header, packet.data, signatureChannel);
-        }
-
-        private void BatchToTargets(DisposableList<PlayerID> players, StaticRPCPacket packet, Channel signatureChannel)
-        {
-            for (int i = 0; i < players.Count; i++)
-                _staticRpcBatch.Queue(players[i], packet.header, packet.data, signatureChannel);
-        }
-
-        enum RPCMethod
-        {
-            NetworkIdentity,
-            NetworkModule,
-            Static
-        }
-
-        private RPCMethod lastUsedMethod;
-
-        private void FlushByMethod(RPCMethod method)
-        {
-            switch (method)
+            if (hasCustomPostProcessor || hasCompression)
             {
-                case RPCMethod.NetworkIdentity:
-                    _normalRpcBatch.FlushChannel(Channel.ReliableOrdered);
-                    break;
-                case RPCMethod.NetworkModule:
-                    _childRpcBatch.FlushChannel(Channel.ReliableOrdered);
-                    break;
-                case RPCMethod.Static:
-                    _staticRpcBatch.FlushChannel(Channel.ReliableOrdered);
-                    break;
-                default: throw new ArgumentOutOfRangeException(nameof(method), method, null);
+                // We copy and leave the original data intact, so that the user can modify it freely.
+                var dataCopy = BitPackerPool.Get();
+                dataCopy.WriteBitDataWithoutConsumingIt(data);
+                data = new BitData(dataCopy);
+
+                if (hasCompression)
+                {
+                    var newPacker = BitPackerPool.Get();
+                    newPacker.UnpickleFrom(dataCopy);
+                    newPacker.ResetPositionAndMode(true);
+                    data = new BitData(newPacker);
+                }
+
+                if (hasCustomPostProcessor)
+                    onPostProcessRpc.Invoke(info, ref data);
             }
         }
 
-        private void FlushIfDifferent(RPCMethod method)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private RPCBatch SelectBatch(Channel signatureChannel, bool immediate)
         {
-            if (lastUsedMethod != method)
-            {
-                FlushByMethod(lastUsedMethod);
-                lastUsedMethod = method;
-            }
+            return immediate && signatureChannel == Channel.Unreliable ? _immediateBatch : _unionBatch;
         }
 
-        public void BatchToServer<T>(T packet, Channel signatureChannel) where T : IRpc
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void BatchToServer(RPCPacket normalRpc, Channel signatureChannel,
+            MTUBehaviour mtuBehaviour = MTUBehaviour.NetworkManager, bool immediate = false)
         {
-            switch (packet)
-            {
-                case RPCPacket normalRpc:
-                    FlushIfDifferent(RPCMethod.NetworkIdentity);
-                    _normalRpcBatch.Queue(PlayerID.Server, normalRpc.header, normalRpc.data, signatureChannel);
-                    break;
-                case ChildRPCPacket childRpc:
-                    FlushIfDifferent(RPCMethod.NetworkModule);
-                    _childRpcBatch.Queue(PlayerID.Server, childRpc.header, childRpc.data, signatureChannel);
-                    break;
-                case StaticRPCPacket staticRpc:
-                    FlushIfDifferent(RPCMethod.Static);
-                    _staticRpcBatch.Queue(PlayerID.Server, staticRpc.header, staticRpc.data, signatureChannel);
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException();
-            }
+            SelectBatch(signatureChannel, immediate).Queue(PlayerID.Server, new UnionRPCHeader(normalRpc.header), normalRpc.data, signatureChannel, mtuBehaviour);
         }
 
-        public void BatchToTargets<T>(DisposableList<PlayerID> players, T packet, Channel signatureChannel) where T : IRpc
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void BatchToServer(ChildRPCPacket childRpc, Channel signatureChannel,
+            MTUBehaviour mtuBehaviour = MTUBehaviour.NetworkManager, bool immediate = false)
         {
-            switch (packet)
-            {
-                case RPCPacket normalRpc:
-                    FlushIfDifferent(RPCMethod.NetworkIdentity);
-                    BatchToTargets(players, normalRpc, signatureChannel);
-                    break;
-                case ChildRPCPacket childRpc:
-                    FlushIfDifferent(RPCMethod.NetworkModule);
-                    BatchToTargets(players, childRpc, signatureChannel);
-                    break;
-                case StaticRPCPacket staticRpc:
-                    FlushIfDifferent(RPCMethod.Static);
-                    BatchToTargets(players, staticRpc, signatureChannel);
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException();
-            }
+            SelectBatch(signatureChannel, immediate).Queue(PlayerID.Server, new UnionRPCHeader(childRpc.header), childRpc.data, signatureChannel, mtuBehaviour);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void BatchToServer(StaticRPCPacket staticRpc, Channel signatureChannel,
+            MTUBehaviour mtuBehaviour = MTUBehaviour.NetworkManager, bool immediate = false)
+        {
+            SelectBatch(signatureChannel, immediate).Queue(PlayerID.Server, new UnionRPCHeader(staticRpc.header), staticRpc.data, signatureChannel, mtuBehaviour);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void BatchToTargets(DisposableList<PlayerID> players, RPCPacket packet, Channel signatureChannel,
+            MTUBehaviour mtuBehaviour = MTUBehaviour.NetworkManager, bool immediate = false)
+        {
+            SelectBatch(signatureChannel, immediate).Queue(players, new UnionRPCHeader(packet.header), packet.data, signatureChannel, mtuBehaviour);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void BatchToTarget(PlayerID player, RPCPacket packet, Channel signatureChannel,
+            MTUBehaviour mtuBehaviour = MTUBehaviour.NetworkManager, bool immediate = false)
+        {
+            SelectBatch(signatureChannel, immediate).Queue(player, new UnionRPCHeader(packet.header), packet.data, signatureChannel, mtuBehaviour);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void BatchToTarget(PlayerID player, ChildRPCPacket packet, Channel signatureChannel,
+            MTUBehaviour mtuBehaviour = MTUBehaviour.NetworkManager, bool immediate = false)
+        {
+            SelectBatch(signatureChannel, immediate).Queue(player, new UnionRPCHeader(packet.header), packet.data, signatureChannel, mtuBehaviour);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void BatchToTargets(DisposableList<PlayerID> players, ChildRPCPacket packet, Channel signatureChannel,
+            MTUBehaviour mtuBehaviour = MTUBehaviour.NetworkManager, bool immediate = false)
+        {
+            SelectBatch(signatureChannel, immediate).Queue(players, new UnionRPCHeader(packet.header), packet.data, signatureChannel, mtuBehaviour);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void BatchToTargets(DisposableList<PlayerID> players, StaticRPCPacket packet, Channel signatureChannel,
+            MTUBehaviour mtuBehaviour = MTUBehaviour.NetworkManager, bool immediate = false)
+        {
+            SelectBatch(signatureChannel, immediate).Queue(players, new UnionRPCHeader(packet.header), packet.data, signatureChannel, mtuBehaviour);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void BatchToTarget(PlayerID player, StaticRPCPacket packet, Channel signatureChannel,
+            MTUBehaviour mtuBehaviour = MTUBehaviour.NetworkManager, bool immediate = false)
+        {
+            SelectBatch(signatureChannel, immediate).Queue(player, new UnionRPCHeader(packet.header), packet.data, signatureChannel, mtuBehaviour);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void BatchToTargets(IReadOnlyList<PlayerID> players, StaticRPCPacket packet, Channel signatureChannel, ObserverFilter filter = default,
+            MTUBehaviour mtuBehaviour = MTUBehaviour.NetworkManager, bool immediate = false)
+        {
+            SelectBatch(signatureChannel, immediate).Queue(players, new UnionRPCHeader(packet.header), packet.data, signatureChannel, filter, mtuBehaviour);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void BatchToTargets(IReadOnlyList<PlayerID> players, RPCPacket packet, Channel signatureChannel, ObserverFilter filter = default,
+            MTUBehaviour mtuBehaviour = MTUBehaviour.NetworkManager, bool immediate = false)
+        {
+            SelectBatch(signatureChannel, immediate).Queue(players, new UnionRPCHeader(packet.header), packet.data, signatureChannel, filter, mtuBehaviour);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void BatchToTargets(IReadOnlyList<PlayerID> players, ChildRPCPacket packet, Channel signatureChannel, ObserverFilter filter = default,
+            MTUBehaviour mtuBehaviour = MTUBehaviour.NetworkManager, bool immediate = false)
+        {
+            SelectBatch(signatureChannel, immediate).Queue(players, new UnionRPCHeader(packet.header), packet.data, signatureChannel, filter, mtuBehaviour);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void BatchNetworkMessages()
         {
-            _staticRpcBatch.Flush();
-            _normalRpcBatch.Flush();
-            _childRpcBatch.Flush();
+            _unionBatch.Flush();
+
+            if (_immediateBatch.hasPending)
+            {
+                _immediateContentFlushed = true;
+                _immediateBatch.Flush();
+            }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void FlushBatchedRPCs()
         {
             BatchNetworkMessages();
+        }
+
+        /// <summary>
+        /// Signals that immediate content was handed to the transport outside the
+        /// immediate batch, so the next <see cref="FlushImmediateRPCs"/> still forces a send.
+        /// </summary>
+        internal void MarkImmediateContentPending()
+        {
+            _immediateContentFlushed = true;
+        }
+
+        public bool FlushImmediateRPCs()
+        {
+            bool flushed = _immediateContentFlushed;
+            _immediateContentFlushed = false;
+
+            if (_immediateBatch != null && _immediateBatch.hasPending)
+            {
+                _immediateBatch.Flush();
+                flushed = true;
+            }
+
+            return flushed;
         }
     }
 }

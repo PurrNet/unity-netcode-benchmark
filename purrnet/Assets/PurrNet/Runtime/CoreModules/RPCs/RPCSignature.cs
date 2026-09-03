@@ -12,6 +12,12 @@ namespace PurrNet
         public PlayerID sender;
         public bool asServer;
 
+        /// <summary>
+        /// True when this RPC arrived wrapped in an immediate batch; used to reject
+        /// non-immediate RPCs that a peer tries to smuggle onto the immediate lane.
+        /// </summary>
+        public bool receivedImmediate;
+
         [UsedByIL] public RPCSignature compileTimeSignature;
     }
 
@@ -41,6 +47,8 @@ namespace PurrNet
         public IList<PlayerID> targetPlayerList;
         public StripCodeModeOverride stripCodeMode;
         public bool deltaPacked;
+        public MTUBehaviour mtuExceeded;
+        public bool immediate;
 
         public DisposableList<PlayerID> GetTargets()
         {
@@ -59,7 +67,8 @@ namespace PurrNet
         [UsedImplicitly]
         public static RPCSignature Make(RPCType type, Channel channel, bool runLocally, bool requireOwnership,
             bool bufferLast, bool requireServer, bool excludeOwner, string name, bool isStatic, float asyncTimoutInSec,
-            CompressionLevel compressionLevel, bool excludeSender, bool deltaPacked)
+            CompressionLevel compressionLevel, bool excludeSender, bool deltaPacked,
+            MTUBehaviour mtuExceeded, bool immediate)
         {
             return new RPCSignature
             {
@@ -78,14 +87,17 @@ namespace PurrNet
                 rpcName = name,
                 asyncTimeoutInSec = asyncTimoutInSec,
                 compressionLevel = compressionLevel,
-                deltaPacked = deltaPacked
+                deltaPacked = deltaPacked,
+                mtuExceeded = mtuExceeded,
+                immediate = immediate
             };
         }
 
         [UsedImplicitly]
         public static RPCSignature MakeWithTarget(RPCType type, Channel channel, bool runLocally, bool requireOwnership,
             bool bufferLast, bool requireServer, bool excludeOwner, string name, bool isStatic, float asyncTimoutInSec,
-            CompressionLevel compressionLevel, bool excludeSender, bool deltaPacked, PlayerID? playerID, IEnumerable<PlayerID> players, IList<PlayerID> playersList)
+            CompressionLevel compressionLevel, bool excludeSender, bool deltaPacked,
+            MTUBehaviour mtuExceeded, bool immediate, PlayerID? playerID, IEnumerable<PlayerID> players, IList<PlayerID> playersList)
         {
             return new RPCSignature
             {
@@ -104,7 +116,9 @@ namespace PurrNet
                 rpcName = name,
                 asyncTimeoutInSec = asyncTimoutInSec,
                 compressionLevel = compressionLevel,
-                deltaPacked = deltaPacked
+                deltaPacked = deltaPacked,
+                mtuExceeded = mtuExceeded,
+                immediate = immediate
             };
         }
     }

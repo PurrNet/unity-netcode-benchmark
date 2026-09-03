@@ -1,23 +1,56 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-#if UNITY_EDITOR && PURR_LEAKS_CHECK
 using PurrNet.Pooling;
-#endif
+using PurrNet.Utils;
 using UnityEngine;
 
 namespace PurrNet
 {
+    [AddComponentMenu("")]
     [DefaultExecutionOrder(32000)]
     public class UnityLatestUpdate : MonoBehaviour
     {
         static UnityLatestUpdate _instance;
 
-        public static event Action onUpdate;
+        private static readonly PurrAction<Action> _update = new(static action => action(), 32);
+        private static readonly PurrAction<Action> _fixedUpdate = new(static action => action(), 64);
+        private static readonly PurrAction<Action> _latestUpdate = new(static action => action(), 64);
+        private static readonly PurrAction<Action> _postLatestUpdate = new(static action => action(), 8);
 
-        public static event Action onFixedUpdate;
+        internal static PurrAction<Action> update => _update;
 
-        public static event Action onLatestUpdate;
+        internal static PurrAction<Action> fixedUpdate => _fixedUpdate;
+
+        internal static PurrAction<Action> latestUpdate => _latestUpdate;
+
+        public static event Action onUpdate
+        {
+            add => _update.Add(value);
+            remove => _update.Remove(value);
+        }
+
+        public static event Action onFixedUpdate
+        {
+            add => _fixedUpdate.Add(value);
+            remove => _fixedUpdate.Remove(value);
+        }
+
+        public static event Action onLatestUpdate
+        {
+            add => _latestUpdate.Add(value);
+            remove => _latestUpdate.Remove(value);
+        }
+
+        /// <summary>
+        /// Runs after every <see cref="onLatestUpdate"/> subscriber; for work that must
+        /// observe everything the latest-update callbacks produced this frame.
+        /// </summary>
+        public static event Action onPostLatestUpdate
+        {
+            add => _postLatestUpdate.Add(value);
+            remove => _postLatestUpdate.Remove(value);
+        }
 
         private static readonly List<PriorityAction> _executeASAP = new();
 
@@ -49,39 +82,58 @@ namespace PurrNet
                 action = action,
             };
 
-            int insertIdx = _executeASAP.Count;
-
-            for (int i = 0; i < _executeASAP.Count; i++)
+            lock (_executeASAP)
             {
-                var cur = _executeASAP[i];
-                if (cur.priority > priority ||
-                    (cur.priority == priority && cur.subPriority > subPriority))
-                {
-                    insertIdx = i;
-                    break;
-                }
-            }
+                int insertIdx = _executeASAP.Count;
 
-            _executeASAP.Insert(insertIdx, item);
+                for (int i = 0; i < _executeASAP.Count; i++)
+                {
+                    var cur = _executeASAP[i];
+                    if (cur.priority > priority ||
+                        (cur.priority == priority && cur.subPriority > subPriority))
+                    {
+                        insertIdx = i;
+                        break;
+                    }
+                }
+
+                _executeASAP.Insert(insertIdx, item);
+            }
         }
 
         public static void TriggerPendingAsaps()
         {
-            for (var i = 0; i < _executeASAP.Count; i++)
+            List<PriorityAction> toRun;
+            lock (_executeASAP)
             {
-                var action = _executeASAP[i];
-
-                try
+                if (_executeASAP.Count == 0)
+                    return;
+                toRun = ListPool<PriorityAction>.Instantiate();
+                toRun.AddRange(_executeASAP);
+                _executeASAP.Clear();
+            }
+            try
+            {
+                for (var i = 0; i < toRun.Count; i++)
                 {
-                    action.action?.Invoke();
+                    try
+                    {
+                        toRun[i].action?.Invoke();
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogException(e);
+                    }
                 }
-                catch (Exception e)
-                {
-                    Debug.LogException(e);
-                }
+            }
+            finally
+            {
+                ListPool<PriorityAction>.Destroy(toRun);
             }
         }
 
+        /// <summary>Completes during the next Unity update.</summary>
+        /// <remarks>Call from the Unity main thread.</remarks>
         public static Task Yield()
         {
             var promise = new TaskCompletionSource<bool>();
@@ -97,6 +149,8 @@ namespace PurrNet
             }
         }
 
+        /// <summary>Completes after at least <paramref name="seconds"/> of Unity update time.</summary>
+        /// <remarks>Call from the Unity main thread.</remarks>
         public static Task WaitSeconds(float seconds)
         {
             var promise = new TaskCompletionSource<bool>();
@@ -117,10 +171,12 @@ namespace PurrNet
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void OnSubsystemRegistration()
         {
-            onUpdate = null;
-            onFixedUpdate = null;
-            onLatestUpdate = null;
-            _executeASAP.Clear();
+            _update.Clear();
+            _fixedUpdate.Clear();
+            _latestUpdate.Clear();
+            _postLatestUpdate.Clear();
+            lock (_executeASAP)
+                _executeASAP.Clear();
 
             if (_instance)
                 return;
@@ -156,7 +212,7 @@ namespace PurrNet
         private void Update()
         {
             TriggerPendingAsaps();
-            onUpdate?.Invoke();
+            _update.Invoke();
 #if UNITY_EDITOR && PURR_LEAKS_CHECK
             _sweep += Time.deltaTime;
 
@@ -171,13 +227,14 @@ namespace PurrNet
         private void FixedUpdate()
         {
             TriggerPendingAsaps();
-            onFixedUpdate?.Invoke();
+            _fixedUpdate.Invoke();
         }
 
         private void LateUpdate()
         {
             TriggerPendingAsaps();
-            onLatestUpdate?.Invoke();
+            _latestUpdate.Invoke();
+            _postLatestUpdate.Invoke();
         }
     }
 }

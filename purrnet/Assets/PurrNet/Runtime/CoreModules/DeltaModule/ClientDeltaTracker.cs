@@ -68,30 +68,6 @@ namespace PurrNet.Modules
             return low;
         }
 
-        private int BinarySearchOlderThan(float seconds)
-        {
-            float threshold = Time.unscaledTime - seconds;
-            int low = 0;
-            int high = _history.Count - 1;
-            int result = _history.Count;
-
-            while (low <= high)
-            {
-                int mid = (low + high) / 2;
-                if (_history[mid].enterTime < threshold)
-                {
-                    result = mid;
-                    high = mid - 1;
-                }
-                else
-                {
-                    low = mid + 1;
-                }
-            }
-
-            return result;
-        }
-
         public int GetLastMatch()
         {
             if (_history.Count == 0)
@@ -108,10 +84,17 @@ namespace PurrNet.Modules
 
         public int FindBestMatch(out uint key)
         {
-            key = mostRecentId;
             int index = BinarySearch(mostRecentId);
             if (index < _history.Count && _history[index].key == mostRecentId)
+            {
+                var entry = _history[index];
+                entry.enterTime = Time.unscaledTime;
+                _history[index] = entry;
+                key = mostRecentId;
                 return index;
+            }
+
+            key = 0;
             return -1;
         }
 
@@ -121,15 +104,17 @@ namespace PurrNet.Modules
             if (_history.Count < MAX_HISTORY_SIZE)
                 return 0;
 
-            if (_history.Count == 0)
+            float threshold = Time.unscaledTime - maxAge;
+            int removeUpTo = 0;
+
+            // Cleanup is mirrored to the peer as one exclusive ID, so only a contiguous
+            // prefix can be removed. A recently referenced baseline stops cleanup here;
+            // packets using it may still be in flight on the unordered channel.
+            while (removeUpTo < _history.Count && _history[removeUpTo].enterTime < threshold)
+                removeUpTo++;
+
+            if (removeUpTo == 0)
                 return 0;
-
-            bool isFirstOldEnough = _history[0].enterTime < Time.unscaledTime - maxAge;
-
-            if (!isFirstOldEnough)
-                return 0;
-
-            int removeUpTo = BinarySearchOlderThan(maxAge);
 
             for (int i = 0; i < removeUpTo; i++)
             {
@@ -236,11 +221,11 @@ namespace PurrNet.Modules
                 var old = _history[index];
                 if (old.value is IDisposable disposable)
                     disposable.Dispose();
-                _history[index] = new Entry { key = id, value = Packer.Copy(newValue) };
+                _history[index] = new Entry { key = id, value = Packer.Copy(newValue), enterTime = Time.unscaledTime };
             }
             else
             {
-                _history.Insert(index, new Entry { key = id, value = Packer.Copy(newValue) });
+                _history.Insert(index, new Entry { key = id, value = Packer.Copy(newValue), enterTime = Time.unscaledTime });
             }
         }
     }

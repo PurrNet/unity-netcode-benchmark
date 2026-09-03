@@ -6,6 +6,7 @@ using UnityEngine;
 
 namespace PurrNet.Transports
 {
+    [AddComponentMenu("PurrNet/Transport/UDP Transport")]
     [DefaultExecutionOrder(-100)]
     public partial class UDPTransport : GenericTransport, ITransport, INetLogger
     {
@@ -29,9 +30,7 @@ namespace PurrNet.Transports
         [SerializeField]
         private float _timeoutInSeconds = 5f;
 
-        [Tooltip("When enabled, the transport will poll events in the Update method instead of per Tick.")]
-        [SerializeField]
-        private bool _pollEventsInUpdate;
+        [SerializeField] private NetworkSimulation _networkSimulation = NetworkSimulation.@default;
 
         public event OnConnected onConnected;
         public event OnDisconnected onDisconnected;
@@ -57,9 +56,39 @@ namespace PurrNet.Transports
             set => _maxConnections = value;
         }
 
+        public NetworkSimulation networkSimulation
+        {
+            get => _networkSimulation;
+            set
+            {
+                _networkSimulation = value;
+                ApplySimulationSettings();
+            }
+        }
+
         public IReadOnlyList<Connection> connections => _connections;
 
         public IReadOnlyDictionary<Connection, PeerInfo> peers => _peers;
+
+        /// <summary>
+        /// Toggles LiteNetLib's socket-level statistics on both the client and server managers.
+        /// When enabled the counters below reflect the real bytes/packets handed to the OS socket,
+        /// including LiteNetLib framing, ACKs and MTU pings (but excluding the UDP/IP headers).
+        /// </summary>
+        public void SetStatisticsEnabled(bool enabled)
+        {
+            if (_client != null) _client.EnableStatistics = enabled;
+            if (_server != null) _server.EnableStatistics = enabled;
+        }
+
+        public bool statisticsEnabled => (_client != null && _client.EnableStatistics) ||
+                                         (_server != null && _server.EnableStatistics);
+
+        public long nativeBytesSent => (_client?.Statistics.BytesSent ?? 0) + (_server?.Statistics.BytesSent ?? 0);
+        public long nativeBytesReceived => (_client?.Statistics.BytesReceived ?? 0) + (_server?.Statistics.BytesReceived ?? 0);
+        public long nativePacketsSent => (_client?.Statistics.PacketsSent ?? 0) + (_server?.Statistics.PacketsSent ?? 0);
+        public long nativePacketsReceived => (_client?.Statistics.PacketsReceived ?? 0) + (_server?.Statistics.PacketsReceived ?? 0);
+        public long nativePacketLoss => (_client?.Statistics.PacketLoss ?? 0) + (_server?.Statistics.PacketLoss ?? 0);
 
         private EventBasedNetListener _clientListener;
         private EventBasedNetListener _serverListener;
@@ -74,6 +103,9 @@ namespace PurrNet.Transports
         readonly List<Connection> _connections = new List<Connection>();
 
         readonly Dictionary<Connection, PeerInfo> _peers = new Dictionary<Connection, PeerInfo>();
+        readonly Dictionary<NetPeer, Connection> _peerToConnection = new Dictionary<NetPeer, Connection>();
+        readonly Dictionary<Connection, NetPeer> _connectionToPeer = new Dictionary<Connection, NetPeer>();
+        private int _nextConnectionId = 1;
 
         public override bool isSupported => Application.platform != RuntimePlatform.WebGLPlayer;
 
@@ -95,13 +127,28 @@ namespace PurrNet.Transports
             try
             {
                 if (asServer)
-                    return _server.GetPeerById(target.connectionId).GetMaxSinglePacketSize(ToDeliveryMethod(channel));
+                    return _connectionToPeer[target].GetMaxSinglePacketSize(ToDeliveryMethod(channel));
                 return _client.FirstPeer.GetMaxSinglePacketSize(ToDeliveryMethod(channel));
             }
             catch
             {
                 return 1024;
             }
+        }
+
+        public bool measuresRoundTripTime => true;
+
+        public int GetRoundTripTime(Connection conn, bool asServer)
+        {
+            if (asServer)
+                return _connectionToPeer.TryGetValue(conn, out var peer) ? GetRoundTripTime(peer) : -1;
+
+            return GetRoundTripTime(_client?.FirstPeer);
+        }
+
+        private static int GetRoundTripTime(NetPeer peer)
+        {
+            return peer != null && peer.HasRoundTripTime ? peer.RoundTripTime : -1;
         }
 
         private void SetupCloud()
@@ -153,6 +200,36 @@ namespace PurrNet.Transports
             _serverListener.PeerConnectedEvent += OnServerConnected;
             _serverListener.PeerDisconnectedEvent += OnServerDisconnected;
             _serverListener.NetworkReceiveEvent += OnServerData;
+
+            ApplySimulationSettings();
+        }
+
+        private void ApplySimulationSettings()
+        {
+            bool apply = _networkSimulation.ShouldApply();
+
+            if (_client != null)
+            {
+                _client.SimulateLatency = apply && _networkSimulation.simulateLatency;
+                _client.SimulationMinLatency = _networkSimulation.minLatency;
+                _client.SimulationMaxLatency = _networkSimulation.maxLatency;
+                _client.SimulatePacketLoss = apply && _networkSimulation.simulatePacketLoss;
+                _client.SimulationPacketLossChance = _networkSimulation.packetLossChance;
+            }
+
+            if (_server != null)
+            {
+                _server.SimulateLatency = apply && _networkSimulation.simulateLatency;
+                _server.SimulationMinLatency = _networkSimulation.minLatency;
+                _server.SimulationMaxLatency = _networkSimulation.maxLatency;
+                _server.SimulatePacketLoss = apply && _networkSimulation.simulatePacketLoss;
+                _server.SimulationPacketLossChance = _networkSimulation.packetLossChance;
+            }
+        }
+
+        private void OnValidate()
+        {
+            ApplySimulationSettings();
         }
 
         public void RaiseDataReceived(Connection conn, ByteData data, bool asServer)
@@ -167,16 +244,17 @@ namespace PurrNet.Transports
 
         private void OnServerData(NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliverymethod)
         {
+            if (!_peerToConnection.TryGetValue(peer, out var conn))
+                return;
+
             var data = new ByteData(reader.RawData, reader.UserDataOffset, reader.UserDataSize);
-            onDataReceived?.Invoke(new Connection(peer.Id), data, true);
-            reader.Recycle();
+            onDataReceived?.Invoke(conn, data, true);
         }
 
         private void OnClientData(NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliverymethod)
         {
             var data = new ByteData(reader.RawData, reader.UserDataOffset, reader.UserDataSize);
             onDataReceived?.Invoke(new Connection(peer.Id), data, false);
-            reader.Recycle();
         }
 
         private void OnServerConnectionRequest(ConnectionRequest request)
@@ -220,13 +298,16 @@ namespace PurrNet.Transports
 
         private void OnServerDisconnected(NetPeer peer, DisconnectInfo disconnectinfo)
         {
-            var conn = new Connection(peer.Id);
+            if (!_peerToConnection.TryGetValue(peer, out var conn))
+                return;
 
             for (int i = 0; i < _connections.Count; i++)
             {
                 if (_connections[i] == conn)
                 {
                     _peers.Remove(conn);
+                    _connectionToPeer.Remove(conn);
+                    _peerToConnection.Remove(peer);
                     _connections.RemoveAt(i);
                     break;
                 }
@@ -244,8 +325,10 @@ namespace PurrNet.Transports
 
         private void OnServerConnected(NetPeer peer)
         {
-            var conn = new Connection(peer.Id);
+            var conn = new Connection(_nextConnectionId++);
 
+            _peerToConnection[peer] = conn;
+            _connectionToPeer[conn] = peer;
             _peers[conn] = PeerInfo.Generate(peer);
 
             _connections.Add(conn);
@@ -256,19 +339,16 @@ namespace PurrNet.Transports
         /// and ManualUpdate(...) for update and send packets
         public void ReceiveMessages(float delta)
         {
-            if (!_pollEventsInUpdate)
-            {
-                if (_server.IsRunning)
-                    _server.PollEvents();
+            if (_server.IsRunning)
+                _server.PollEvents();
 
-                if (_client.IsRunning)
-                    _client.PollEvents();
-            }
+            if (_client.IsRunning)
+                _client.PollEvents();
         }
 
         public void SendMessages(float delta)
         {
-            var dInMs = Mathf.FloorToInt(delta * 1000);
+            var dInMs = delta * 1000f;
 
             if (_server.IsRunning)
                 _server.ManualUpdate(dInMs);
@@ -279,11 +359,8 @@ namespace PurrNet.Transports
 
         public void UnityUpdate(float delta)
         {
-            if (_pollEventsInUpdate)
-            {
-                if (_server.IsRunning) _server.PollEvents();
-                if (_client.IsRunning) _client.PollEvents();
-            }
+            if (_server.IsRunning) _server.PollEvents();
+            if (_client.IsRunning) _client.PollEvents();
         }
 
         public void Connect(string ip, ushort port)
@@ -351,8 +428,11 @@ namespace PurrNet.Transports
                 listenerState = ConnectionState.Disconnected;
                 TriggerConnectionStateEvent(true);
 
+                _peerToConnection.Clear();
+                _connectionToPeer.Clear();
                 _peers.Clear();
                 _connections.Clear();
+                _nextConnectionId = 1;
             }
         }
 
@@ -376,7 +456,7 @@ namespace PurrNet.Transports
                 return;
 
             var deliveryMethod = ToDeliveryMethod(method);
-            var peer = _server.GetPeerById(target.connectionId);
+            _connectionToPeer.TryGetValue(target, out var peer);
             peer?.Send(data.data, data.offset, data.length, deliveryMethod);
             RaiseDataSent(target, data, true);
         }
@@ -393,7 +473,7 @@ namespace PurrNet.Transports
 
         public void CloseConnection(Connection conn)
         {
-            var peer = _server.GetPeerById(conn.connectionId);
+            _connectionToPeer.TryGetValue(conn, out var peer);
             peer?.Disconnect();
         }
 
@@ -418,8 +498,11 @@ namespace PurrNet.Transports
             TriggerConnectionStateEvent(true);
             TriggerConnectionStateEvent(false);
 
+            _peerToConnection.Clear();
+            _connectionToPeer.Clear();
             _peers.Clear();
             _connections.Clear();
+            _nextConnectionId = 1;
         }
 
         public void WriteNet(NetLogLevel level, string str, params object[] args)

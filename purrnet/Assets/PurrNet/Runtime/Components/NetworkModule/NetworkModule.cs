@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using JetBrains.Annotations;
 using PurrNet.Logging;
@@ -6,10 +7,10 @@ using PurrNet.Modules;
 using PurrNet.Packing;
 using PurrNet.Pooling;
 using PurrNet.Profiler;
-using PurrNet.Transports;
 
 namespace PurrNet
 {
+    [Serializable]
     public class NetworkModule
     {
         public NetworkIdentity parent { get; private set; }
@@ -44,6 +45,57 @@ namespace PurrNet
 
         public PlayerID? owner => parent ? parent.owner : null;
 
+        /// <summary>
+        /// When true, this module's state is only ever sent to the owner of the parent identity.
+        /// Non-owner observers still see the object, they just never receive this module's data.
+        /// Override in your module (or pass ownerOnly: true to a sync type's constructor) to enable.
+        /// </summary>
+        public virtual bool ownerOnly => false;
+
+        private List<PlayerID> _ownerOnlyObservers;
+
+        /// <summary>
+        /// The observers this module is allowed to send to.
+        /// Same as the parent's observer list, unless the module is <see cref="ownerOnly"/>,
+        /// in which case it contains only the owner (or nothing when there is no owner).
+        /// Server only.
+        /// </summary>
+        public IReadOnlyList<PlayerID> observers
+        {
+            get
+            {
+                if (!parent)
+                    return Array.Empty<PlayerID>();
+
+                if (!ownerOnly)
+                    return parent.observers;
+
+                RefreshOwnerOnlyObservers();
+                return _ownerOnlyObservers;
+            }
+        }
+
+        private void RefreshOwnerOnlyObservers()
+        {
+            _ownerOnlyObservers ??= new List<PlayerID>(1);
+            _ownerOnlyObservers.Clear();
+
+            var cachedOwner = parent.owner;
+            if (!cachedOwner.HasValue)
+                return;
+
+            var all = parent.observers;
+
+            for (var i = 0; i < all.Count; i++)
+            {
+                if (all[i] != cachedOwner.Value)
+                    continue;
+
+                _ownerOnlyObservers.Add(cachedOwner.Value);
+                return;
+            }
+        }
+
         public bool isController => parent && parent.isController;
 
         [UsedImplicitly]
@@ -63,9 +115,11 @@ namespace PurrNet
                                   $"You can initialize it on Awake or override OnInitializeModules.", parent);
         }
 
-        public virtual void OnReceivedRpc(int id, BitPacker stream, ChildRPCPacket packet, RPCInfo info, bool asServer) { }
+        [UsedByIL]
+        public virtual void OnReceivedRpc(int id, ChildRPCPacket packet, RPCInfo info, bool asServer) { }
 
-        public static void OnReceivedRpc(int id, BitPacker stream, StaticRPCPacket packet, RPCInfo info, bool asServer) { }
+        [UsedByIL]
+        public static void OnReceivedRpc(int id, StaticRPCPacket packet, RPCInfo info, bool asServer) { }
 
         public virtual void OnSpawn()
         {
@@ -75,11 +129,47 @@ namespace PurrNet
         {
         }
 
+        /// <summary>
+        /// Called only on the spawning peer, at the end of the frame the object was spawned in,
+        /// right before batched RPCs flush. Anything queued here departs in the same flush as the
+        /// spawn, ordered right behind the spawn packet.
+        /// </summary>
+        public virtual void OnSpawnSent()
+        {
+        }
+
+        /// <summary>
+        /// Called only on peers that created the object from a spawn packet, once the entire
+        /// packet has been deserialized and early-spawned. Everything that spawned alongside
+        /// this object exists at this point; safe to react to spawn data.
+        /// </summary>
+        public virtual void OnSpawnReceived()
+        {
+        }
+
         public virtual void OnDespawned()
         {
         }
 
         public virtual void OnDespawned(bool asServer)
+        {
+        }
+
+        /// <summary>
+        /// Called on the spawner to attach custom data to the parent's spawn packet.
+        /// Whatever you write here travels with the object and is read back in OnDeserialize.
+        /// </summary>
+        /// <param name="packer">The packer to write your data into</param>
+        public virtual void OnSerialize(BitPacker packer)
+        {
+        }
+
+        /// <summary>
+        /// Called on peers that create the object, after the spawn packet arrives.
+        /// Read the data back in the same order you wrote it in OnSerialize.
+        /// </summary>
+        /// <param name="packer">The packer to read your data from</param>
+        public virtual void OnDeserialize(BitPacker packer)
         {
         }
 
@@ -173,6 +263,7 @@ namespace PurrNet
         [UsedByIL]
         protected void SendRPC(ChildRPCPacket packet, RPCSignature signature)
         {
+            NetworkAssetResolver.serializationSceneHint = null;
 #if UNITY_EDITOR || PURR_RUNTIME_PROFILING
             _myType ??= GetType();
 #endif
@@ -180,12 +271,13 @@ namespace PurrNet
             if (!parent.ValidateSendingRPC(signature, out var module))
                 return;
 
-            module.AppendToBufferedRPCs(packet, signature);
+            if (signature.bufferLast)
+                module.AppendToBufferedRPCs(packet, signature);
 
 #if UNITY_EDITOR || PURR_RUNTIME_PROFILING
-            parent.SendRPC(_myType, module, packet, signature);
+            parent.SendRPCChild(_myType, module, packet, signature, ownerOnly);
 #else
-            parent.SendRPC(null, module, packet, signature);
+            parent.SendRPCChild(null, module, packet, signature, ownerOnly);
 #endif
         }
 
@@ -194,19 +286,49 @@ namespace PurrNet
 #endif
 
         [UsedByIL]
-        protected bool ValidateReceivingRPC(RPCInfo info, RPCSignature signature, IRpc data, bool asServer)
+        protected bool ValidateReceivingRPC<T>(RPCInfo info, RPCSignature signature, T data, bool asServer, uint requestId, bool isAwaitable) where T : struct, IRpc
         {
 #if UNITY_EDITOR || PURR_RUNTIME_PROFILING
             _myType ??= GetType();
-            Statistics.ReceivedRPC(_myType, signature.type, signature.rpcName, data.rpcData.segment, parent);
+            Statistics.ReceivedRPC(_myType, signature.type, signature.rpcName, data.rpcData, parent);
 #endif
-            return parent && parent.ValidateIncomingRPC(info, signature, data, asServer);
+            return parent && parent.ValidateIncomingRPC(info, signature, data, asServer, requestId, isAwaitable, ownerOnly);
         }
 
         [UsedByIL]
         public DisposableList<PlayerID> GetObservers(RPCSignature signature)
         {
-            return parent.GetObservers(signature);
+            if (!ownerOnly)
+                return parent.GetObservers(signature);
+
+            var players = DisposableList<PlayerID>.Create(1);
+            var cachedOwner = parent.owner;
+
+            if (!cachedOwner.HasValue || signature.excludeOwner)
+                return players;
+
+            if (signature.targetPlayer != null)
+            {
+                if (signature.targetPlayer.Value == cachedOwner.Value)
+                    players.Add(cachedOwner.Value);
+                return players;
+            }
+
+            if (signature.runLocally && cachedOwner.Value == networkManager.localPlayer)
+                return players;
+
+            var all = parent.observers;
+
+            for (var i = 0; i < all.Count; i++)
+            {
+                if (all[i] != cachedOwner.Value)
+                    continue;
+
+                players.Add(cachedOwner.Value);
+                break;
+            }
+
+            return players;
         }
 
         [UsedByIL]
@@ -220,7 +342,7 @@ namespace PurrNet
                     BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
                 gmethod = method?.MakeGenericMethod(rpcHeader.types);
 
-                NetworkIdentity.genericMethods.Add(key, gmethod);
+                NetworkIdentity.genericMethods.Add(key.CloneForStorage(), gmethod);
             }
 
             if (gmethod == null)
@@ -255,7 +377,9 @@ namespace PurrNet
         {
             if (!parent)
                 throw new InvalidOperationException(
-                    $"Trying to send RPC from '{GetType().Name}' which is not spawned.");
+                    $"Trying to send RPC from '<b>{GetType().FullName}</b> {name}' which is not spawned.");
+
+            NetworkAssetResolver.serializationSceneHint = parent.sceneId;
 
             var rpc = new ChildRPCPacket
             {
@@ -267,7 +391,7 @@ namespace PurrNet
                     rpcId = rpcId,
                     senderId = RPCModule.GetLocalPlayer(networkManager)
                 },
-                data = data.ToByteData(),
+                data = new BitData(data)
             };
 
             return rpc;

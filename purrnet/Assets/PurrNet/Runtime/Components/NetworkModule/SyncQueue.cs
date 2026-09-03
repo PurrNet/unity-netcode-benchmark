@@ -11,6 +11,8 @@ namespace PurrNet
     public class SyncQueue<T> : NetworkModule, IReadOnlyCollection<T>
     {
         [SerializeField] private bool _ownerAuth;
+
+        [SerializeField] private bool _ownerOnly;
         [SerializeField] private SerializableQueue<T> _serializedQueue = new SerializableQueue<T>();
         private Queue<T> _queue = new Queue<T>();
 
@@ -19,6 +21,8 @@ namespace PurrNet
         public event SyncQueueChanged<T> onChanged;
 
         public bool ownerAuth => _ownerAuth;
+
+        public override bool ownerOnly => _ownerOnly;
         public int Count => _queue.Count;
 
         public override void OnPoolReset()
@@ -30,9 +34,10 @@ namespace PurrNet
 #endif
         }
 
-        public SyncQueue(bool ownerAuth = false)
+        public SyncQueue(bool ownerAuth = false, bool ownerOnly = false)
         {
             _ownerAuth = ownerAuth;
+            _ownerOnly = ownerOnly;
 
 #if UNITY_EDITOR
             onChanged += UpdateSerializedQueue;
@@ -41,11 +46,13 @@ namespace PurrNet
 
         public void OnBeforeSerialize()
         {
+            _serializedQueue ??= new SerializableQueue<T>();
             _serializedQueue.FromQueue(_queue);
         }
 
         public void OnAfterDeserialize()
         {
+            _serializedQueue ??= new SerializableQueue<T>();
             _queue = _serializedQueue.ToQueue();
         }
 
@@ -243,22 +250,19 @@ namespace PurrNet
             SendInitialStateToOthers(items);
         }
 
-        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true)]
+        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true, runLocally: true)]
         private void SendInitialStateToOthers(Queue<T> items)
         {
-            if (!isServer || isHost)
+            _queue.Clear();
+            foreach (var item in items)
             {
-                _queue.Clear();
-                foreach (var item in items)
-                {
-                    _queue.Enqueue(item);
-                }
+                _queue.Enqueue(item);
+            }
 
-                InvokeChange(new SyncQueueChange<T>(SyncQueueOperation.Cleared));
-                foreach (var item in items)
-                {
-                    InvokeChange(new SyncQueueChange<T>(SyncQueueOperation.Enqueued, item));
-                }
+            InvokeChange(new SyncQueueChange<T>(SyncQueueOperation.Cleared));
+            foreach (var item in items)
+            {
+                InvokeChange(new SyncQueueChange<T>(SyncQueueOperation.Enqueued, item));
             }
         }
 
@@ -273,14 +277,11 @@ namespace PurrNet
             SendEnqueueToOthers(item);
         }
 
-        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true)]
+        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true, runLocally: true)]
         private void SendEnqueueToOthers(T item)
         {
-            if (!isServer || isHost)
-            {
-                _queue.Enqueue(item);
-                InvokeChange(new SyncQueueChange<T>(SyncQueueOperation.Enqueued, item));
-            }
+            _queue.Enqueue(item);
+            InvokeChange(new SyncQueueChange<T>(SyncQueueOperation.Enqueued, item));
         }
 
         [ObserversRpc(Channel.ReliableOrdered)]
@@ -300,16 +301,13 @@ namespace PurrNet
             SendDequeueToOthers();
         }
 
-        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true)]
+        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true, runLocally: true)]
         private void SendDequeueToOthers()
         {
-            if (!isServer || isHost)
+            if (_queue.Count > 0)
             {
-                if (_queue.Count > 0)
-                {
-                    T item = _queue.Dequeue();
-                    InvokeChange(new SyncQueueChange<T>(SyncQueueOperation.Dequeued, item));
-                }
+                T item = _queue.Dequeue();
+                InvokeChange(new SyncQueueChange<T>(SyncQueueOperation.Dequeued, item));
             }
         }
 
@@ -333,14 +331,11 @@ namespace PurrNet
             SendClearToOthers();
         }
 
-        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true)]
+        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true, runLocally: true)]
         private void SendClearToOthers()
         {
-            if (!isServer || isHost)
-            {
-                _queue.Clear();
-                InvokeChange(new SyncQueueChange<T>(SyncQueueOperation.Cleared));
-            }
+            _queue.Clear();
+            InvokeChange(new SyncQueueChange<T>(SyncQueueOperation.Cleared));
         }
 
         [ObserversRpc(Channel.ReliableOrdered)]
@@ -386,15 +381,18 @@ namespace PurrNet
         [SerializeField] private List<T> _values = new List<T>();
         [SerializeField] private List<string> _stringValues = new List<string>();
 
-        private bool _isValueSerializable;
+        private static readonly bool _isValueSerializable =
+            typeof(T).IsSerializable || typeof(UnityEngine.Object).IsAssignableFrom(typeof(T));
 
-        public SerializableQueue()
+        private void EnsureLists()
         {
-            _isValueSerializable = typeof(T).IsSerializable || typeof(UnityEngine.Object).IsAssignableFrom(typeof(T));
+            _values ??= new List<T>();
+            _stringValues ??= new List<string>();
         }
 
         public Queue<T> ToQueue()
         {
+            EnsureLists();
             var queue = new Queue<T>();
 
             if (_isValueSerializable)
@@ -417,6 +415,10 @@ namespace PurrNet
 
         public void FromQueue(Queue<T> queue)
         {
+            if (queue == null)
+                return;
+
+            EnsureLists();
             _values.Clear();
             _stringValues.Clear();
 

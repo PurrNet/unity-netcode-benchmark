@@ -29,6 +29,7 @@ namespace PurrNet.Editor
 
             EditorGUI.BeginChangeCheck();
 
+#if !UNITY_6000_3_OR_NEWER
             var toolbarResult = EditorGUILayout.EnumPopup(
                 new GUIContent("Toolbar Mode",
                     "Defines how the PurrNet toolbar will be displayed in the Unity Editor. " +
@@ -39,6 +40,17 @@ namespace PurrNet.Editor
             settings.toolbarTransportDropDown = EditorGUILayout.Toggle(
                 new GUIContent("Toolbar Transport"),
                 settings.toolbarTransportDropDown);
+
+            GUILayout.Space(10f);
+#endif
+
+            EditorGUILayout.BeginHorizontal();
+            settings.reflectionCachePath = EditorGUILayout.TextField(
+                new GUIContent("Reflection Cache Path",
+                    "File path for the Network Reflection RPC cache. " +
+                    "This file is tracked in version control so it stays consistent across clones."),
+                settings.reflectionCachePath);
+            EditorGUILayout.EndHorizontal();
 
             GUILayout.Space(10f);
 

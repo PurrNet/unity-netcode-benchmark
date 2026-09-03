@@ -13,16 +13,19 @@ namespace PurrNet
     /// </summary>
     /// <typeparam name="T">Type to sync to the server</typeparam>
     [System.Serializable]
-    public class SyncInput<T> : NetworkModule, ITick where T : unmanaged, System.IEquatable<T>
+    public class SyncInput<T> : NetworkModule, ITick, ISerializationCallbackReceiver where T : unmanaged, System.IEquatable<T>
     {
         public SyncInput(T defaultValue = default, float hostPing = 0f)
         {
             _value = defaultValue;
+            _initialValue = defaultValue;
             _simulatedHostPing = hostPing;
         }
-        
+
         [SerializeField, PurrLock] private T _value;
-        
+
+        [SerializeField, HideInInspector] private T _initialValue;
+
         [Tooltip("Simulated ping in ms. This is only for the host to simulate a ping delay.")]
         [SerializeField, PurrLock] private float _simulatedHostPing;
         
@@ -31,7 +34,6 @@ namespace PurrNet
         private int _lastAckId;
         private bool _isDirty;
         private Dictionary<int, T> _history = new();
-        private float _hostSimDelayTimer;
         private T _queuedHostValue, _lastQueuedHostValue;
 
         private readonly Queue<PendingInput> _pendingHostInputs = new();
@@ -92,6 +94,31 @@ namespace PurrNet
                     value = 0;
                 _simulatedHostPing = value;
             }
+        }
+
+        public override void OnPoolReset()
+        {
+            onChanged = null;
+            onSentData = null;
+
+            _value = _initialValue;
+            _lastValue = default;
+            _currentId = 0;
+            _lastAckId = 0;
+            _isDirty = false;
+            _history.Clear();
+            _queuedHostValue = _initialValue;
+            _lastQueuedHostValue = _initialValue;
+            _pendingHostInputs.Clear();
+        }
+
+        public void OnBeforeSerialize()
+        {
+        }
+
+        public void OnAfterDeserialize()
+        {
+            _initialValue = _value;
         }
 
         public void SetDirty()
@@ -176,7 +203,7 @@ namespace PurrNet
             SendInputServerRpc(value, id);
         }
 
-        [ServerRpc(channel: Channel.Unreliable)]
+        [ServerRpc(channel: Channel.Unreliable, immediate:true)]
         private void SendInputServerRpc(T value, int id, RPCInfo info = default)
         {
             _lastValue = _value;
@@ -186,7 +213,7 @@ namespace PurrNet
                 onChanged?.Invoke(_value);
         }
 
-        [TargetRpc(channel: Channel.Unreliable)]
+        [TargetRpc(channel: Channel.Unreliable, immediate:true)]
         private void Acknowledge(PlayerID player, int id)
         {
             if (isHost) return;

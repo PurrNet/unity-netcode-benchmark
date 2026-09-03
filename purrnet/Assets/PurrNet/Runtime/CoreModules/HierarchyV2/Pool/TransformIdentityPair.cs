@@ -15,7 +15,7 @@ namespace PurrNet.Modules
             this.identity = identity;
         }
 
-        public bool HasObserver(PlayerID playerID, List<NetworkIdentity> observed)
+        public bool HasObserver(PlayerID playerID)
         {
             bool hasObserver = false;
             var components = ListPool<NetworkIdentity>.Instantiate();
@@ -25,10 +25,10 @@ namespace PurrNet.Modules
 
             for (var i = 0; i < count; i++)
             {
-                if (components[i].IsObserver(playerID))
+                if (components[i].IsObserverOrPending(playerID))
                 {
-                    observed.Add(components[i]);
                     hasObserver = true;
+                    break;
                 }
             }
 

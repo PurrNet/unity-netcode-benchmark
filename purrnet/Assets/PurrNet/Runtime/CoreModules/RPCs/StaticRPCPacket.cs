@@ -1,13 +1,14 @@
 ﻿using System;
+using PurrNet.Modules;
 using PurrNet.Packing;
-using PurrNet.Transports;
 using PurrNet.Utils;
+using UnityEngine;
 
 namespace PurrNet
 {
     public struct StaticRPCHeader : IPackedAuto, IEquatable<StaticRPCHeader>
     {
-        public PackedUInt typeHash;
+        public uint typeHash;
         public Size rpcId;
         public PlayerID senderId;
         public PlayerID? targetId;
@@ -39,9 +40,9 @@ namespace PurrNet
     public struct StaticRPCPacket : IPackedAuto, IRpc
     {
         public StaticRPCHeader header;
-        [DontDeltaCompress] public ByteData data;
+        [DontDeltaCompress, UsedByIL] public BitData data;
 
-        public ByteData rpcData
+        public BitData rpcData
         {
             get { return data; }
             set { data = value; }
@@ -56,7 +57,7 @@ namespace PurrNet
 
         public uint GetStableHeaderHash()
         {
-            ulong nid = header.typeHash.value;
+            ulong nid = header.typeHash;
             ulong rpc = header.rpcId.value;
 
             ulong hash = 1469598103934665603UL;

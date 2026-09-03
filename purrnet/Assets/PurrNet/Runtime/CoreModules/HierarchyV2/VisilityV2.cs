@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using PurrNet.Collections;
 using PurrNet.Pooling;
 using UnityEngine;
@@ -7,6 +7,7 @@ namespace PurrNet.Modules
 {
     internal class VisilityV2
     {
+        readonly NetworkManager _manager;
         readonly NetworkVisibilityRuleSet _defaultRuleSet;
 
         public delegate void VisibilityChanged(PlayerID player, Transform scope, bool hasVisibility);
@@ -15,6 +16,7 @@ namespace PurrNet.Modules
 
         public VisilityV2(NetworkManager manager)
         {
+            _manager = manager;
             _defaultRuleSet = manager.visibilityRules;
         }
 
@@ -37,7 +39,7 @@ namespace PurrNet.Modules
             if (!transform)
                 return;
 
-            bool isParentVisible = !parent || parent.IsObserver(player);
+            bool isParentVisible = !parent || parent.IsObserverOrPending(player);
 
             RefreshVisibilityForGameObject(player, transform, _defaultRuleSet, isParentVisible, false);
         }
@@ -74,6 +76,9 @@ namespace PurrNet.Modules
             bool removed = false;
 
             int ccount = identities.Count;
+            if (ccount == 0)
+                return removed;
+
             for (var i = 0; i < ccount; i++)
             {
                 var identity = identities[i];
@@ -82,11 +87,25 @@ namespace PurrNet.Modules
             }
 
             var directChildren = identities[0].directChildren;
+            if (directChildren == null)
+                return removed;
+
             var dcount = directChildren.Count;
 
             for (var i = 0; i < dcount; i++)
             {
-                removed |= RefreshVisibilityForGameObject(directChildren[i].transform, player);
+                if (i >= directChildren.Count)
+                    break;
+
+                var child = directChildren[i];
+                if (!child)
+                    continue;
+
+                var childTransform = child.transform;
+                if (!childTransform)
+                    continue;
+
+                removed |= RefreshVisibilityForGameObject(childTransform, player);
             }
 
             return removed;
@@ -98,19 +117,40 @@ namespace PurrNet.Modules
             transform.GetComponents(identities.list);
 
             int ccount = identities.Count;
+            if (ccount == 0)
+                return;
+
             for (var i = 0; i < ccount; i++)
             {
                 var identity = identities[i];
                 var observers = identity.observers;
                 players.UnionWith(observers);
+                if (identity.hasPendingObservers)
+                    players.UnionWith(identity.pendingObservers);
                 identity.ClearObservers();
             }
 
             var directChildren = identities[0].directChildren;
+            if (directChildren == null)
+                return;
+
             var dcount = directChildren.Count;
 
             for (var i = 0; i < dcount; i++)
-                ClearVisibilityForGameObject(directChildren[i].transform, players);
+            {
+                if (i >= directChildren.Count)
+                    break;
+
+                var child = directChildren[i];
+                if (!child)
+                    continue;
+
+                var childTransform = child.transform;
+                if (!childTransform)
+                    continue;
+
+                ClearVisibilityForGameObject(childTransform, players);
+            }
         }
 
         private void RefreshVisibilityForGameObject(PlayerID player, Transform transform,
@@ -120,19 +160,35 @@ namespace PurrNet.Modules
 
             transform.GetComponents(identities.list);
 
-            var isVisible = Evaluate(player, identities.list, ref rules, isParentVisible, out bool fullyChanged);
+            if (identities.Count == 0)
+                return;
+
+            var isVisible = Evaluate(player, identities.list, ref rules, isParentVisible, out bool fullyChanged, transform);
             bool shouldTrigger = !wasParentDirtied && fullyChanged;
 
             if (shouldTrigger)
                 wasParentDirtied = true;
 
             var directChildren = identities[0].directChildren;
-            var count = directChildren.Count;
-
-            for (var i = 0; i < count; i++)
+            if (directChildren != null)
             {
-                var pair = directChildren[i];
-                RefreshVisibilityForGameObject(player, pair.transform, rules, isVisible, wasParentDirtied);
+                var count = directChildren.Count;
+
+                for (var i = 0; i < count; i++)
+                {
+                    if (i >= directChildren.Count)
+                        break;
+
+                    var pair = directChildren[i];
+                    if (!pair)
+                        continue;
+
+                    var childTransform = pair.transform;
+                    if (!childTransform)
+                        continue;
+
+                    RefreshVisibilityForGameObject(player, childTransform, rules, isVisible, wasParentDirtied);
+                }
             }
 
             if (shouldTrigger)
@@ -171,8 +227,8 @@ namespace PurrNet.Modules
         /// Evaluate visibility of the object.
         /// Also adds/removes observers based on the visibility.
         /// </summary>
-        private static bool Evaluate(PlayerID player, List<NetworkIdentity> identities,
-            ref NetworkVisibilityRuleSet rules, bool isParentVisible, out bool fullyChanged)
+        private bool Evaluate(PlayerID player, List<NetworkIdentity> identities,
+            ref NetworkVisibilityRuleSet rules, bool isParentVisible, out bool fullyChanged, Transform transform)
         {
             fullyChanged = false;
 
@@ -192,7 +248,7 @@ namespace PurrNet.Modules
                 if (identity.whitelist.Contains(player))
                 {
                     isAnyVisible = true;
-                    if (identity.TryAddObserver(player))
+                    if (ShouldAddObserver(player, identity) && identity.TryAddObserver(player))
                         fullyChanged = true;
                     continue;
                 }
@@ -212,7 +268,7 @@ namespace PurrNet.Modules
                 if (!r)
                 {
                     isAnyVisible = true;
-                    if (identity.TryAddObserver(player))
+                    if (ShouldAddObserver(player, identity) && identity.TryAddObserver(player))
                         fullyChanged = true;
                     continue;
                 }
@@ -220,7 +276,7 @@ namespace PurrNet.Modules
                 if (identity.owner == player)
                 {
                     isAnyVisible = true;
-                    if (identity.TryAddObserver(player))
+                    if (ShouldAddObserver(player, identity) && identity.TryAddObserver(player))
                         fullyChanged = true;
                     continue;
                 }
@@ -233,12 +289,44 @@ namespace PurrNet.Modules
                 else
                 {
                     isAnyVisible = true;
-                    if (identity.TryAddObserver(player))
+                    if (ShouldAddObserver(player, identity) && identity.TryAddObserver(player))
                         fullyChanged = true;
                 }
             }
 
             return isAnyVisible;
         }
+
+        private bool ShouldAddObserver(PlayerID player, NetworkIdentity identity)
+        {
+#if ADDRESSABLES_PURRNET_SUPPORT
+            return ShouldAddObserverAddressables(player, identity);
+#else
+            return true;
+#endif
+        }
+
+#if ADDRESSABLES_PURRNET_SUPPORT
+        private bool ShouldAddObserverAddressables(PlayerID player, NetworkIdentity identity)
+        {
+            if (!_manager.networkRules)
+                return true;
+
+            if (!_manager.networkRules.AddressablesWaitForLoadBeforeObserver)
+                return true;
+
+            if (!_manager.prefabResolver.TryGetAddressableGuid(identity.scopedPrefabId, out var guid))
+                return true;
+
+            if (!_manager.TryGetModule<AddressablesSyncModule>(true, out var sync))
+                return true;
+
+            if (sync.ClientHasLoaded(player, guid))
+                return true;
+
+            sync.RequestPlayerToLoad(player, guid);
+            return false;
+        }
+#endif
     }
 }

@@ -4,6 +4,20 @@ namespace PurrNet.Editor
 {
     public static class InstallPurrNetFeatures
     {
+#if PURR_MTU_DEBUGGING
+        [MenuItem("Tools/PurrNet/Features/Debug/Disable MTU Debugging", priority = 105)]
+        public static void Uninstall_PURR_MTU_DEBUGGING()
+        {
+            SymbolsHelper.RemoveSymbol("PURR_MTU_DEBUGGING");
+        }
+#else
+        [MenuItem("Tools/PurrNet/Features/Debug/Enable MTU Debugging", priority = 105)]
+        public static void Install_PURR_MTU_DEBUGGING()
+        {
+            SymbolsHelper.AddSymbol("PURR_MTU_DEBUGGING");
+        }
+#endif
+
 #if PURR_RUNTIME_PROFILING
         [MenuItem("Tools/PurrNet/Features/Disable Runtime Profiling", priority = 105)]
         public static void Uninstall_PURR_RUNTIME_PROFILING()
@@ -57,6 +71,20 @@ namespace PurrNet.Editor
         public static void InstallEndianness()
         {
             SymbolsHelper.AddSymbol("PURR_ENDIAN");
+        }
+#endif
+
+#if PURRNET_DISABLE_ASSET_REGISTRY_AUTO_GENERATION
+        [MenuItem("Tools/PurrNet/Features/Enable Asset Registry Auto Generation", priority = 105)]
+        private static void InstallAssetRegistryAutoGeneration()
+        {
+            SymbolsHelper.RemoveSymbol("PURRNET_DISABLE_ASSET_REGISTRY_AUTO_GENERATION");
+        }
+#else
+        [MenuItem("Tools/PurrNet/Features/Disable Asset Registry Auto Generation", priority = 105)]
+        private static void UninstallAssetRegistryAutoGeneration()
+        {
+            SymbolsHelper.AddSymbol("PURRNET_DISABLE_ASSET_REGISTRY_AUTO_GENERATION");
         }
 #endif
     }

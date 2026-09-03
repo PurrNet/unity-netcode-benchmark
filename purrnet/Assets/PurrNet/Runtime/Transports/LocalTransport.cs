@@ -4,6 +4,7 @@ using UnityEngine;
 
 namespace PurrNet.Transports
 {
+    [AddComponentMenu("PurrNet/Transport/Local Transport")]
     [DefaultExecutionOrder(-100)]
     public class LocalTransport : GenericTransport, ITransport
     {
@@ -185,6 +186,11 @@ namespace PurrNet.Transports
         }
 
         public void SendMessages(float delta) { }
+
+        public void UnityUpdate(float delta)
+        {
+            ReceiveMessages(delta);
+        }
 
         ConnectionState _prevClientState = ConnectionState.Disconnected;
         ConnectionState _prevServerState = ConnectionState.Disconnected;

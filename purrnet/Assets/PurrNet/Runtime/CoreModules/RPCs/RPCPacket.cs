@@ -1,6 +1,6 @@
 ﻿using System;
+using PurrNet.Modules;
 using PurrNet.Packing;
-using PurrNet.Transports;
 using PurrNet.Utils;
 
 namespace PurrNet
@@ -8,9 +8,9 @@ namespace PurrNet
     public struct RPCPacket : IPackedAuto, IRpc
     {
         public NetworkIdentityRPCHeader header;
-        [DontDeltaCompress] public ByteData data;
+        [DontDeltaCompress, UsedByIL] public BitData data;
 
-        public ByteData rpcData
+        public BitData rpcData
         {
             get { return data; }
             set { data = value; }
@@ -55,37 +55,41 @@ namespace PurrNet
 
     internal readonly struct RPC_ID : IEquatable<RPC_ID>
     {
-        public readonly PackedUInt typeHash;
+        public readonly uint typeHash;
         public readonly SceneID sceneId;
         public readonly NetworkID networkId;
         private readonly Size rpcId;
         private readonly Size childId;
+        private readonly PlayerID targetPlayer;
 
-        public RPC_ID(RPCPacket packet)
+        public RPC_ID(RPCPacket packet, PlayerID targetPlayer = default)
         {
             sceneId = packet.header.sceneId;
             networkId = packet.header.networkId;
             rpcId = packet.header.rpcId;
             typeHash = default;
             childId = default;
+            this.targetPlayer = targetPlayer;
         }
 
-        public RPC_ID(StaticRPCPacket packet)
+        public RPC_ID(StaticRPCPacket packet, PlayerID targetPlayer = default)
         {
             sceneId = default;
             networkId = default;
             rpcId = packet.header.rpcId;
             typeHash = packet.header.typeHash;
             childId = default;
+            this.targetPlayer = targetPlayer;
         }
 
-        public RPC_ID(ChildRPCPacket packet)
+        public RPC_ID(ChildRPCPacket packet, PlayerID targetPlayer = default)
         {
             sceneId = packet.header.sceneId;
             networkId = packet.header.networkId;
             rpcId = packet.header.rpcId;
             typeHash = default;
             childId = packet.header.childId;
+            this.targetPlayer = targetPlayer;
         }
 
         public override int GetHashCode()
@@ -94,7 +98,8 @@ namespace PurrNet
                    networkId.GetHashCode() ^
                    rpcId.GetHashCode() ^
                    typeHash.GetHashCode() ^
-                   childId.GetHashCode();
+                   childId.GetHashCode() ^
+                   targetPlayer.GetHashCode();
         }
 
         public bool Equals(RPC_ID other)
@@ -103,7 +108,8 @@ namespace PurrNet
                    sceneId.Equals(other.sceneId) &&
                    networkId.Equals(other.networkId) &&
                    rpcId == other.rpcId &&
-                   childId == other.childId;
+                   childId == other.childId &&
+                   targetPlayer.Equals(other.targetPlayer);
         }
 
         public override bool Equals(object obj)
@@ -112,10 +118,18 @@ namespace PurrNet
         }
     }
 
+    internal class RPC_DATA_BASE<T>
+    {
+        public RPC_ID rpcid;
+        public T header;
+        public RPCSignature sig;
+        public BitPacker stream;
+    }
+
     internal class RPC_DATA
     {
         public RPC_ID rpcid;
-        public RPCPacket packet;
+        public NetworkIdentityRPCHeader header;
         public RPCSignature sig;
         public BitPacker stream;
     }
@@ -123,7 +137,7 @@ namespace PurrNet
     internal class CHILD_RPC_DATA
     {
         public RPC_ID rpcid;
-        public ChildRPCPacket packet;
+        public NetworkModuleRPCHeader header;
         public RPCSignature sig;
         public BitPacker stream;
     }
@@ -131,7 +145,7 @@ namespace PurrNet
     internal class STATIC_RPC_DATA
     {
         public RPC_ID rpcid;
-        public StaticRPCPacket packet;
+        public StaticRPCHeader header;
         public RPCSignature sig;
         public BitPacker stream;
     }

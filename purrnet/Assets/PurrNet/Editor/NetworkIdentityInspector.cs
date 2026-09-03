@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Reflection;
 using PurrNet.Contributors;
+using PurrNet.Utils;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -27,6 +28,8 @@ namespace PurrNet.Editor
         private SerializedProperty _visitiblityRules;
         private readonly List<Contributor> _contributors = new ();
         private readonly List<Contributor> _courtesyOf = new ();
+        private string _docsUrl;
+        private static Texture2D _helpIcon;
 
 #if TRI_INSPECTOR_PACKAGE || ODIN_INSPECTOR
         protected override void OnEnable()
@@ -49,34 +52,48 @@ namespace PurrNet.Editor
 
             if (target)
             {
-                var targetType = target.GetType();
-                var attributes = targetType.GetCustomAttributes(typeof(ContributorAttribute), true);
-                var courtesy = targetType.GetCustomAttributes(typeof(CourtesyOfAttribute), true);
-
-                for (var i = 0; i < attributes.Length; i++)
+                try
                 {
-                    var attr = (ContributorAttribute)attributes[i];
+                    var targetType = target.GetType();
+                    var attributes = targetType.GetCustomAttributes(typeof(ContributorAttribute), true);
+                    var courtesy = targetType.GetCustomAttributes(typeof(CourtesyOfAttribute), true);
 
-                    if (attr == null)
-                        continue;
-
-                    _contributors.Add(new Contributor
+                    for (var i = 0; i < attributes.Length; i++)
                     {
-                        name = attr.name,
-                        url = attr.url
-                    });
+                        var attr = (ContributorAttribute)attributes[i];
+
+                        if (attr == null)
+                            continue;
+
+                        _contributors.Add(new Contributor
+                        {
+                            name = attr.name,
+                            url = attr.url
+                        });
+                    }
+
+                    for (var i = 0; i < courtesy.Length; i++)
+                    {
+                        var attr = (CourtesyOfAttribute)courtesy[i];
+                        if (attr == null)
+                            continue;
+                        _courtesyOf.Add(new Contributor
+                        {
+                            name = attr.name,
+                            url = attr.url
+                        });
+                    }
+
+                    var docsAttr = targetType.GetCustomAttribute<PurrDocsAttribute>();
+                    if (docsAttr != null)
+                        _docsUrl = docsAttr.url;
                 }
-
-                for (var i = 0; i < courtesy.Length; i++)
+                catch (System.IO.FileNotFoundException)
                 {
-                    var attr = (CourtesyOfAttribute)courtesy[i];
-                    if (attr == null)
-                        continue;
-                    _courtesyOf.Add(new Contributor
-                    {
-                        name = attr.name,
-                        url = attr.url
-                    });
+                    // Reflection on types that reference .NET 6 assemblies can fail in Unity's runtime
+                }
+                catch (System.Reflection.ReflectionTypeLoadException)
+                {
                 }
             }
         }
@@ -88,14 +105,32 @@ namespace PurrNet.Editor
 
         public override void OnInspectorGUI()
         {
-            var identity = (NetworkIdentity)target;
-            bool hasNetworkManagerAsChild = identity && identity.GetComponentInChildren<NetworkManager>();
+            var identity = target as NetworkIdentity;
+
+            if (identity == null)
+            {
+                DrawDefaultInspector();
+                return;
+            }
+
+            bool hasNetworkManagerAsChild = identity.GetComponentInChildren<NetworkManager>();
 
             if (hasNetworkManagerAsChild)
                 EditorGUILayout.HelpBox("NetworkIdentity is a child of a NetworkManager. This is not supported.",
                     MessageType.Error);
 
-            base.OnInspectorGUI();
+            try
+            {
+                base.OnInspectorGUI();
+            }
+            catch (System.IO.FileNotFoundException)
+            {
+                DrawDefaultInspectorFallback();
+            }
+            catch (System.Reflection.ReflectionTypeLoadException)
+            {
+                DrawDefaultInspectorFallback();
+            }
 
             DrawIdentityInspector();
             GUI.enabled = true;
@@ -103,6 +138,16 @@ namespace PurrNet.Editor
             DrawContributors();
 
             serializedObject.ApplyModifiedProperties();
+
+            /*if (!string.IsNullOrEmpty(_docsUrl))
+            {
+                _helpIcon ??= Resources.Load("purricon") as Texture2D;
+                GUILayout.BeginHorizontal();
+                GUILayout.FlexibleSpace();
+                if (GUILayout.Button(new GUIContent(" Open Docs", _helpIcon), GUILayout.ExpandWidth(false), GUILayout.Height(20)))
+                    Application.OpenURL("https://purrnet.dev/docs/" + _docsUrl);
+                GUILayout.EndHorizontal();
+            }*/
         }
 
         private void DrawContributors()
@@ -167,12 +212,46 @@ namespace PurrNet.Editor
 
         private void HandleOverrides(NetworkIdentity identity, bool multi)
         {
-            if (multi || identity.isSpawned)
-                GUI.enabled = false;
+            bool anySpawned = false;
+            if (multi)
+            {
+                foreach (var t in targets)
+                {
+                    if (t is NetworkIdentity ni && ni.isSpawned)
+                    {
+                        anySpawned = true;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                anySpawned = identity.isSpawned;
+            }
 
             string label = "Override Defaults";
 
-            if (!multi)
+            if (multi)
+            {
+                bool networkRulesMixed = _networkRules.hasMultipleDifferentValues;
+                bool visibilityRulesMixed = _visitiblityRules.hasMultipleDifferentValues;
+
+                bool isNetworkRulesOverridden = _networkRules.objectReferenceValue != null;
+                bool isVisibilityRulesOverridden = _visitiblityRules.objectReferenceValue != null;
+
+                int overriddenCount = (isNetworkRulesOverridden ? 1 : 0) + (isVisibilityRulesOverridden ? 1 : 0);
+
+                if (networkRulesMixed || visibilityRulesMixed || overriddenCount > 0)
+                {
+                    label += " (";
+                    label += networkRulesMixed ? "P*" : (isNetworkRulesOverridden ? "P" : "");
+                    if ((networkRulesMixed || isNetworkRulesOverridden) && (visibilityRulesMixed || isVisibilityRulesOverridden))
+                        label += ",";
+                    label += visibilityRulesMixed ? "V*" : (isVisibilityRulesOverridden ? "V" : "");
+                    label += ")";
+                }
+            }
+            else
             {
                 bool isNetworkRulesOverridden = _networkRules.objectReferenceValue != null;
                 bool isVisibilityRulesOverridden = _visitiblityRules.objectReferenceValue != null;
@@ -184,9 +263,7 @@ namespace PurrNet.Editor
                     label += " (";
 
                     if (isNetworkRulesOverridden)
-                    {
                         label += overridenCount > 1 ? "P," : "P";
-                    }
 
                     if (isVisibilityRulesOverridden)
                         label += "V";
@@ -194,21 +271,25 @@ namespace PurrNet.Editor
                     label += ")";
                 }
             }
-            else
-            {
-                label += " (...)";
-            }
 
             var old = GUI.enabled;
-            GUI.enabled = !multi;
             _foldoutVisible = EditorGUILayout.BeginFoldoutHeaderGroup(_foldoutVisible, label);
-            GUI.enabled = old;
-            if (!multi && _foldoutVisible)
+
+            if (_foldoutVisible)
             {
+                GUI.enabled = !anySpawned;
                 EditorGUI.indentLevel++;
+
+                EditorGUI.showMixedValue = _networkRules.hasMultipleDifferentValues;
                 EditorGUILayout.PropertyField(_networkRules, new GUIContent("Permissions Override"));
+                EditorGUI.showMixedValue = false;
+
+                EditorGUI.showMixedValue = _visitiblityRules.hasMultipleDifferentValues;
                 EditorGUILayout.PropertyField(_visitiblityRules, new GUIContent("Visibility Override"));
+                EditorGUI.showMixedValue = false;
+
                 EditorGUI.indentLevel--;
+                GUI.enabled = old;
             }
 
             EditorGUILayout.EndFoldoutHeaderGroup();
@@ -259,7 +340,7 @@ namespace PurrNet.Editor
 
             EditorGUILayout.BeginVertical("box", GUILayout.ExpandWidth(false));
 
-            EditorGUILayout.LabelField($"prefabId: {identity.prefabId}");
+            EditorGUILayout.LabelField($"prefabId: {identity.scopedPrefabId}");
             EditorGUILayout.LabelField($"componentIndex: {identity.componentIndex}");
             EditorGUILayout.LabelField($"shouldBePooled: {identity.shouldBePooled}");
             EditorGUILayout.ObjectField("parent", identity.parent, typeof(NetworkIdentity), true);
@@ -315,11 +396,44 @@ namespace PurrNet.Editor
             EditorGUILayout.EndFoldoutHeaderGroup();
         }
 
+        private void DrawDefaultInspectorFallback()
+        {
+            serializedObject.UpdateIfRequiredOrScript();
+            var iterator = serializedObject.GetIterator();
+            for (bool enterChildren = true; iterator.NextVisible(enterChildren); enterChildren = false)
+            {
+                try
+                {
+                    EditorGUILayout.PropertyField(iterator, true);
+                }
+                catch (System.IO.FileNotFoundException)
+                {
+                }
+                catch (System.Reflection.ReflectionTypeLoadException)
+                {
+                }
+            }
+        }
+
         protected void DrawPurrButtons(NetworkIdentity targetIdentity)
         {
             if (targetIdentity == null)
                 return;
 
+            try
+            {
+                DrawPurrButtonsInternal(targetIdentity);
+            }
+            catch (System.IO.FileNotFoundException)
+            {
+            }
+            catch (System.Reflection.ReflectionTypeLoadException)
+            {
+            }
+        }
+
+        private void DrawPurrButtonsInternal(NetworkIdentity targetIdentity)
+        {
             GUILayout.Space(5);
 
             var methods = targetIdentity.GetType().GetMethods(
@@ -332,7 +446,19 @@ namespace PurrNet.Editor
 
             foreach (var method in methods)
             {
-                var buttonAttr = method.GetCustomAttribute<PurrButtonAttribute>();
+                PurrButtonAttribute buttonAttr;
+                try
+                {
+                    buttonAttr = method.GetCustomAttribute<PurrButtonAttribute>();
+                }
+                catch (System.IO.FileNotFoundException)
+                {
+                    continue;
+                }
+                catch (System.Reflection.ReflectionTypeLoadException)
+                {
+                    continue;
+                }
 
                 if (buttonAttr != null)
                 {

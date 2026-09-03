@@ -10,11 +10,11 @@ namespace PurrNet.Packing
         {
             if (value.isDisposed || value.dictionary == null)
             {
-                Packer<bool>.Write(packer, false);
+                packer.WriteBit(false);
                 return;
             }
 
-            Packer<bool>.Write(packer, true);
+            packer.WriteBit(true);
 
             int length = value.Count;
             packer.WriteInteger(length, 31);
@@ -137,6 +137,7 @@ namespace PurrNet.Packing
 
                 if (value.isDisposed)
                     value = DisposableDictionary<TKey, TValue>.Create();
+                else value.Clear();
 
                 foreach (var (k, v) in oldvalue)
                     value.Add(k, v);
@@ -175,8 +176,8 @@ namespace PurrNet.Packing
 
                 foreach (var (key, val) in oldvalue)
                 {
-                    oldKeysList.Add(key);
-                    oldValuesList.Add(val);
+                    oldKeysList.Add(PurrCopy<TKey>.Copy(key));
+                    oldValuesList.Add(PurrCopy<TValue>.Copy(val));
                 }
             }
 

@@ -3,6 +3,7 @@ using PurrNet.Logging;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using PurrNet.Packing;
 using PurrNet.Transports;
 
 namespace PurrNet
@@ -46,11 +47,15 @@ namespace PurrNet
     {
         [SerializeField] private bool _ownerAuth;
 
+        [SerializeField] private bool _ownerOnly;
+
         [SerializeField]
         private SerializableDictionary<TKey, TValue> _serializedDict = new SerializableDictionary<TKey, TValue>();
         [SerializeField, Min(0)] private float _sendIntervalInSeconds;
         [SerializeField, Tooltip("This will send the entire state when things change. It's reliable, but more data heavy")] //We should optimize this in the future
         private bool _useForceSend;
+        [SerializeField, HideInInspector]
+        private SerializableDictionary<TKey, TValue> _initialSerializedDict = new SerializableDictionary<TKey, TValue>();
 
 
         private Dictionary<TKey, TValue> _dict = new Dictionary<TKey, TValue>();
@@ -66,6 +71,8 @@ namespace PurrNet
         /// Whether it is the owner or the server that has the authority to modify the dictionary
         /// </summary>
         public bool ownerAuth => _ownerAuth;
+
+        public override bool ownerOnly => _ownerOnly;
 
         public float sendIntervalInSeconds
         {
@@ -89,6 +96,8 @@ namespace PurrNet
         public override void OnPoolReset()
         {
             onChanged = null;
+            _pendingChanges.Clear();
+            RestoreInitialDict();
             _lastSendTime = default;
             _isDirty = default;
             _wasLastDirty = default;
@@ -103,9 +112,10 @@ namespace PurrNet
         /// </summary>
         /// <param name="ownerAuth">Whether the dictionary is owner authed or server auth</param>
         /// <param name="useForceSend">This will send the full state after state syncing. This will be more data heavy, but more consistent</param>
-        public SyncDictionary(bool ownerAuth = false, bool useForceSend = false)
+        public SyncDictionary(bool ownerAuth = false, bool useForceSend = false, bool ownerOnly = false)
         {
             _ownerAuth = ownerAuth;
+            _ownerOnly = ownerOnly;
             _useForceSend = useForceSend;
 
 #if UNITY_EDITOR
@@ -133,27 +143,48 @@ namespace PurrNet
 
         public void OnBeforeSerialize()
         {
-            _serializedDict.FromDictionary(_dict);
+            _serializedDict?.FromDictionary(_dict);
         }
 
         public void OnAfterDeserialize()
         {
-            _dict = _serializedDict.ToDictionary();
+            _dict ??= new Dictionary<TKey, TValue>();
+            _serializedDict ??= new SerializableDictionary<TKey, TValue>();
+            _initialSerializedDict ??= new SerializableDictionary<TKey, TValue>();
+
+            _serializedDict.CopyTo(_dict);
+            CacheInitialDict();
         }
 
-        public override void OnSpawn()
+        private void CacheInitialDict()
         {
-            base.OnSpawn();
-
-            if (!IsController(_ownerAuth)) return;
-
-            if (isServer)
-                SendInitialStateToAll(_dict);
-            else SendInitialStateToServer(_dict);
+            _initialSerializedDict.FromDictionary(_dict);
         }
 
-        public override void OnObserverAdded(PlayerID player)
+        private void RestoreInitialDict()
         {
+            _initialSerializedDict.CopyTo(_dict);
+        }
+        
+        public override void OnSpawnSent()
+        {
+            if (isServer || !IsController(_ownerAuth))
+                return;
+
+            if (!_isDirty && _initialSerializedDict.Matches(_dict))
+                return;
+
+            SendInitialStateToServer(_dict);
+            _pendingChanges.Clear();
+            _isDirty = false;
+            _wasLastDirty = false;
+        }
+
+        public override void OnObserverAdded(PlayerID player, bool isSpawner)
+        {
+            if (isSpawner && ownerAuth && owner == player)
+                return;
+
             HandleInitialStateTarget(player, _dict);
         }
 
@@ -176,21 +207,18 @@ namespace PurrNet
             SendInitialStateToOthers(initialState);
         }
 
-        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true)]
+        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true, runLocally: true)]
         private void SendInitialStateToOthers(Dictionary<TKey, TValue> initialState)
         {
-            if (!isServer || isHost)
+            _dict = initialState;
+
+            var initialChang = new SyncDictionaryChange<TKey, TValue>(SyncDictionaryOperation.Cleared);
+            InvokeChange(initialChang);
+
+            foreach (var kvp in _dict)
             {
-                _dict = initialState;
-
-                var initialChang = new SyncDictionaryChange<TKey, TValue>(SyncDictionaryOperation.Cleared);
-                InvokeChange(initialChang);
-
-                foreach (var kvp in _dict)
-                {
-                    var change = new SyncDictionaryChange<TKey, TValue>(SyncDictionaryOperation.Added, kvp.Key, kvp.Value);
-                    InvokeChange(change);
-                }
+                var change = new SyncDictionaryChange<TKey, TValue>(SyncDictionaryOperation.Added, kvp.Key, kvp.Value);
+                InvokeChange(change);
             }
         }
 
@@ -338,6 +366,9 @@ namespace PurrNet
         }
         public void OnTick(float delta)
         {
+            if (!_isDirty && !_wasLastDirty)
+                return;
+
             if (!IsController(_ownerAuth))
                 return;
 
@@ -399,7 +430,7 @@ namespace PurrNet
             _wasLastDirty = true;
             _isDirty = false;
         }
-        
+
         #region RPCs
 
         [ServerRpc(Channel.ReliableOrdered, requireOwnership: true)]
@@ -409,15 +440,12 @@ namespace PurrNet
             SendAddToOthers(key, value);
         }
 
-        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true)]
+        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true, runLocally: true)]
         private void SendAddToOthers(TKey key, TValue value)
         {
-            if (!isServer || isHost)
-            {
-                _dict[key] = value;
-                var change = new SyncDictionaryChange<TKey, TValue>(SyncDictionaryOperation.Added, key, value);
-                InvokeChange(change);
-            }
+            _dict[key] = value;
+            var change = new SyncDictionaryChange<TKey, TValue>(SyncDictionaryOperation.Added, key, value);
+            InvokeChange(change);
         }
 
         [ObserversRpc(Channel.ReliableOrdered)]
@@ -438,17 +466,14 @@ namespace PurrNet
             SendRemoveToOthers(key);
         }
 
-        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true)]
+        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true, runLocally: true)]
         private void SendRemoveToOthers(TKey key)
         {
-            if (!isServer || isHost)
+            if (_dict.TryGetValue(key, out TValue value))
             {
-                if (_dict.TryGetValue(key, out TValue value))
-                {
-                    _dict.Remove(key);
-                    var change = new SyncDictionaryChange<TKey, TValue>(SyncDictionaryOperation.Removed, key, value);
-                    InvokeChange(change);
-                }
+                _dict.Remove(key);
+                var change = new SyncDictionaryChange<TKey, TValue>(SyncDictionaryOperation.Removed, key, value);
+                InvokeChange(change);
             }
         }
 
@@ -472,15 +497,12 @@ namespace PurrNet
             SendClearToOthers();
         }
 
-        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true)]
+        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true, runLocally: true)]
         private void SendClearToOthers()
         {
-            if (!isServer || isHost)
-            {
-                _dict.Clear();
-                var change = new SyncDictionaryChange<TKey, TValue>(SyncDictionaryOperation.Cleared);
-                InvokeChange(change);
-            }
+            _dict.Clear();
+            var change = new SyncDictionaryChange<TKey, TValue>(SyncDictionaryOperation.Cleared);
+            InvokeChange(change);
         }
 
         [ObserversRpc(Channel.ReliableOrdered)]
@@ -501,16 +523,13 @@ namespace PurrNet
             SendSetToOthers(key, value, isNewKey);
         }
 
-        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true)]
+        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true, runLocally: true)]
         private void SendSetToOthers(TKey key, TValue value, bool isNewKey)
         {
-            if (!isServer || isHost)
-            {
-                _dict[key] = value;
-                var operation = isNewKey ? SyncDictionaryOperation.Added : SyncDictionaryOperation.Set;
-                var change = new SyncDictionaryChange<TKey, TValue>(operation, key, value);
-                InvokeChange(change);
-            }
+            _dict[key] = value;
+            var operation = isNewKey ? SyncDictionaryOperation.Added : SyncDictionaryOperation.Set;
+            var change = new SyncDictionaryChange<TKey, TValue>(operation, key, value);
+            InvokeChange(change);
         }
 
         [ObserversRpc(Channel.ReliableOrdered)]
@@ -559,17 +578,14 @@ namespace PurrNet
             SendSetDirtyToOthers(key, value);
         }
 
-        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true)]
+        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true, runLocally: true)]
         private void SendSetDirtyToOthers(TKey key, TValue value)
         {
-            if (!isServer || isHost)
+            if (_dict.ContainsKey(key))
             {
-                if (_dict.ContainsKey(key))
-                {
-                    _dict[key] = value;
-                    var change = new SyncDictionaryChange<TKey, TValue>(SyncDictionaryOperation.Set, key, value);
-                    InvokeChange(change);
-                }
+                _dict[key] = value;
+                var change = new SyncDictionaryChange<TKey, TValue>(SyncDictionaryOperation.Set, key, value);
+                InvokeChange(change);
             }
         }
 
@@ -607,20 +623,61 @@ namespace PurrNet
         [SerializeField] private List<string> stringKeys = new List<string>();
         [SerializeField] private List<string> stringValues = new List<string>();
 
-        private bool isKeySerializable;
-        private bool isValueSerializable;
+        private static readonly bool isKeySerializable =
+            typeof(TKey).IsSerializable || typeof(UnityEngine.Object).IsAssignableFrom(typeof(TKey));
 
-        public SerializableDictionary()
+        private static readonly bool isValueSerializable =
+            typeof(TValue).IsSerializable || typeof(UnityEngine.Object).IsAssignableFrom(typeof(TValue));
+
+        private void EnsureLists()
         {
-            isKeySerializable =
-                typeof(TKey).IsSerializable || typeof(UnityEngine.Object).IsAssignableFrom(typeof(TKey));
-            isValueSerializable = typeof(TValue).IsSerializable ||
-                                  typeof(UnityEngine.Object).IsAssignableFrom(typeof(TValue));
+            keys ??= new List<TKey>();
+            values ??= new List<TValue>();
+            stringKeys ??= new List<string>();
+            stringValues ??= new List<string>();
         }
 
         public Dictionary<TKey, TValue> ToDictionary()
         {
-            var dict = new Dictionary<TKey, TValue>();
+            var dict = new Dictionary<TKey, TValue>(keys.Count);
+            CopyTo(dict);
+            return dict;
+        }
+
+        public bool Matches(Dictionary<TKey, TValue> dict)
+        {
+            if (!isKeySerializable || !isValueSerializable)
+                return false;
+
+            EnsureLists();
+
+            int count = Mathf.Min(keys.Count, values.Count);
+
+            if (dict.Count != count)
+                return false;
+
+            for (int i = 0; i < count; i++)
+            {
+                if (keys[i] == null)
+                    return false;
+
+                if (!dict.TryGetValue(keys[i], out var value))
+                    return false;
+
+                if (!PurrEquality<TValue>.Equals(value, values[i]))
+                    return false;
+            }
+
+            return true;
+        }
+
+        public void CopyTo(Dictionary<TKey, TValue> dict)
+        {
+            if (dict == null)
+                return;
+
+            EnsureLists();
+            dict.Clear();
 
             if (isKeySerializable && isValueSerializable)
             {
@@ -636,16 +693,18 @@ namespace PurrNet
                 var count = Mathf.Min(stringKeys.Count, stringValues.Count);
                 for (int i = 0; i < count; i++)
                 {
-                    if (stringKeys[i] != null && !dict.ContainsKey(default(TKey)))
-                        dict.Add(default(TKey), default(TValue));
+                    if (stringKeys[i] != null && !dict.ContainsKey(default(TKey)!))
+                        dict.Add(default(TKey)!, default(TValue));
                 }
             }
-
-            return dict;
         }
 
         public void FromDictionary(Dictionary<TKey, TValue> dict)
         {
+            if (dict == null)
+                return;
+
+            EnsureLists();
             keys.Clear();
             values.Clear();
             stringKeys.Clear();

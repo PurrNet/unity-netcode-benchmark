@@ -3,6 +3,7 @@ using PurrNet.Logging;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using PurrNet.Packing;
 using PurrNet.Pooling;
 using PurrNet.Transports;
 using UnityEngine.Scripting;
@@ -77,11 +78,14 @@ namespace PurrNet
     }
 
     [Serializable]
-    public class SyncList<T> : NetworkModule, IList<T>, ITick
+    public class SyncList<T> : NetworkModule, IList<T>, ISerializationCallbackReceiver, ITick
     {
         [SerializeField] private bool _ownerAuth;
+
+        [SerializeField] private bool _ownerOnly;
         [SerializeField, Min(0)] private float _sendIntervalInSeconds;
         [SerializeField] private List<T> _list = new List<T>();
+        [SerializeField, HideInInspector] private List<T> _initialList = new List<T>();
 
         public List<T> list => _list;
         public List<T> ToList() => _list;
@@ -97,6 +101,8 @@ namespace PurrNet
         /// Whether it is the owner or the server that has the authority to modify the list
         /// </summary>
         public bool ownerAuth => _ownerAuth;
+
+        public override bool ownerOnly => _ownerOnly;
 
         public float sendIntervalInSeconds
         {
@@ -120,20 +126,24 @@ namespace PurrNet
         {
             onChanged = null;
             _pendingChanges.Clear();
+            RestoreInitialList();
             _lastSendTime = default;
             _wasLastDirty = default;
             _isDirty = default;
         }
 
-        public SyncList(bool ownerAuth = false)
+        public SyncList(bool ownerAuth = false, bool ownerOnly = false)
         {
             _ownerAuth = ownerAuth;
+            _ownerOnly = ownerOnly;
         }
 
-        public SyncList(List<T> defaultValues, bool ownerAuth = false)
+        public SyncList(List<T> defaultValues, bool ownerAuth = false, bool ownerOnly = false)
         {
             _list = defaultValues;
             _ownerAuth = ownerAuth;
+            _ownerOnly = ownerOnly;
+            CacheInitialList();
         }
 
         public T this[int idx]
@@ -146,7 +156,7 @@ namespace PurrNet
 
                 var oldValue = _list[idx];
 
-                if (oldValue != null && oldValue.Equals(value) || oldValue == null && value == null)
+                if (PurrEquality<T>.Equals(oldValue, value))
                     return;
 
                 _list[idx] = value;
@@ -171,17 +181,51 @@ namespace PurrNet
             _isDirty = true;
         }
 
-        public override void OnSpawn()
+        private void CacheInitialList()
         {
-            if (!IsController(_ownerAuth)) return;
-
-            if (isServer)
-                SendInitialStateToAll(_list);
-            else SendInitialStateToServer(_list);
+            _initialList.Clear();
+            _initialList.AddRange(_list);
         }
 
-        public override void OnObserverAdded(PlayerID player)
+        private void RestoreInitialList()
         {
+            _list.Clear();
+            _list.AddRange(_initialList);
+        }
+
+        private bool MatchesInitialList()
+        {
+            if (_list.Count != _initialList.Count)
+                return false;
+
+            for (int i = 0; i < _list.Count; i++)
+            {
+                if (!PurrEquality<T>.Equals(_list[i], _initialList[i]))
+                    return false;
+            }
+
+            return true;
+        }
+
+        public override void OnSpawnSent()
+        {
+            if (isServer || !IsController(_ownerAuth))
+                return;
+
+            if (!_isDirty && MatchesInitialList())
+                return;
+
+            SendInitialStateToServer(_list);
+            _pendingChanges.Clear();
+            _isDirty = false;
+            _wasLastDirty = false;
+        }
+
+        public override void OnObserverAdded(PlayerID player, bool isSpawner)
+        {
+            if (isSpawner && ownerAuth && owner == player)
+                return;
+
             SendInitialToTarget(player, _list);
         }
 
@@ -223,7 +267,7 @@ namespace PurrNet
                     InvokeChange(SyncListChange<T>.Added(newList[i], i));
                     listChanged = true;
                 }
-                else if (!_list[i]?.Equals(newList[i]) ?? newList[i] != null)
+                else if (!PurrEquality<T>.Equals(_list[i], newList[i]))
                 {
                     var old = _list[i];
                     _list[i] = newList[i];
@@ -243,22 +287,19 @@ namespace PurrNet
             SendInitialStateToOthers(items);
         }
 
-        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true)]
+        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true, runLocally: true)]
         private void SendInitialStateToOthers(List<T> items)
         {
-            if (!isServer || isHost)
+            _list.Clear();
+            _list.AddRange(items);
+
+            var change = SyncListChange<T>.Cleared();
+            InvokeChange(change);
+
+            for (int i = 0; i < items.Count; i++)
             {
-                _list.Clear();
-                _list.AddRange(items);
-
-                var change = SyncListChange<T>.Cleared();
-                InvokeChange(change);
-
-                for (int i = 0; i < items.Count; i++)
-                {
-                    var changeI = SyncListChange<T>.Added(items[i], i);
-                    InvokeChange(changeI);
-                }
+                var changeI = SyncListChange<T>.Added(items[i], i);
+                InvokeChange(changeI);
             }
         }
 
@@ -354,7 +395,7 @@ namespace PurrNet
         {
             if (!ValidateAuthority())
                 return;
-            
+
             using var sorted = DisposableList<T>.Create(_list);
             sorted.list.Sort(comparison);
 
@@ -366,7 +407,7 @@ namespace PurrNet
                 if (!EqualityComparer<T>.Default.Equals(oldItem, newItem))
                 {
                     _list[i] = newItem;
-                    
+
                     var change = SyncListChange<T>.Set(newItem, oldItem, i);
                     QueueChange(change);
                     InvokeChange(change);
@@ -376,9 +417,10 @@ namespace PurrNet
 
         public bool Contains(T item) => _list.Contains(item);
         public void CopyTo(T[] array, int arrayIndex) => _list.CopyTo(array, arrayIndex);
-        public IEnumerator<T> GetEnumerator() => _list.GetEnumerator();
+        public List<T>.Enumerator GetEnumerator() => _list.GetEnumerator();
         public int IndexOf(T item) => _list.IndexOf(item);
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        IEnumerator<T> IEnumerable<T>.GetEnumerator() => _list.GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator() => ((IEnumerable<T>)this).GetEnumerator();
 
         private bool ValidateAuthority()
         {
@@ -433,6 +475,9 @@ namespace PurrNet
 
         public void OnTick(float delta)
         {
+            if (!_isDirty && !_wasLastDirty)
+                return;
+
             if (!IsController(_ownerAuth))
                 return;
 
@@ -494,15 +539,12 @@ namespace PurrNet
             SendAddToOthers(item);
         }
 
-        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true)]
+        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true, runLocally: true)]
         private void SendAddToOthers(T item)
         {
-            if (!isServer || isHost)
-            {
-                _list.Add(item);
-                var change = SyncListChange<T>.Added(item, _list.Count - 1);
-                InvokeChange(change);
-            }
+            _list.Add(item);
+            var change = SyncListChange<T>.Added(item, _list.Count - 1);
+            InvokeChange(change);
         }
 
         [ObserversRpc(Channel.ReliableOrdered)]
@@ -523,19 +565,16 @@ namespace PurrNet
             SendRemoveToOthers(item);
         }
 
-        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true)]
+        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true, runLocally: true)]
         private void SendRemoveToOthers(T item)
         {
-            if (!isServer || isHost)
+            int idx = _list.IndexOf(item);
+            if (idx >= 0)
             {
-                int idx = _list.IndexOf(item);
-                if (idx >= 0)
-                {
-                    var oldValue = _list[idx];
-                    _list.RemoveAt(idx);
-                    var change = SyncListChange<T>.Removed(item, oldValue, idx);
-                    InvokeChange(change);
-                }
+                var oldValue = _list[idx];
+                _list.RemoveAt(idx);
+                var change = SyncListChange<T>.Removed(item, oldValue, idx);
+                InvokeChange(change);
             }
         }
 
@@ -562,10 +601,10 @@ namespace PurrNet
             SendRemoveAtToOthers(index);
         }
 
-        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true)]
+        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true, runLocally: true)]
         private void SendRemoveAtToOthers(int index)
         {
-            if ((!isServer || isHost) && index < _list.Count)
+            if (index < _list.Count)
             {
                 var oldValue = _list[index];
                 T item = _list[index];
@@ -595,15 +634,12 @@ namespace PurrNet
             SendClearToOthers();
         }
 
-        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true)]
+        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true, runLocally: true)]
         private void SendClearToOthers()
         {
-            if (!isServer || isHost)
-            {
-                _list.Clear();
-                var change = SyncListChange<T>.Cleared();
-                InvokeChange(change);
-            }
+            _list.Clear();
+            var change = SyncListChange<T>.Cleared();
+            InvokeChange(change);
         }
 
         [ObserversRpc(Channel.ReliableOrdered)]
@@ -624,10 +660,10 @@ namespace PurrNet
             SendSetToOthers(index, item);
         }
 
-        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true)]
+        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true, runLocally: true)]
         private void SendSetToOthers(int index, T item)
         {
-            if ((!isServer || isHost) && index < _list.Count)
+            if (index < _list.Count)
             {
                 var oldValue = _list[index];
                 _list[index] = item;
@@ -655,10 +691,10 @@ namespace PurrNet
             SendInsertToOthers(index, item);
         }
 
-        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true)]
+        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true, runLocally: true)]
         private void SendInsertToOthers(int index, T item)
         {
-            if ((!isServer || isHost) && index <= _list.Count)
+            if (index <= _list.Count)
             {
                 _list.Insert(index, item);
                 var change = SyncListChange<T>.Inserted(item, index);
@@ -684,17 +720,14 @@ namespace PurrNet
             SendSetDirtyToOthers(index, value);
         }
 
-        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true)]
+        [ObserversRpc(Channel.ReliableOrdered, excludeOwner: true, runLocally: true)]
         private void SendSetDirtyToOthers(int index, T value)
         {
-            if (!isServer || isHost)
+            if (index >= 0 && index < _list.Count)
             {
-                if (index >= 0 && index < _list.Count)
-                {
-                    _list[index] = value;
-                    var change = SyncListChange<T>.SetDirty(value, index);
-                    InvokeChange(change);
-                }
+                _list[index] = value;
+                var change = SyncListChange<T>.SetDirty(value, index);
+                InvokeChange(change);
             }
         }
 
@@ -719,5 +752,17 @@ namespace PurrNet
         }
 
         #endregion
+
+        public void OnBeforeSerialize()
+        {
+        }
+
+        public void OnAfterDeserialize()
+        {
+            _list ??= new List<T>();
+            _initialList ??= new List<T>();
+
+            CacheInitialList();
+        }
     }
 }

@@ -6,6 +6,7 @@ using PurrNet.Logging;
 using PurrNet.Packing;
 using PurrNet.Transports;
 using UnityEngine;
+using Channel = PurrNet.Transports.Channel;
 
 #if !UNITASK_PURRNET_SUPPORT
 using RawTask = System.Threading.Tasks.Task;
@@ -24,55 +25,315 @@ namespace PurrNet.Modules
         public float timeSent;
         public float timeout;
 
-        public Action timeoutRequest;
-        public Action<BitPacker> respond;
+        internal IRpcRequestCompleter completer;
+    }
+
+    internal interface IRpcRequestCompleter
+    {
+        void Respond(BitPacker stream);
+        void Fail(Exception exception);
+    }
+
+    internal sealed class TaskRequestCompleter : IRpcRequestCompleter
+    {
+        private readonly TaskCompletionSource<bool> _tcs = new TaskCompletionSource<bool>();
+        public Task task => _tcs.Task;
+        public void Respond(BitPacker stream) => _tcs.SetResult(true);
+        public void Fail(Exception exception) => _tcs.SetException(exception);
+    }
+
+    internal sealed class TaskRequestCompleter<T> : IRpcRequestCompleter
+    {
+        private readonly TaskCompletionSource<T> _tcs = new TaskCompletionSource<T>();
+        public Task<T> task => _tcs.Task;
+
+        public void Respond(BitPacker stream)
+        {
+            T response = default;
+            Packer<T>.Read(stream, ref response);
+            _tcs.SetResult(response);
+        }
+
+        public void Fail(Exception exception) => _tcs.SetException(exception);
+    }
+
+    internal sealed class UniTaskRequestCompleter : IRpcRequestCompleter
+    {
+#if !UNITASK_PURRNET_SUPPORT
+        private readonly TaskCompletionSource<bool> _tcs = new TaskCompletionSource<bool>();
+#else
+        private readonly UniTaskCompletionSource<bool> _tcs = new UniTaskCompletionSource<bool>();
+#endif
+        public RawTask task => _tcs.Task;
+        public void Respond(BitPacker stream) => _tcs.TrySetResult(true);
+        public void Fail(Exception exception) => _tcs.TrySetException(exception);
+    }
+
+    internal sealed class UniTaskRequestCompleter<T> : IRpcRequestCompleter
+    {
+#if !UNITASK_PURRNET_SUPPORT
+        private readonly TaskCompletionSource<T> _tcs = new TaskCompletionSource<T>();
+        public Task<T> task => _tcs.Task;
+#else
+        private readonly UniTaskCompletionSource<T> _tcs = new UniTaskCompletionSource<T>();
+        public UniTask<T> task => _tcs.Task;
+#endif
+
+        public void Respond(BitPacker stream)
+        {
+            T response = default;
+            Packer<T>.Read(stream, ref response);
+            _tcs.TrySetResult(response);
+        }
+
+        public void Fail(Exception exception) => _tcs.TrySetException(exception);
     }
 
     public struct RpcResponse
     {
+        public PlayerID? sender;
+        public PlayerID? forward;
+        public Channel? channel;
         public PackedUInt id;
         public ByteData data;
     }
 
-    public class RpcRequestResponseModule : INetworkModule, IFixedUpdate
+    public struct RpcRejection
     {
+        public PlayerID? sender;
+        public PlayerID? forward;
+        public Channel? channel;
+        public PackedUInt id;
+        public RpcError error;
+    }
+
+    /// <summary>
+    /// Envelope for responses to immediate RPCs; registered as an immediate broadcast
+    /// type so the response dispatches on arrival instead of waiting for the tick.
+    /// </summary>
+    public struct ImmediateRpcResponse
+    {
+        public RpcResponse response;
+    }
+
+    /// <inheritdoc cref="ImmediateRpcResponse"/>
+    public struct ImmediateRpcRejection
+    {
+        public RpcRejection rejection;
+    }
+
+    public class RpcRequestResponseModule : INetworkModule, IFixedUpdate, IPromoteToServerModule
+    {
+        private readonly NetworkManager _manager;
         private readonly PlayersManager _playersManager;
         private readonly List<RpcRequest> _requests = new List<RpcRequest>();
 
         private uint _nextId;
+        private bool _asServer;
 
-        public RpcRequestResponseModule(PlayersManager playersManager)
+        public RpcRequestResponseModule(NetworkManager manager, PlayersManager playersManager, bool asServer)
         {
+            _asServer = asServer;
             _playersManager = playersManager;
+            _manager = manager;
         }
+
+        public void PromoteToServerModule()
+        {
+            _asServer = true;
+        }
+
+        public void PostPromoteToServerModule() { }
 
         public void Enable(bool asServer)
         {
             _playersManager.Subscribe<RpcResponse>(OnRpcResponse);
+            _playersManager.Subscribe<RpcRejection>(OnRpcRejection);
+            _playersManager.RegisterImmediateType<ImmediateRpcResponse>();
+            _playersManager.Subscribe<ImmediateRpcResponse>(OnImmediateRpcResponse);
+            _playersManager.RegisterImmediateType<ImmediateRpcRejection>();
+            _playersManager.Subscribe<ImmediateRpcRejection>(OnImmediateRpcRejection);
+            _playersManager.onPlayerLeft += OnPlayerLeft;
         }
 
         public void Disable(bool asServer)
         {
             _playersManager.Unsubscribe<RpcResponse>(OnRpcResponse);
+            _playersManager.Unsubscribe<RpcRejection>(OnRpcRejection);
+            _playersManager.Unsubscribe<ImmediateRpcResponse>(OnImmediateRpcResponse);
+            _playersManager.UnregisterImmediateType<ImmediateRpcResponse>();
+            _playersManager.Unsubscribe<ImmediateRpcRejection>(OnImmediateRpcRejection);
+            _playersManager.UnregisterImmediateType<ImmediateRpcRejection>();
+            _playersManager.onPlayerLeft -= OnPlayerLeft;
         }
 
-        private void OnRpcResponse(PlayerID conn, RpcResponse data, bool asServer)
+        private void OnPlayerLeft(PlayerID player, bool asServer)
         {
             for (int i = 0; i < _requests.Count; i++)
             {
                 var request = _requests[i];
-                if (request.id == data.id && (!request.target.HasValue || request.target == conn))
+                if (!request.target.HasValue || request.target.Value.isServer || request.target.Value != player)
+                    continue;
+
+                _requests.RemoveAt(i);
+                i--;
+
+                try
+                {
+                    request.completer.Fail(new RpcTargetDisconnectedException(player,
+                        $"Async RPC with request id of '{request.id}' failed because target player '{player}' disconnected."));
+                }
+                catch (Exception e)
+                {
+                    PurrLogger.LogError($"Error while failing RPC request after target disconnect: {e}");
+                }
+            }
+        }
+
+        private void OnRpcResponse(PlayerID conn, RpcResponse data, bool asServer)
+            => HandleRpcResponse(conn, data, asServer, false);
+
+        private void OnImmediateRpcResponse(PlayerID conn, ImmediateRpcResponse data, bool asServer)
+            => HandleRpcResponse(conn, data.response, asServer, true);
+
+        private void HandleRpcResponse(PlayerID conn, RpcResponse data, bool asServer, bool immediate)
+        {
+            var localPlayer = _manager.localPlayer;
+
+            switch (asServer)
+            {
+                case true when data.forward.HasValue && data.forward != localPlayer:
+                    data.sender = conn;
+                    var relayChannel = data.channel ?? Channel.ReliableOrdered;
+                    if (immediate)
+                        SendImmediateResponse(data.forward.Value, data, relayChannel, null);
+                    else
+                        _playersManager.Send(data.forward.Value, data, relayChannel);
+                    return;
+                case true:
+                    data.sender = null;
+                    break;
+            }
+
+            var actualSender = data.sender ?? conn;
+
+            for (int i = 0; i < _requests.Count; i++)
+            {
+                var request = _requests[i];
+                if (request.id == data.id && (!request.target.HasValue || request.target == actualSender || request.target.Value.isServer))
                 {
                     _requests.RemoveAt(i);
 
-                    using var stream = RPCModule.AllocStream(true);
-                    stream.WriteBytes(data.data);
-                    stream.ResetPosition();
+                    try
+                    {
+                        using var stream = RPCModule.AllocStream(false);
+                        stream.WriteBytes(data.data);
+                        stream.ResetPositionAndMode(true);
 
-                    request.respond(stream);
+                        request.completer.Respond(stream);
+                    }
+                    catch (Exception e)
+                    {
+                        PurrLogger.LogError($"Error while processing RPC response: {e}");
+                    }
+
                     break;
                 }
             }
+        }
+
+        private void OnRpcRejection(PlayerID conn, RpcRejection data, bool asServer)
+            => HandleRpcRejection(conn, data, asServer, false);
+
+        private void OnImmediateRpcRejection(PlayerID conn, ImmediateRpcRejection data, bool asServer)
+            => HandleRpcRejection(conn, data.rejection, asServer, true);
+
+        private void HandleRpcRejection(PlayerID conn, RpcRejection data, bool asServer, bool immediate)
+        {
+            var localPlayer = _manager.localPlayer;
+
+            switch (asServer)
+            {
+                case true when data.forward.HasValue && data.forward != localPlayer:
+                    data.sender = conn;
+                    var relayChannel = data.channel ?? Channel.ReliableOrdered;
+                    if (immediate)
+                        SendImmediateRejection(data.forward.Value, data, relayChannel);
+                    else
+                        _playersManager.Send(data.forward.Value, data, relayChannel);
+                    return;
+                case true:
+                    data.sender = null;
+                    break;
+            }
+
+            var actualSender = data.sender ?? conn;
+
+            for (int i = 0; i < _requests.Count; i++)
+            {
+                var request = _requests[i];
+                if (request.id == data.id && (!request.target.HasValue || request.target == actualSender || request.target.Value.isServer))
+                {
+                    _requests.RemoveAt(i);
+
+                    try
+                    {
+                        request.completer.Fail(new RpcRejectedException(data.error));
+                    }
+                    catch (Exception e)
+                    {
+                        PurrLogger.LogError($"Error while processing RPC rejection: {e}");
+                    }
+
+                    break;
+                }
+            }
+        }
+
+        public void SendRejection(PlayerID originalSender, uint requestId, RpcError error, Channel channel,
+            bool immediate = false)
+        {
+            var rejection = new RpcRejection
+            {
+                id = requestId,
+                error = error,
+                channel = channel
+            };
+
+            if (_asServer)
+            {
+                if (originalSender.isServer || _manager.isHost && originalSender == _manager.localPlayer)
+                {
+                    OnRpcRejection(_manager.localPlayer, rejection, true);
+                    return;
+                }
+
+                if (immediate)
+                    SendImmediateRejection(originalSender, rejection, channel);
+                else
+                    _playersManager.Send(originalSender, rejection, channel);
+                return;
+            }
+
+            rejection.forward = originalSender;
+
+            if (immediate)
+                SendImmediateRejection(null, rejection, channel);
+            else
+                _playersManager.SendToServer(rejection, channel);
+        }
+
+        private void SendImmediateRejection(PlayerID? target, RpcRejection rejection, Channel channel)
+        {
+            var wrapped = new ImmediateRpcRejection { rejection = rejection };
+
+            if (target.HasValue)
+                _playersManager.Send(target.Value, wrapped, channel);
+            else
+                _playersManager.SendToServer(wrapped, channel);
+
+            if (_manager.TryGetModule<RPCModule>(_asServer, out var rpcModule))
+                rpcModule.MarkImmediateContentPending();
         }
 
         [UsedByIL]
@@ -201,54 +462,18 @@ namespace PurrNet.Modules
 
         public Task GetNextId(PlayerID? target, float timeout, out RpcRequest request)
         {
-            var tcs = new TaskCompletionSource<bool>();
-            var id = _nextId++;
-
-            request = new RpcRequest
-            {
-                id = id,
-                target = target,
-                timeSent = Time.unscaledTime,
-                timeout = timeout,
-                respond = _ => { tcs.SetResult(true); },
-                timeoutRequest = () =>
-                {
-                    tcs.SetException(
-                        new TimeoutException(
-                            $"Async RPC with request id of '{id}' timed out after {timeout} seconds."));
-                }
-            };
-
+            var completer = new TaskRequestCompleter();
+            request = NewRequest(target, timeout, completer);
             _requests.Add(request);
-            return tcs.Task;
+            return completer.task;
         }
 
         public RawTask GetNextIdUniTask(PlayerID? target, float timeout, out RpcRequest request)
         {
-#if !UNITASK_PURRNET_SUPPORT
-            var tcs = new TaskCompletionSource<bool>();
-#else
-            var tcs = new UniTaskCompletionSource<bool>();
-#endif
-            var id = _nextId++;
-
-            request = new RpcRequest
-            {
-                id = id,
-                target = target,
-                timeSent = Time.unscaledTime,
-                timeout = timeout,
-                respond = _ => { tcs.TrySetResult(true); },
-                timeoutRequest = () =>
-                {
-                    tcs.TrySetException(
-                        new TimeoutException(
-                            $"Async RPC with request id of '{id}' timed out after {timeout} seconds."));
-                }
-            };
-
+            var completer = new UniTaskRequestCompleter();
+            request = NewRequest(target, timeout, completer);
             _requests.Add(request);
-            return tcs.Task;
+            return completer.task;
         }
 
 #if !UNITASK_PURRNET_SUPPORT
@@ -258,64 +483,30 @@ namespace PurrNet.Modules
 #endif
         GetNextIdUniTask<T>(PlayerID? target, float timeout, out RpcRequest request)
         {
-#if !UNITASK_PURRNET_SUPPORT
-            var tcs = new TaskCompletionSource<T>();
-#else
-            var tcs = new UniTaskCompletionSource<T>();
-#endif
-            var id = _nextId++;
-
-            request = new RpcRequest
-            {
-                id = id,
-                target = target,
-                timeSent = Time.unscaledTime,
-                timeout = timeout,
-                respond = stream =>
-                {
-                    T response = default;
-                    Packer<T>.Read(stream, ref response);
-                    tcs.TrySetResult(response);
-                },
-                timeoutRequest = () =>
-                {
-                    tcs.TrySetException(
-                        new TimeoutException(
-                            $"Async RPC with request id of '{id}' timed out after {timeout} seconds."));
-                }
-            };
-
+            var completer = new UniTaskRequestCompleter<T>();
+            request = NewRequest(target, timeout, completer);
             _requests.Add(request);
-            return tcs.Task;
+            return completer.task;
         }
 
         public Task<T> GetNextId<T>(PlayerID? target, float timeout, out RpcRequest request)
         {
-            var tcs = new TaskCompletionSource<T>();
-            var id = _nextId++;
+            var completer = new TaskRequestCompleter<T>();
+            request = NewRequest(target, timeout, completer);
+            _requests.Add(request);
+            return completer.task;
+        }
 
-            request = new RpcRequest
+        private RpcRequest NewRequest(PlayerID? target, float timeout, IRpcRequestCompleter completer)
+        {
+            return new RpcRequest
             {
-                id = id,
+                id = _nextId++,
                 target = target,
                 timeSent = Time.unscaledTime,
                 timeout = timeout,
-                respond = stream =>
-                {
-                    T response = default;
-                    Packer<T>.Read(stream, ref response);
-                    tcs.SetResult(response);
-                },
-                timeoutRequest = () =>
-                {
-                    tcs.SetException(
-                        new TimeoutException(
-                            $"Async RPC with request id of '{id}' timed out after {timeout} seconds."));
-                }
+                completer = completer
             };
-
-            _requests.Add(request);
-            return tcs.Task;
         }
 
         public void FixedUpdate()
@@ -327,14 +518,104 @@ namespace PurrNet.Modules
                 {
                     _requests.RemoveAt(i);
                     i--;
-                    request.timeoutRequest();
+                    request.completer.Fail(new TimeoutException(
+                        $"Async RPC with request id of '{request.id}' timed out after {request.timeout} seconds."));
                 }
             }
         }
 
-        static IEnumerator WaitThen(IEnumerator coroutine, Action action)
+        private void SendResponseToSender(RpcResponse responsePacket, RPCInfo info, Channel channel)
         {
-            yield return coroutine;
+            // Server responding to its own RPC - direct loopback since
+            // BroadcastModule.SendToServer is a no-op on the server side
+            if (info.asServer && info.sender.isServer)
+            {
+                OnRpcResponse(info.sender, responsePacket, true);
+                return;
+            }
+
+            var mtuOverride = info.compileTimeSignature.mtuExceeded.AsOverride();
+
+            if (info.compileTimeSignature.immediate)
+            {
+                SendImmediateResponse(info.asServer ? info.sender : (PlayerID?)null, responsePacket, channel, mtuOverride);
+                return;
+            }
+
+            if (info.asServer)
+                _playersManager.Send(info.sender, responsePacket, channel, mtuOverride);
+            else
+                _playersManager.SendToServer(responsePacket, channel, mtuOverride);
+        }
+
+        private void SendImmediateResponse(PlayerID? target, RpcResponse responsePacket, Channel channel,
+            MTUExceededBehaviour? mtuOverride)
+        {
+            var wrapped = new ImmediateRpcResponse { response = responsePacket };
+
+            if (target.HasValue)
+                _playersManager.Send(target.Value, wrapped, channel, mtuOverride);
+            else
+                _playersManager.SendToServer(wrapped, channel, mtuOverride);
+
+            // the response bypasses the immediate RPC batch, so poke the module
+            // to still force a transport send this frame
+            if (_manager.TryGetModule<RPCModule>(_asServer, out var rpcModule))
+                rpcModule.MarkImmediateContentPending();
+        }
+
+        private static void SendEmptyResponse(RPCInfo info, uint reqId, NetworkManager manager)
+        {
+            try
+            {
+                if (!manager.TryGetModule<RpcRequestResponseModule>(info.asServer, out var rpcModule))
+                    return;
+
+                var isForwarded = info is { asServer: false, sender: { isServer: false } };
+
+                var responsePacket = new RpcResponse
+                {
+                    id = reqId,
+                    data = ByteData.empty,
+                    forward = isForwarded ? info.sender : null,
+                    channel = isForwarded ? info.compileTimeSignature.channel : null
+                };
+
+                var channel = info.compileTimeSignature.channel;
+                rpcModule.SendResponseToSender(responsePacket, info, channel);
+            }
+            catch (Exception e)
+            {
+                PurrLogger.LogError($"Failed to send empty RPC response: {e}");
+            }
+        }
+
+        static IEnumerator WaitThen(IEnumerator coroutine, Action action, Action onError)
+        {
+            Exception caught = null;
+
+            while (true)
+            {
+                try
+                {
+                    if (!coroutine.MoveNext())
+                        break;
+                }
+                catch (Exception ex)
+                {
+                    caught = ex;
+                    break;
+                }
+
+                yield return coroutine.Current;
+            }
+
+            if (caught != null)
+            {
+                PurrLogger.LogError($"Error while processing RPC coroutine: {caught}");
+                onError?.Invoke();
+                yield break;
+            }
 
             try
             {
@@ -342,7 +623,8 @@ namespace PurrNet.Modules
             }
             catch (Exception ex)
             {
-                PurrLogger.LogError($"Error while processing RPC response: {ex.Message}\n{ex.StackTrace}");
+                PurrLogger.LogError($"Error while processing RPC response: {ex}");
+                onError?.Invoke();
             }
         }
 
@@ -354,30 +636,17 @@ namespace PurrNet.Modules
             {
                 manager.StartCoroutine(WaitThen(response, () =>
                 {
-                    if (manager.TryGetModule<RpcRequestResponseModule>(info.asServer, out var rpcModule))
-                    {
-                        // rpcModule
-                        var responsePacket = new RpcResponse
-                        {
-                            id = reqId,
-                            data = ByteData.empty
-                        };
-
-                        var channel = info.compileTimeSignature.channel;
-
-                        if (info.asServer)
-                            rpcModule._playersManager.Send(info.sender, responsePacket, channel);
-                        else rpcModule._playersManager.SendToServer(responsePacket, channel);
-                    }
-                    else
-                    {
-                        PurrLogger.LogError("Failed to get module, response won't be sent and receiver will timeout.");
-                    }
+                    SendEmptyResponse(info, reqId, manager);
+                },
+                () =>
+                {
+                    SendEmptyResponse(info, reqId, manager);
                 }));
             }
             catch (Exception ex)
             {
-                PurrLogger.LogError($"Error while processing RPC response: {ex.Message}\n{ex.StackTrace}");
+                PurrLogger.LogError($"Error while processing RPC response: {ex}");
+                SendEmptyResponse(info, reqId, manager);
             }
         }
 
@@ -388,34 +657,16 @@ namespace PurrNet.Modules
             try
             {
                 await response;
-
-                if (manager.TryGetModule<RpcRequestResponseModule>(info.asServer, out var rpcModule))
-                {
-                    // rpcModule
-                    var responsePacket = new RpcResponse
-                    {
-                        id = reqId,
-                        data = ByteData.empty
-                    };
-
-                    var channel = info.compileTimeSignature.channel;
-
-                    if (info.asServer)
-                        rpcModule._playersManager.Send(info.sender, responsePacket, channel);
-                    else rpcModule._playersManager.SendToServer(responsePacket, channel);
-                }
-                else
-                {
-                    PurrLogger.LogError("Failed to get module, response won't be sent and receiver will timeout.");
-                }
+                SendEmptyResponse(info, reqId, manager);
             }
             catch (Exception ex)
             {
-                PurrLogger.LogError($"Error while processing RPC response: {ex.Message}\n{ex.StackTrace}");
+                PurrLogger.LogError($"Error while processing RPC response: {ex}");
+                SendEmptyResponse(info, reqId, manager);
             }
         }
 
-        public static Type GetTaskResultType(object maybeTask)
+        private static Type GetTaskResultType(object maybeTask)
         {
             if (maybeTask == null)
                 return null;
@@ -478,31 +729,24 @@ namespace PurrNet.Modules
                 var taskResultType = GetTaskResultType(task);
                 object result = await AwaitAnyTaskAsync(task);
 
-                var t = task.GetType();
-                if (t.IsGenericType)
-                {
-                    var resultProp = t.GetProperty("Result");
-                    result = resultProp?.GetValue(task);
-                }
-
                 if (manager.TryGetModule<RpcRequestResponseModule>(info.asServer, out var rpcModule))
                 {
+                    var isForwarded = info is { asServer: false, sender: { isServer: false } };
+
                     using var tmpStream = RPCModule.AllocStream(false);
 
                     Packer.Write(tmpStream, taskResultType, result);
 
-                    // rpcModule
                     var responsePacket = new RpcResponse
                     {
                         id = reqId,
-                        data = tmpStream.ToByteData()
+                        data = tmpStream.ToByteData(),
+                        forward = isForwarded ? info.sender : null,
+                        channel = isForwarded ? info.compileTimeSignature.channel : null
                     };
 
                     var channel = info.compileTimeSignature.channel;
-
-                    if (info.asServer)
-                        rpcModule._playersManager.Send(info.sender, responsePacket, channel);
-                    else rpcModule._playersManager.SendToServer(responsePacket, channel);
+                    rpcModule.SendResponseToSender(responsePacket, info, channel);
                 }
                 else
                 {
@@ -511,7 +755,7 @@ namespace PurrNet.Modules
             }
             catch (Exception ex)
             {
-                PurrLogger.LogError($"Error while processing RPC response: {ex.Message}\n{ex.StackTrace}");
+                PurrLogger.LogError($"Error while processing RPC response: {ex}");
             }
         }
 
@@ -531,22 +775,21 @@ namespace PurrNet.Modules
 
                 if (manager.TryGetModule<RpcRequestResponseModule>(info.asServer, out var rpcModule))
                 {
+                    var isForwarded = info is { asServer: false, sender: { isServer: false } };
                     using var tmpStream = RPCModule.AllocStream(false);
 
                     Packer.Write(tmpStream, taskResultType, result);
 
-                    // rpcModule
                     var responsePacket = new RpcResponse
                     {
                         id = reqId,
-                        data = tmpStream.ToByteData()
+                        data = tmpStream.ToByteData(),
+                        forward = isForwarded ? info.sender : null,
+                        channel = isForwarded ? info.compileTimeSignature.channel : null
                     };
 
                     var channel = info.compileTimeSignature.channel;
-
-                    if (info.asServer)
-                        rpcModule._playersManager.Send(info.sender, responsePacket, channel);
-                    else rpcModule._playersManager.SendToServer(responsePacket, channel);
+                    rpcModule.SendResponseToSender(responsePacket, info, channel);
                 }
                 else
                 {
@@ -555,7 +798,7 @@ namespace PurrNet.Modules
             }
             catch (Exception ex)
             {
-                PurrLogger.LogError($"Error while processing RPC response: {ex.Message}\n{ex.StackTrace}");
+                PurrLogger.LogError($"Error while processing RPC response: {ex}");
             }
         }
 
@@ -582,22 +825,21 @@ namespace PurrNet.Modules
 
                 if (manager.TryGetModule<RpcRequestResponseModule>(info.asServer, out var rpcModule))
                 {
+                    var isForwarded = info is { asServer: false, sender: { isServer: false } };
                     using var tmpStream = RPCModule.AllocStream(false);
 
                     Packer<T>.Write(tmpStream, result);
 
-                    // rpcModule
                     var responsePacket = new RpcResponse
                     {
                         id = reqId,
-                        data = tmpStream.ToByteData()
+                        data = tmpStream.ToByteData(),
+                        forward = isForwarded ? info.sender : null,
+                        channel = isForwarded ? info.compileTimeSignature.channel : null
                     };
 
                     var channel = info.compileTimeSignature.channel;
-
-                    if (info.asServer)
-                        rpcModule._playersManager.Send(info.sender, responsePacket, channel);
-                    else rpcModule._playersManager.SendToServer(responsePacket, channel);
+                    rpcModule.SendResponseToSender(responsePacket, info, channel);
                 }
                 else
                 {
@@ -606,7 +848,7 @@ namespace PurrNet.Modules
             }
             catch (Exception ex)
             {
-                PurrLogger.LogError($"Error while processing RPC response: {ex.Message}\n{ex.StackTrace}");
+                PurrLogger.LogError($"Error while processing RPC response: {ex}");
             }
         }
 
@@ -617,30 +859,12 @@ namespace PurrNet.Modules
             try
             {
                 await response;
-
-                if (manager.TryGetModule<RpcRequestResponseModule>(info.asServer, out var rpcModule))
-                {
-                    // rpcModule
-                    var responsePacket = new RpcResponse
-                    {
-                        id = reqId,
-                        data = ByteData.empty
-                    };
-
-                    var channel = info.compileTimeSignature.channel;
-
-                    if (info.asServer)
-                        rpcModule._playersManager.Send(info.sender, responsePacket, channel);
-                    else rpcModule._playersManager.SendToServer(responsePacket, channel);
-                }
-                else
-                {
-                    PurrLogger.LogError("Failed to get module, response won't be sent and receiver will timeout.");
-                }
+                SendEmptyResponse(info, reqId, manager);
             }
             catch (Exception ex)
             {
-                PurrLogger.LogError($"Error while processing RPC response: {ex.Message}\n{ex.StackTrace}");
+                PurrLogger.LogError($"Error while processing RPC response: {ex}");
+                SendEmptyResponse(info, reqId, manager);
             }
         }
 
@@ -677,22 +901,21 @@ namespace PurrNet.Modules
 
                 if (manager.TryGetModule<RpcRequestResponseModule>(info.asServer, out var rpcModule))
                 {
+                    var isForwarded = info is { asServer: false, sender: { isServer: false } };
                     using var tmpStream = RPCModule.AllocStream(false);
 
                     Packer<T>.Write(tmpStream, result);
 
-                    // rpcModule
                     var responsePacket = new RpcResponse
                     {
                         id = reqId,
-                        data = tmpStream.ToByteData()
+                        data = tmpStream.ToByteData(),
+                        forward = isForwarded ? info.sender : null,
+                        channel = isForwarded ? info.compileTimeSignature.channel : null
                     };
 
                     var channel = info.compileTimeSignature.channel;
-
-                    if (info.asServer)
-                        rpcModule._playersManager.Send(info.sender, responsePacket, channel);
-                    else rpcModule._playersManager.SendToServer(responsePacket, channel);
+                    rpcModule.SendResponseToSender(responsePacket, info, channel);
                 }
                 else
                 {
@@ -701,7 +924,7 @@ namespace PurrNet.Modules
             }
             catch (Exception ex)
             {
-                PurrLogger.LogError($"Error while processing RPC response: {ex.Message}\n{ex.StackTrace}");
+                PurrLogger.LogError($"Error while processing RPC response: {ex}");
             }
         }
 

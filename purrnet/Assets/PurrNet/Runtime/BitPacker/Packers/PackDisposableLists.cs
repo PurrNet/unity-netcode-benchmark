@@ -8,13 +8,13 @@ namespace PurrNet.Packing
         [UsedByIL]
         public static void WriteDisposableList<T>(this BitPacker packer, DisposableList<T> value)
         {
-            if (value.isDisposed || value.list == null)
+            if (value.isDisposed || value.rawList == null)
             {
-                Packer<bool>.Write(packer, false);
+                packer.WriteBit(false);
                 return;
             }
 
-            Packer<bool>.Write(packer, true);
+            packer.WriteBit(true);
 
             uint length = (uint)value.Count;
             Packer<Size>.Write(packer, length);

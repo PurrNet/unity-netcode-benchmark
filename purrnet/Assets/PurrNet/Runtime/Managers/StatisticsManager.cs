@@ -1,7 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using PurrNet.Logging;
 using PurrNet.Modules;
 using PurrNet.Transports;
@@ -9,6 +6,7 @@ using UnityEngine;
 
 namespace PurrNet
 {
+    [AddComponentMenu("PurrNet/Statistics Manager")]
     public partial class StatisticsManager : MonoBehaviour
     {
         [Range(0.05f, 1f)] public float checkInterval = 0.33f;
@@ -17,12 +15,41 @@ namespace PurrNet
         [SerializeField] private StatisticsDisplayTarget _displayTarget = StatisticsDisplayTarget.Editor | StatisticsDisplayTarget.Build;
         [SerializeField] private float fontSize = 13f;
         [SerializeField] private Color textColor = Color.white;
+        [SerializeField] private int _highPingThreshold = 250;
+        [SerializeField] private int _highPingRecoveryThreshold = 180;
+        [SerializeField] private int _highJitterThreshold = 80;
+        [SerializeField] private int _highJitterRecoveryThreshold = 50;
+        [SerializeField, Range(0, 100)] private int _highPacketLossThreshold = 10;
+        [SerializeField, Range(0, 100)] private int _highPacketLossRecoveryThreshold = 5;
+        [SerializeField] private float _qualityChangeDuration = 2f;
+        [SerializeField] private float _connectionStallThreshold = 2f;
 
         public int ping { get; private set; }
         public int jitter { get; private set; }
         public int packetLoss { get; private set; }
         public float upload { get; private set; }
         public float download { get; private set; }
+        /// <summary>
+        /// False until the warmup has enough clean samples to publish a ping. While it is false
+        /// <see cref="ping"/> and <see cref="jitter"/> are 0 and no quality flag can raise, so a UI
+        /// can hide a readout rather than show a zero it would have to explain.
+        /// </summary>
+        public bool hasPingEstimate => _hasPingSample;
+
+        public bool isHighPing => _isHighPing;
+        public bool isHighJitter => _isHighJitter;
+        public bool isHighPacketLoss => _isHighPacketLoss;
+        public bool isConnectionStalled => _isConnectionStalled;
+
+        public delegate void HighPingChanged(bool isHigh, int ping);
+        public delegate void HighJitterChanged(bool isHigh, int jitter);
+        public delegate void HighPacketLossChanged(bool isHigh, int packetLoss);
+        public delegate void ConnectionStalledChanged(bool isStalled, float secondsSinceLastReceived);
+
+        public event HighPingChanged onHighPingChanged;
+        public event HighJitterChanged onHighJitterChanged;
+        public event HighPacketLossChanged onHighPacketLossChanged;
+        public event ConnectionStalledChanged onConnectionStalledChanged;
 
         private NetworkManager _networkManager;
         private PlayersBroadcaster _playersClientBroadcaster;
@@ -35,51 +62,92 @@ namespace PurrNet
         public bool connectedServer { get; private set; }
         public bool connectedClient { get; private set; }
 
-        private const float PING_HISTORY_TIME = 2.5f; // Seconds
-        private const int PACKET_HISTORY_SECONDS = 5;
-        private const int MAX_PACKET_HISTORY = 200;
-        private const float JITTER_SAMPLE_TIME = 2.5f;
+        private const float PING_EMA_RISE_ALPHA = 0.15f;
+        private const float PING_EMA_FALL_ALPHA = 0.1f;
+        private const float JITTER_EMA_ALPHA = 0.0625f;
+        private const float WARMUP_DURATION = 1.0f;
 
+        private const int PING_WARMUP_SAMPLES = 5;
+        private const float STALL_FRAME_SECONDS = 0.25f;
 
-        private int[] _pingStats;
-        private readonly uint[] _sentPacketSequences = new uint[MAX_PACKET_HISTORY];
-        private readonly uint[] _receivedPacketSequences = new uint[MAX_PACKET_HISTORY];
-        private readonly float[] _sentPacketTimes = new float[MAX_PACKET_HISTORY];
-        private readonly float[] _receivedPacketTimes = new float[MAX_PACKET_HISTORY];
-        private readonly Queue<(float time, int value)> _pingVisibleHistory = new();
+        private float _emaPing;
+        private bool _hasPingSample;
+        private float _connectionTime;
+        private int _lastRawPing;
+        private float _emaJitter;
 
-        private int _pingHistorySize;
-        private int _pingIndex;
-        private int _pingCount;
-        private int _sentPacketIndex;
-        private int _receivedPacketIndex;
-        private int _sentPacketCount;
-        private int _receivedPacketCount;
-        private uint _lastPingSendTick;
+        private readonly int[] _warmupSamples = new int[PING_WARMUP_SAMPLES];
+        private readonly int[] _warmupScratch = new int[PING_WARMUP_SAMPLES];
+        private int _warmupWrites;
+        private float _lastFrameRealtime = -1f;
+        private float _lastStallRealtime = -1f;
 
-        private int _packetsToSendPerSec = 20;
-        private uint _lastPacketSendTick;
+        private const int MAX_SEQUENCE_TRACKING = 256;
+        private const float PACKET_LOSS_WINDOW = 5f;
+        private const float MIN_INFLIGHT_GRACE = 0.5f;
+        private const float PACKET_LOSS_WARMUP = 3f;
+        private const int DEFAULT_PACKETS_PER_SEC = 20;
+        private const uint MAX_VALID_PING_MS = 60000;
+
+        private readonly uint[] _seqIds = new uint[MAX_SEQUENCE_TRACKING];
+        private readonly float[] _seqSendTimes = new float[MAX_SEQUENCE_TRACKING];
+        private readonly bool[] _seqAcked = new bool[MAX_SEQUENCE_TRACKING];
+        private int _seqHead;
+        private int _seqCount;
         private uint _packetSequence;
+
+        private int _packetsToSendPerSec = DEFAULT_PACKETS_PER_SEC;
+        private float _lastPacketSendTime;
+        private float _lastPingSendTime;
 
         private float _totalDataReceived;
         private float _totalDataSent;
         private float _lastDataCheckTime;
+        private float _lastClientDataReceivedTime;
 
+        private bool _isHighPing;
+        private bool _isHighJitter;
+        private bool _isHighPacketLoss;
+        private bool _isConnectionStalled;
+        private float _highPingTransitionStarted = -1f;
+        private float _highJitterTransitionStarted = -1f;
+        private float _highPacketLossTransitionStarted = -1f;
+        private int _highPingTransitionTicks;
+        private int _highJitterTransitionTicks;
+        private int _highPacketLossTransitionTicks;
+
+        private const int MIN_QUALITY_TICKS = 3;
+
+        private int _cachedPing = -1;
+        private int _cachedJitter = -1;
+        private int _cachedPacketLoss = -1;
+        private float _cachedUpload = -1f;
+        private float _cachedDownload = -1f;
+
+        private readonly char[] _charBuffer = new char[64];
         private string _cachedPingText = "Ping: 0ms";
         private string _cachedJitterText = "Jitter: 0ms";
         private string _cachedPacketLossText = "Packet Loss: 0%";
         private string _cachedUploadText = "Upload: 0.000KB/s";
         private string _cachedDownloadText = "Download: 0.000KB/s";
-        private float _lastGuiUpdateTime;
-        private const float GUI_UPDATE_INTERVAL = 0.1f;
 
-        private readonly StringBuilder _stringBuilder = new();
+        private bool _labelStyleInitialized;
 
         private void Awake()
         {
             _networkManager = NetworkManager.main;
             _networkManager.onServerConnectionState += OnServerConnectionState;
             _networkManager.onClientConnectionState += OnClientConnectionState;
+        }
+
+        private void OnEnable()
+        {
+            PurrOnGUI.Subscribe(DrawStatisticsGUI);
+        }
+
+        private void OnDisable()
+        {
+            PurrOnGUI.Unsubscribe(DrawStatisticsGUI);
         }
 
         private void Start()
@@ -91,19 +159,41 @@ namespace PurrNet
                 return;
             }
 
-            UpdateLabelStyle();
+            EnsureLabelStyle();
         }
 
         private void OnValidate()
         {
+            _highPingThreshold = Mathf.Max(0, _highPingThreshold);
+            _highPingRecoveryThreshold = Mathf.Clamp(_highPingRecoveryThreshold, 0, _highPingThreshold);
+            _highJitterThreshold = Mathf.Max(0, _highJitterThreshold);
+            _highJitterRecoveryThreshold = Mathf.Clamp(_highJitterRecoveryThreshold, 0, _highJitterThreshold);
+            _highPacketLossThreshold = Mathf.Clamp(_highPacketLossThreshold, 0, 100);
+            _highPacketLossRecoveryThreshold = Mathf.Clamp(_highPacketLossRecoveryThreshold, 0, _highPacketLossThreshold);
+            _qualityChangeDuration = Mathf.Max(0f, _qualityChangeDuration);
+            _connectionStallThreshold = Mathf.Max(0f, _connectionStallThreshold);
+
 #if UNITY_EDITOR
             if (!Application.isPlaying)
-                UpdateLabelStyle();
+            {
+                _labelStyleInitialized = false;
+                EnsureLabelStyle();
+            }
 #endif
         }
 
-        private void UpdateLabelStyle()
+        private void EnsureLabelStyle()
         {
+            if (_labelStyleInitialized && _labelStyle != null)
+            {
+                _labelStyle.fontSize = Mathf.RoundToInt(fontSize);
+                _labelStyle.normal.textColor = textColor;
+                _labelStyle.alignment = (placement == StatisticsPlacement.TopRight || placement == StatisticsPlacement.BottomRight)
+                    ? TextAnchor.UpperRight
+                    : TextAnchor.UpperLeft;
+                return;
+            }
+
             _labelStyle = new GUIStyle
             {
                 fontSize = Mathf.RoundToInt(fontSize),
@@ -112,6 +202,7 @@ namespace PurrNet
                     ? TextAnchor.UpperRight
                     : TextAnchor.UpperLeft
             };
+            _labelStyleInitialized = true;
         }
 
         private void OnDestroy()
@@ -120,10 +211,12 @@ namespace PurrNet
             {
                 _networkManager.onServerConnectionState -= OnServerConnectionState;
                 _networkManager.onClientConnectionState -= OnClientConnectionState;
-                _networkManager.transport.transport.onDataReceived -= OnDataReceived;
-                _networkManager.transport.transport.onDataSent -= OnDataSent;
-                if (_networkManager.TryGetModule(out TickManager tm, false))
-                    tm.onTick -= OnClientTick;
+                var rt = _networkManager.rawTransport;
+                if (rt != null)
+                {
+                    rt.onDataReceived -= OnDataReceived;
+                    rt.onDataSent -= OnDataSent;
+                }
             }
 
             if (_playersServerBroadcaster != null)
@@ -142,24 +235,22 @@ namespace PurrNet
             ClientUnsubscribe_ServerStats();
         }
 
-        private void OnGUI()
+        private void DrawStatisticsGUI()
         {
-#if UNITY_EDITOR
-            if (!_displayTarget.HasFlag(StatisticsDisplayTarget.Editor))
+            var requiredTarget = Application.isEditor ? StatisticsDisplayTarget.Editor : StatisticsDisplayTarget.Build;
+            if (!_displayTarget.HasFlag(requiredTarget))
                 return;
-#else
-            if (!_displayTarget.HasFlag(StatisticsDisplayTarget.Build))
-                return;
-#endif
+
             if (placement == StatisticsPlacement.None || !connectedClient)
                 return;
 
+            EnsureLabelStyle();
             UpdateCachedStrings();
 
             var position = GetPosition();
-            float currentY = position.y;
             const float labelWidth = 200;
-            Rect rect = new(position.x, currentY, labelWidth, LineHeight);
+            Rect rect = new(position.x, position.y, labelWidth, LineHeight);
+
             if (_displayType.HasFlag(StatisticsDisplayType.Ping))
             {
                 GUI.Label(rect, _cachedPingText, _labelStyle);
@@ -198,27 +289,102 @@ namespace PurrNet
 
         private void UpdateCachedStrings()
         {
-            var currentTime = Time.time;
-            if (currentTime - _lastGuiUpdateTime < GUI_UPDATE_INTERVAL)
-                return;
+            if (ping != _cachedPing)
+            {
+                _cachedPing = ping;
+                _cachedPingText = FormatStat("Ping: ", ping, "ms");
+            }
 
-            _lastGuiUpdateTime = currentTime;
+            if (jitter != _cachedJitter)
+            {
+                _cachedJitter = jitter;
+                _cachedJitterText = FormatStat("Jitter: ", jitter, "ms");
+            }
 
-            _stringBuilder.Clear().Append("Ping: ").Append(ping).Append("ms");
-            _cachedPingText = _stringBuilder.ToString();
+            if (packetLoss != _cachedPacketLoss)
+            {
+                _cachedPacketLoss = packetLoss;
+                _cachedPacketLossText = FormatStat("Packet Loss: ", packetLoss, "%");
+            }
 
-            _stringBuilder.Clear().Append("Jitter: ").Append(jitter).Append("ms");
-            _cachedJitterText = _stringBuilder.ToString();
+            if (!Mathf.Approximately(upload, _cachedUpload))
+            {
+                _cachedUpload = upload;
+                _cachedUploadText = FormatStatFloat("Upload: ", upload, "KB/s");
+            }
 
-            _stringBuilder.Clear().Append("Packet Loss: ").Append(packetLoss).Append('%');
-            _cachedPacketLossText = _stringBuilder.ToString();
+            if (!Mathf.Approximately(download, _cachedDownload))
+            {
+                _cachedDownload = download;
+                _cachedDownloadText = FormatStatFloat("Download: ", download, "KB/s");
+            }
 
-            _stringBuilder.Clear().Append("Upload: ").Append(upload.ToString("F3")).Append("KB/s");
-            _cachedUploadText = _stringBuilder.ToString();
-
-            _stringBuilder.Clear().Append("Download: ").Append(download.ToString("F3")).Append("KB/s");
-            _cachedDownloadText = _stringBuilder.ToString();
             UpdateCachedStrings_ServerStats();
+        }
+
+        private string FormatStat(string prefix, int value, string suffix)
+        {
+            int pos = 0;
+
+            for (int i = 0; i < prefix.Length; i++)
+                _charBuffer[pos++] = prefix[i];
+
+            pos = WriteInt(_charBuffer, pos, value);
+
+            for (int i = 0; i < suffix.Length; i++)
+                _charBuffer[pos++] = suffix[i];
+
+            return new string(_charBuffer, 0, pos);
+        }
+
+        private string FormatStatFloat(string prefix, float value, string suffix)
+        {
+            int pos = 0;
+
+            for (int i = 0; i < prefix.Length; i++)
+                _charBuffer[pos++] = prefix[i];
+
+            int intPart = (int)value;
+            int fracPart = Mathf.Abs((int)((value - intPart) * 1000));
+
+            pos = WriteInt(_charBuffer, pos, intPart);
+            _charBuffer[pos++] = '.';
+
+            if (fracPart < 100) _charBuffer[pos++] = '0';
+            if (fracPart < 10) _charBuffer[pos++] = '0';
+            pos = WriteInt(_charBuffer, pos, fracPart);
+
+            for (int i = 0; i < suffix.Length; i++)
+                _charBuffer[pos++] = suffix[i];
+
+            return new string(_charBuffer, 0, pos);
+        }
+
+        private static int WriteInt(char[] buffer, int pos, int value)
+        {
+            if (value < 0)
+            {
+                buffer[pos++] = '-';
+                value = -value;
+            }
+
+            if (value == 0)
+            {
+                buffer[pos++] = '0';
+                return pos;
+            }
+
+            int start = pos;
+            while (value > 0)
+            {
+                buffer[pos++] = (char)('0' + value % 10);
+                value /= 10;
+            }
+
+            for (int i = start, j = pos - 1; i < j; i++, j--)
+                (buffer[i], buffer[j]) = (buffer[j], buffer[i]);
+
+            return pos;
         }
 
         private Vector2 GetPosition()
@@ -256,44 +422,69 @@ namespace PurrNet
 
         private void Update()
         {
-            if (Time.time - _lastDataCheckTime >= 1f)
+            TrackLocalStalls();
+
+            if (Time.unscaledTime - _lastDataCheckTime >= 1f)
             {
                 download = _totalDataReceived / 1024f;
                 upload = _totalDataSent / 1024f;
                 _totalDataReceived = 0;
                 _totalDataSent = 0;
-                _lastDataCheckTime = Time.time;
+                _lastDataCheckTime = Time.unscaledTime;
             }
 
             if (connectedClient)
-                CleanupOldPackets(Time.time);
+            {
+                CalculatePacketLoss();
+                UpdateNetworkQuality();
+            }
 
             ServerStatsUpdate();
         }
 
         private void OnServerConnectionState(ConnectionState state)
         {
-            _playersServerBroadcaster = _networkManager.GetModule<PlayersBroadcaster>(true);
-            _pingHistorySize = Mathf.RoundToInt(_networkManager.tickModule.tickRate * PING_HISTORY_TIME);
-            _pingStats = new int[_pingHistorySize];
-
             connectedServer = state == ConnectionState.Connected;
 
-            if (state != ConnectionState.Connected)
+            switch (state)
             {
-                _playersServerBroadcaster.Unsubscribe<PingMessage>(ReceivePing);
-                _playersServerBroadcaster.Unsubscribe<PacketMessage>(ReceivePacket);
-                _networkManager.transport.transport.onDataReceived -= OnDataReceived;
-                _networkManager.transport.transport.onDataSent -= OnDataSent;
-                ServerUnsubscribe_ServerStats();
-                return;
+                case ConnectionState.Disconnected:
+                    if (_playersServerBroadcaster == null)
+                        return;
+                    _playersServerBroadcaster.Unsubscribe<PingMessage>(ReceivePing);
+                    _playersServerBroadcaster.Unsubscribe<PacketMessage>(ReceivePacket);
+                    _playersServerBroadcaster = null;
+                    if (_networkManager.TryGetModule<PlayersManager>(true, out var serverPlayersCleanup))
+                    {
+                        serverPlayersCleanup.UnregisterImmediateType<PingMessage>();
+                        serverPlayersCleanup.UnregisterImmediateType<PacketMessage>();
+                    }
+                    var rt = _networkManager.rawTransport;
+                    if (rt != null)
+                    {
+                        rt.onDataReceived -= OnDataReceived;
+                        rt.onDataSent -= OnDataSent;
+                    }
+                    ServerUnsubscribe_ServerStats();
+                    return;
+                case ConnectionState.Connected:
+                    _playersServerBroadcaster = _networkManager.GetModule<PlayersBroadcaster>(true);
+                    _playersServerBroadcaster.Subscribe<PingMessage>(ReceivePing);
+                    _playersServerBroadcaster.Subscribe<PacketMessage>(ReceivePacket);
+                    if (_networkManager.TryGetModule<PlayersManager>(true, out var serverPlayers))
+                    {
+                        serverPlayers.RegisterImmediateType<PingMessage>();
+                        serverPlayers.RegisterImmediateType<PacketMessage>();
+                    }
+                    _networkManager.rawTransport.onDataReceived += OnDataReceived;
+                    _networkManager.rawTransport.onDataSent += OnDataSent;
+                    ServerSubscribe_ServerStats();
+                    break;
+                case ConnectionState.Connecting:
+                case ConnectionState.Disconnecting:
+                    break;
+                default: throw new ArgumentOutOfRangeException(nameof(state), state, null);
             }
-
-            _playersServerBroadcaster.Subscribe<PingMessage>(ReceivePing);
-            _playersServerBroadcaster.Subscribe<PacketMessage>(ReceivePacket);
-            _networkManager.transport.transport.onDataReceived += OnDataReceived;
-            _networkManager.transport.transport.onDataSent += OnDataSent;
-            ServerSubscribe_ServerStats();
         }
 
         private void OnClientConnectionState(ConnectionState state)
@@ -302,8 +493,6 @@ namespace PurrNet
                 return;
 
             _playersClientBroadcaster = _networkManager.GetModule<PlayersBroadcaster>(false);
-            _pingHistorySize = Mathf.RoundToInt(_networkManager.tickModule.tickRate * PING_HISTORY_TIME);
-            _pingStats = new int[_pingHistorySize];
 
             connectedClient = state == ConnectionState.Connected;
 
@@ -311,11 +500,19 @@ namespace PurrNet
             {
                 _playersClientBroadcaster.Unsubscribe<PingMessage>(ReceivePing);
                 _playersClientBroadcaster.Unsubscribe<PacketMessage>(ReceivePacket);
-                _tickManager.onTick -= OnClientTick;
+                if (_networkManager.TryGetModule<PlayersManager>(false, out var clientPlayersCleanup))
+                {
+                    clientPlayersCleanup.UnregisterImmediateType<PingMessage>();
+                    clientPlayersCleanup.UnregisterImmediateType<PacketMessage>();
+                }
                 if (!connectedServer)
                 {
-                    _networkManager.transport.transport.onDataReceived -= OnDataReceived;
-                    _networkManager.transport.transport.onDataSent -= OnDataSent;
+                    var rt = _networkManager.rawTransport;
+                    if (rt != null)
+                    {
+                        rt.onDataReceived -= OnDataReceived;
+                        rt.onDataSent -= OnDataSent;
+                    }
                 }
 
                 ClientUnsubscribe_ServerStats();
@@ -325,14 +522,19 @@ namespace PurrNet
 
             _playersClientBroadcaster.Subscribe<PingMessage>(ReceivePing);
             _playersClientBroadcaster.Subscribe<PacketMessage>(ReceivePacket);
-            _tickManager.onTick += OnClientTick;
+            if (_networkManager.TryGetModule<PlayersManager>(false, out var clientPlayers))
+            {
+                clientPlayers.RegisterImmediateType<PingMessage>();
+                clientPlayers.RegisterImmediateType<PacketMessage>();
+            }
 
             if (!connectedServer)
             {
-                _networkManager.transport.transport.onDataReceived += OnDataReceived;
-                _networkManager.transport.transport.onDataSent += OnDataSent;
+                _networkManager.rawTransport.onDataReceived += OnDataReceived;
+                _networkManager.rawTransport.onDataSent += OnDataSent;
             }
 
+            _packetsToSendPerSec = DEFAULT_PACKETS_PER_SEC;
             if (_tickManager.tickRate < _packetsToSendPerSec)
                 _packetsToSendPerSec = Mathf.Max(5, _tickManager.tickRate / 2);
 
@@ -345,51 +547,64 @@ namespace PurrNet
             ping = 0;
             jitter = 0;
             packetLoss = 0;
-            _pingIndex = 0;
-            _pingCount = 0;
-            _sentPacketIndex = 0;
-            _receivedPacketIndex = 0;
-            _sentPacketCount = 0;
-            _receivedPacketCount = 0;
+            _emaPing = 0;
+            _hasPingSample = false;
+            _warmupWrites = 0;
+            _connectionTime = Time.unscaledTime;
+            _lastRawPing = 0;
+            _emaJitter = 0;
+            _seqHead = 0;
+            _seqCount = 0;
             _packetSequence = 0;
+            _lastPingSendTime = 0;
+            _lastPacketSendTime = 0;
+            _lastClientDataReceivedTime = Time.unscaledTime;
 
-            for (int i = 0; i < MAX_PACKET_HISTORY; i++)
+            for (int i = 0; i < MAX_SEQUENCE_TRACKING; i++)
             {
-                _sentPacketTimes[i] = 0;
-                _receivedPacketTimes[i] = 0;
-                _sentPacketSequences[i] = 0;
-                _receivedPacketSequences[i] = 0;
+                _seqSendTimes[i] = 0;
+                _seqAcked[i] = false;
             }
 
+            _cachedPing = -1;
+            _cachedJitter = -1;
+            _cachedPacketLoss = -1;
+            _cachedUpload = -1f;
+            _cachedDownload = -1f;
+
+            ResetNetworkQuality();
             ResetStatistics_ServerStats();
         }
 
-        private void OnClientTick()
+        private void LateUpdate()
         {
-            if (!gameObject.activeInHierarchy)
+            if (!connectedClient || _playersClientBroadcaster == null)
                 return;
 
-            HandlePingCheck();
-            HandlePacketCheck();
+            float now = Time.unscaledTime;
+
+            if (now - _lastPingSendTime >= checkInterval)
+                SendPingCheck(now);
+
+            if (now - _lastPacketSendTime >= 1f / _packetsToSendPerSec)
+                SendPacketCheck(now);
         }
 
-        private void HandlePingCheck()
+        private static uint NowMilliseconds()
         {
-            if (_lastPingSendTick + _tickManager.TimeToTick(checkInterval) > _tickManager.localTick)
-                return;
-
-            SendPingCheck();
+            return (uint)(Time.unscaledTimeAsDouble * 1000.0);
         }
 
-        private void SendPingCheck()
+        private void SendPingCheck(float now)
         {
             _playersClientBroadcaster.SendToServer(
                 new PingMessage {
-                    sendTime = _tickManager.localTick,
-                    realSendTime = Time.time
+                    sendTime = NowMilliseconds(),
+                    realSendTime = Time.realtimeSinceStartup
                 },
-                Channel.ReliableUnordered);
-            _lastPingSendTick = _tickManager.localTick;
+                Channel.Unreliable);
+            _lastPingSendTime = now;
+            _networkManager.RequestSendFlushThisFrame();
         }
 
         private void ReceivePing(PlayerID sender, PingMessage msg, bool asServer)
@@ -401,128 +616,243 @@ namespace PurrNet
                         sendTime = msg.sendTime,
                         realSendTime = msg.realSendTime
                     },
-                    Channel.ReliableUnordered);
+                    Channel.Unreliable);
+                _networkManager.RequestSendFlushThisFrame();
                 return;
             }
 
-            float sentTime = msg.realSendTime;
-            int currentPing = Mathf.Max(0, Mathf.FloorToInt((Time.time - sentTime) * 1000));
-            var multiplier = 2f;
-            if (_networkManager.isServer)
-                multiplier = 3f;
-            currentPing -= Mathf.Min(currentPing, Mathf.RoundToInt((_tickManager.tickDelta * multiplier) * 1000));
+            if (_lastStallRealtime >= msg.realSendTime)
+                return;
 
-            _pingStats[_pingIndex] = currentPing;
-            _pingIndex = (_pingIndex + 1) % _pingHistorySize;
-            if (_pingCount < _pingHistorySize)
-                _pingCount++;
+            uint elapsedMs = NowMilliseconds() - msg.sendTime;
+            if (elapsedMs > MAX_VALID_PING_MS)
+                return;
 
-            CalculatePingStats();
+            int currentPing = (int)elapsedMs;
+
+            if (!_hasPingSample)
+            {
+                CollectWarmupSample(currentPing);
+                return;
+            }
+
+            int diff = Mathf.Abs(currentPing - _lastRawPing);
+            _emaJitter += JITTER_EMA_ALPHA * (diff - _emaJitter);
+            _lastRawPing = currentPing;
+
+            float alpha = currentPing > _emaPing ? PING_EMA_RISE_ALPHA : PING_EMA_FALL_ALPHA;
+            _emaPing = alpha * currentPing + (1f - alpha) * _emaPing;
+
+            ping = Mathf.RoundToInt(_emaPing);
+            jitter = Mathf.RoundToInt(_emaJitter);
         }
 
-        private void CalculatePingStats()
+        private void CollectWarmupSample(int currentPing)
         {
-            if (_pingCount == 0)
+            _warmupSamples[_warmupWrites % PING_WARMUP_SAMPLES] = currentPing;
+            _warmupWrites++;
+
+            if (_warmupWrites < PING_WARMUP_SAMPLES ||
+                Time.unscaledTime - _connectionTime < WARMUP_DURATION)
             {
-                ping = 0;
-                jitter = 0;
                 return;
             }
 
-            int sum = 0;
-            for (int i = 0; i < _pingCount; i++)
-                sum += _pingStats[i];
+            _emaPing = MedianWarmupSample();
+            _lastRawPing = Mathf.RoundToInt(_emaPing);
+            _emaJitter = 0f;
+            _hasPingSample = true;
 
-            ping = sum / _pingCount;
-
-            float now = Time.time;
-            _pingVisibleHistory.Enqueue((now, ping));
-;
-            while (_pingVisibleHistory.Count > 0 && now - _pingVisibleHistory.Peek().time > JITTER_SAMPLE_TIME)
-                _pingVisibleHistory.Dequeue();
-
-            if (_pingVisibleHistory.Count > 1)
-            {
-                int min = _pingVisibleHistory.Min(x => x.value);
-                int max = _pingVisibleHistory.Max(x => x.value);
-                jitter = max - min;
-            }
-            else
-            {
-                jitter = 0;
-            }
+            ping = Mathf.RoundToInt(_emaPing);
+            jitter = 0;
         }
 
-        private void HandlePacketCheck()
+        private int MedianWarmupSample()
         {
-            if (_lastPacketSendTick + _tickManager.TimeToTick(1f / _packetsToSendPerSec) > _tickManager.localTick)
-                return;
+            System.Array.Copy(_warmupSamples, _warmupScratch, PING_WARMUP_SAMPLES);
 
-            _lastPacketSendTick = _tickManager.localTick;
+            for (int i = 1; i < PING_WARMUP_SAMPLES; i++)
+            {
+                int value = _warmupScratch[i];
+                int j = i - 1;
 
-            _sentPacketSequences[_sentPacketIndex] = _packetSequence;
-            _sentPacketTimes[_sentPacketIndex] = Time.time;
-            _sentPacketIndex = (_sentPacketIndex + 1) % MAX_PACKET_HISTORY;
-            if (_sentPacketCount < MAX_PACKET_HISTORY)
-                _sentPacketCount++;
+                while (j >= 0 && _warmupScratch[j] > value)
+                {
+                    _warmupScratch[j + 1] = _warmupScratch[j];
+                    j--;
+                }
+
+                _warmupScratch[j + 1] = value;
+            }
+
+            return _warmupScratch[PING_WARMUP_SAMPLES / 2];
+        }
+
+        private void TrackLocalStalls()
+        {
+            float realtime = Time.realtimeSinceStartup;
+
+            if (_lastFrameRealtime >= 0f && realtime - _lastFrameRealtime >= STALL_FRAME_SECONDS)
+                _lastStallRealtime = realtime;
+
+            _lastFrameRealtime = realtime;
+        }
+
+        private void SendPacketCheck(float now)
+        {
+            _lastPacketSendTime = now;
+
+            int idx = _seqHead;
+            _seqIds[idx] = _packetSequence;
+            _seqSendTimes[idx] = now;
+            _seqAcked[idx] = false;
+            _seqHead = (_seqHead + 1) % MAX_SEQUENCE_TRACKING;
+            if (_seqCount < MAX_SEQUENCE_TRACKING)
+                _seqCount++;
 
             _playersClientBroadcaster.SendToServer(new PacketMessage { sequenceId = _packetSequence++ }, Channel.Unreliable);
-
-            CalculatePacketLoss();
         }
 
         private void CalculatePacketLoss()
         {
-            float currentTime = Time.time;
-            float cutoffTime = currentTime - PACKET_HISTORY_SECONDS;
+            float now = Time.unscaledTime;
+            float gracePeriod = Mathf.Max(MIN_INFLIGHT_GRACE, (_emaPing / 1000f) * 3f);
+            float graceThreshold = now - gracePeriod;
+            float windowStart = now - PACKET_LOSS_WINDOW;
 
-            int validSentPackets = 0;
-            int validReceivedPackets = 0;
-
-            for (int i = 0; i < _sentPacketCount; i++)
-            {
-                if (_sentPacketTimes[i] > 0 && _sentPacketTimes[i] >= cutoffTime)
-                    validSentPackets++;
-            }
-
-            for (int i = 0; i < _receivedPacketCount; i++)
-            {
-                if (_receivedPacketTimes[i] > 0 && _receivedPacketTimes[i] >= cutoffTime)
-                    validReceivedPackets++;
-            }
-
-            if (validSentPackets > 0)
-            {
-                int lossPercentage = 100 - (validReceivedPackets * 100 / validSentPackets);
-                packetLoss = Mathf.Clamp(lossPercentage, 0, 100);
-
-                if (_tickManager.localTick < 3 * _tickManager.tickRate)
-                    packetLoss = 0;
-            }
-            else
+            if (now - _connectionTime < PACKET_LOSS_WARMUP)
             {
                 packetLoss = 0;
+                return;
             }
+
+            int totalSettled = 0;
+            int totalLost = 0;
+
+            for (int i = 0; i < _seqCount; i++)
+            {
+                float sendTime = _seqSendTimes[i];
+
+                if (sendTime < windowStart || sendTime > graceThreshold)
+                    continue;
+
+                totalSettled++;
+                if (!_seqAcked[i])
+                    totalLost++;
+            }
+
+            if (totalSettled > 0)
+                packetLoss = Mathf.Clamp(totalLost * 100 / totalSettled, 0, 100);
+            else
+                packetLoss = 0;
         }
 
-        private void CleanupOldPackets(float currentTime)
+        private void UpdateNetworkQuality()
         {
-            float cutoffTime = currentTime - PACKET_HISTORY_SECONDS - 1f;
+            float now = Time.unscaledTime;
 
-            for (int i = 0; i < MAX_PACKET_HISTORY; i++)
+            if (_hasPingSample)
             {
-                if (_sentPacketTimes[i] > 0 && _sentPacketTimes[i] < cutoffTime)
-                {
-                    _sentPacketTimes[i] = 0;
-                    _sentPacketSequences[i] = 0;
-                }
+                if (UpdateQualityState(ping, _highPingThreshold, _highPingRecoveryThreshold, now, ref _isHighPing, ref _highPingTransitionStarted, ref _highPingTransitionTicks))
+                    onHighPingChanged?.Invoke(_isHighPing, ping);
 
-                if (_receivedPacketTimes[i] > 0 && _receivedPacketTimes[i] < cutoffTime)
-                {
-                    _receivedPacketTimes[i] = 0;
-                    _receivedPacketSequences[i] = 0;
-                }
+                if (UpdateQualityState(jitter, _highJitterThreshold, _highJitterRecoveryThreshold, now, ref _isHighJitter, ref _highJitterTransitionStarted, ref _highJitterTransitionTicks))
+                    onHighJitterChanged?.Invoke(_isHighJitter, jitter);
             }
+
+            if (UpdateQualityState(packetLoss, _highPacketLossThreshold, _highPacketLossRecoveryThreshold, now, ref _isHighPacketLoss, ref _highPacketLossTransitionStarted, ref _highPacketLossTransitionTicks))
+                onHighPacketLossChanged?.Invoke(_isHighPacketLoss, packetLoss);
+
+            UpdateConnectionStall(now);
+        }
+
+        private bool UpdateQualityState(int value, int threshold, int recoveryThreshold, float now, ref bool isActive, ref float transitionStarted, ref int transitionTicks)
+        {
+            bool shouldChange = isActive ? value <= recoveryThreshold : value >= threshold;
+
+            if (!shouldChange)
+            {
+                transitionStarted = -1f;
+                transitionTicks = 0;
+                return false;
+            }
+
+            if (_qualityChangeDuration <= 0f)
+            {
+                isActive = !isActive;
+                transitionStarted = -1f;
+                transitionTicks = 0;
+                return true;
+            }
+
+            if (transitionStarted < 0f)
+            {
+                transitionStarted = now;
+                transitionTicks = 0;
+            }
+
+            transitionTicks++;
+
+            if (now - transitionStarted < _qualityChangeDuration || transitionTicks < MIN_QUALITY_TICKS)
+                return false;
+
+            isActive = !isActive;
+            transitionStarted = -1f;
+            transitionTicks = 0;
+            return true;
+        }
+
+        private void UpdateConnectionStall(float now)
+        {
+            if (_connectionStallThreshold <= 0f)
+            {
+                SetConnectionStalled(false, 0f);
+                return;
+            }
+
+            float secondsSinceLastReceived = now - _lastClientDataReceivedTime;
+
+            if (!_isConnectionStalled && secondsSinceLastReceived >= _connectionStallThreshold)
+                SetConnectionStalled(true, secondsSinceLastReceived);
+        }
+
+        private void SetConnectionStalled(bool isStalled, float secondsSinceLastReceived)
+        {
+            if (_isConnectionStalled == isStalled)
+                return;
+
+            _isConnectionStalled = isStalled;
+            onConnectionStalledChanged?.Invoke(isStalled, secondsSinceLastReceived);
+        }
+
+        private void ResetNetworkQuality()
+        {
+            _highPingTransitionStarted = -1f;
+            _highJitterTransitionStarted = -1f;
+            _highPacketLossTransitionStarted = -1f;
+            _highPingTransitionTicks = 0;
+            _highJitterTransitionTicks = 0;
+            _highPacketLossTransitionTicks = 0;
+
+            if (_isHighPing)
+            {
+                _isHighPing = false;
+                onHighPingChanged?.Invoke(false, ping);
+            }
+
+            if (_isHighJitter)
+            {
+                _isHighJitter = false;
+                onHighJitterChanged?.Invoke(false, jitter);
+            }
+
+            if (_isHighPacketLoss)
+            {
+                _isHighPacketLoss = false;
+                onHighPacketLossChanged?.Invoke(false, packetLoss);
+            }
+
+            SetConnectionStalled(false, 0f);
         }
 
         private void ReceivePacket(PlayerID sender, PacketMessage msg, bool asServer)
@@ -533,16 +863,25 @@ namespace PurrNet
                 return;
             }
 
-            _receivedPacketSequences[_receivedPacketIndex] = msg.sequenceId;
-            _receivedPacketTimes[_receivedPacketIndex] = Time.time;
-            _receivedPacketIndex = (_receivedPacketIndex + 1) % MAX_PACKET_HISTORY;
-            if (_receivedPacketCount < MAX_PACKET_HISTORY)
-                _receivedPacketCount++;
+            for (int i = 0; i < _seqCount; i++)
+            {
+                if (_seqIds[i] == msg.sequenceId)
+                {
+                    _seqAcked[i] = true;
+                    break;
+                }
+            }
         }
 
         private void OnDataReceived(Connection conn, ByteData data, bool asServer)
         {
             _totalDataReceived += data.length;
+
+            if (asServer)
+                return;
+
+            _lastClientDataReceivedTime = Time.unscaledTime;
+            SetConnectionStalled(false, 0f);
         }
 
         private void OnDataSent(Connection conn, ByteData data, bool asServer)

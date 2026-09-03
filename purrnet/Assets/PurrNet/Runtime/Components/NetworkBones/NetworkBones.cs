@@ -1,4 +1,6 @@
+using System;
 using PurrNet.Contributors;
+using PurrNet.Logging;
 using PurrNet.Modules;
 using PurrNet.Packing;
 using PurrNet.Pooling;
@@ -8,6 +10,7 @@ using UnityEngine;
 
 namespace PurrNet
 {
+    [AddComponentMenu("PurrNet/Network Bones")]
     [CourtesyOf("Resolute Games", "https://resolutegames.com/")]
     public class NetworkBones : NetworkIdentity
     {
@@ -26,6 +29,21 @@ namespace PurrNet
         private DisposableList<Transform> _bones = DisposableList<Transform>.Create(512);
         private BoneInfo[] _bonesInfo;
 
+        /// <summary>
+        /// Extra bones to sync on top of the ones gathered from SkinnedMeshRenderers.
+        /// Must be set before this identity is spawned.
+        /// </summary>
+        public Transform[] extraBones
+        {
+            get => _extraBones;
+            set => _extraBones = value;
+        }
+
+        /// <summary>
+        /// Number of bones gathered for syncing. Populated once spawned.
+        /// </summary>
+        public int boneCount => _bones.Count;
+
         private Interpolated<Vector3>[] _positions;
         private Interpolated<Quaternion>[] _rotations;
         private Interpolated<Vector3>[] _scales;
@@ -34,6 +52,13 @@ namespace PurrNet
         private DeltaModule _serverDeltaModule;
 
         private float _sendDelta;
+        private bool _cachedIsController;
+        private bool _cachedConnectedOwner;
+
+        private Action _onLateLateUpdate;
+        private int _lateLateUpdateHandle = PurrAction<Action>.InvalidHandle;
+
+        private bool _loggedBoneMismatch;
 
         protected override void OnDestroy()
         {
@@ -51,6 +76,9 @@ namespace PurrNet
 
         protected override void OnSpawned(bool asServer)
         {
+            _cachedConnectedOwner = hasConnectedOwner;
+            _cachedIsController = IsController(_ownerAuth);
+
             if (asServer)
                  networkManager.TryGetModule<DeltaModule>(out _serverDeltaModule, true);
             else networkManager.TryGetModule<DeltaModule>(out _clientDeltaModule, false);
@@ -60,11 +88,31 @@ namespace PurrNet
         {
             networkManager.TryGetModule<DeltaModule>(out _serverDeltaModule, true);
             networkManager.TryGetModule<DeltaModule>(out _clientDeltaModule, false);
+            _cachedIsController = IsController(_ownerAuth);
+        }
+
+        protected override void OnOwnerChanged(PlayerID? oldOwner, PlayerID? newOwner, bool asServer)
+        {
+            _cachedConnectedOwner = hasConnectedOwner;
+            _cachedIsController = IsController(_ownerAuth);
+        }
+
+        protected override void OnOwnerDisconnected(PlayerID ownerId)
+        {
+            _cachedConnectedOwner = false;
+            _cachedIsController = IsController(_ownerAuth);
+        }
+
+        protected override void OnOwnerReconnected(PlayerID ownerId)
+        {
+            _cachedConnectedOwner = hasConnectedOwner;
+            _cachedIsController = IsController(_ownerAuth);
         }
 
         private void OnEnable()
         {
-            UnityLatestUpdate.onLatestUpdate += LateLateUpdate;
+            _onLateLateUpdate ??= LateLateUpdate;
+            _lateLateUpdateHandle = UnityLatestUpdate.latestUpdate.Add(_onLateLateUpdate);
 
             if (!isSpawned)
                 return;
@@ -79,14 +127,15 @@ namespace PurrNet
 
         private void OnDisable()
         {
-            UnityLatestUpdate.onLatestUpdate -= LateLateUpdate;
+            UnityLatestUpdate.latestUpdate.RemoveAt(_lateLateUpdateHandle, _onLateLateUpdate);
+            _lateLateUpdateHandle = PurrAction<Action>.InvalidHandle;
         }
 
         private void GatherBones()
         {
             using var renderers = DisposableList<SkinnedMeshRenderer>.Create(32);
 
-            gameObject.GetComponentsInChildren<SkinnedMeshRenderer>(renderers.list);
+            gameObject.GetComponentsInChildren<SkinnedMeshRenderer>(true, renderers.list);
             _bones.Clear();
 
             for (var rIdx = 0; rIdx < renderers.list.Count; rIdx++)
@@ -124,11 +173,17 @@ namespace PurrNet
 
             for (var bIdx = 0; bIdx < _bones.Count; bIdx++)
             {
+                var posId = new NetworkBoneID(sceneId, nid, bIdx, BoneInfoType.Position);
+                var rotId = new NetworkBoneID(sceneId, nid, bIdx, BoneInfoType.Rotation);
+                var scaleId = new NetworkBoneID(sceneId, nid, bIdx, BoneInfoType.Scale);
                 _bonesInfo[bIdx] = new BoneInfo
                 {
-                    posHash = new NetworkBoneID(sceneId, nid, bIdx, BoneInfoType.Position),
-                    rotHash = new NetworkBoneID(sceneId, nid, bIdx, BoneInfoType.Rotation),
-                    scaleHash = new NetworkBoneID(sceneId, nid, bIdx, BoneInfoType.Scale)
+                    posHash = posId,
+                    rotHash = rotId,
+                    scaleHash = scaleId,
+                    posKeyHash = DeltaModule.GetKeyHash(posId),
+                    rotKeyHash = DeltaModule.GetKeyHash(rotId),
+                    scaleKeyHash = DeltaModule.GetKeyHash(scaleId),
                 };
                 _positions[bIdx] = new Interpolated<Vector3>(Vector3.Lerp, _sendDelta, _bones[bIdx].localPosition, _maxBufferSize, _minBufferSize);
                 _rotations[bIdx] = new Interpolated<Quaternion>(Quaternion.Slerp, _sendDelta, _bones[bIdx].localRotation, _maxBufferSize, _minBufferSize);
@@ -162,7 +217,7 @@ namespace PurrNet
             _accumulateTime += Time.unscaledDeltaTime;
 
             // if we dont control it, update from incoming data
-            if (!IsController(_ownerAuth))
+            if (!_cachedIsController)
             {
                 UpdateVisuals();
 
@@ -196,14 +251,15 @@ namespace PurrNet
 
         private void UpdateVisuals()
         {
+            float dt = Time.unscaledDeltaTime;
             for (var i = 0; i < _bones.Count; i++)
             {
                 var bone = _bones[i];
                 ref var boneInfo = ref _bonesInfo[i];
 
-                var locPos = _positions[i].Advance(Time.unscaledDeltaTime);
-                var locRot = _rotations[i].Advance(Time.unscaledDeltaTime);
-                var locScale = _scales[i].Advance(Time.unscaledDeltaTime);
+                var locPos = _positions[i].Advance(dt);
+                var locRot = _rotations[i].Advance(dt);
+                var locScale = _scales[i].Advance(dt);
 
                 bone.SetLocalPositionAndRotation(locPos, locRot);
                 bone.localScale = locScale;
@@ -214,11 +270,14 @@ namespace PurrNet
             }
         }
 
+        const int MAX_BONE_ENTRY_SIZE = 32; // worst-case single bone delta write ~26 bytes, rounded up
+        const int RPC_BONE_PARAMS_SIZE = 10; // startingIdx + count + BitPacker size prefix per bone RPC
+
         void SendTransforms(DeltaModule module, bool asServer)
         {
             if (asServer)
             {
-                bool checkOwner = _ownerAuth && hasConnectedOwner;
+                bool checkOwner = _ownerAuth && _cachedConnectedOwner;
                 var localPlayerCached = localPlayer;
                 for (var i = 0; i < observers.Count; i++)
                 {
@@ -227,16 +286,22 @@ namespace PurrNet
                     if ((checkOwner && observer == owner) || observer == localPlayerCached)
                         continue;
 
-                    SendPositions(observer, module);
-                    SendRotations(observer, module);
-                    SendScales(observer, module);
+                    int mtu = networkManager.GetMTU(observer, Channel.Unreliable, true) -
+                              RPCBatch.MAX_HEADER_SIZE - RPC_BONE_PARAMS_SIZE;
+
+                    SendPositions(observer, mtu, module);
+                    SendRotations(observer, mtu, module);
+                    SendScales(observer, mtu, module);
                 }
             }
             else if (!isServer)
             {
-                SendPositions(default, module);
-                SendRotations(default, module);
-                SendScales(default, module);
+                int mtu = networkManager.GetMTU(PlayerID.Server, Channel.Unreliable, false) -
+                          RPCBatch.MAX_HEADER_SIZE - RPC_BONE_PARAMS_SIZE;
+
+                SendPositions(default, mtu, module);
+                SendRotations(default, mtu, module);
+                SendScales(default, mtu, module);
             }
         }
 
@@ -291,35 +356,46 @@ namespace PurrNet
             );
         }
 
-        const int MTU = 1100;
+        private bool ValidateBoneRange(PackedUInt startingIdx, PackedUInt count)
+        {
+            if (startingIdx.value + count.value <= (uint)_bones.Count)
+                return true;
+
+            if (!_loggedBoneMismatch)
+            {
+                _loggedBoneMismatch = true;
+                PurrLogger.LogError(
+                    $"NetworkBones '{name}': bone set mismatch, peer synced bones {startingIdx.value}..{startingIdx.value + count.value} but only {_bones.Count} were gathered locally. " +
+                    "The rigs differ between peers (mesh import settings, stripped transforms or extraBones mismatch); ignoring their bone data.", this);
+            }
+
+            return false;
+        }
 
         delegate void Forward(PlayerID observer, PackedUInt startingIdx, PackedUInt count, BitPacker data);
         delegate bool Write(BitPacker packer, DeltaModule module, PlayerID player, BoneInfo info, ref PackedUInt cachedKey);
 
-        void Pack(PlayerID observer, DeltaModule module, Forward forward, Write write)
+        void Pack(PlayerID observer, int MTU, DeltaModule module, Forward forward, Write write)
         {
             using var packer = BitPackerPool.Get();
             PackedUInt cache = default;
             uint lastIndex = 0;
             bool writtenAny = false;
 
-            for (uint b = 0; b <_bones.Count; b++)
+            for (uint b = 0; b < _bones.Count; b++)
             {
-                writtenAny = write(packer, module, observer, _bonesInfo[b], ref cache) || writtenAny;
-
-                if (packer.positionInBytes > MTU)
+                if (writtenAny && packer.positionInBytes + MAX_BONE_ENTRY_SIZE > MTU)
                 {
-                    if (writtenAny)
-                    {
-                        var count = b - lastIndex + 1;
-                        forward(observer, lastIndex, count, packer);
-                    }
+                    var count = b - lastIndex;
+                    forward(observer, lastIndex, count, packer);
 
                     cache = default;
-                    lastIndex = b + 1;
+                    lastIndex = b;
                     packer.ResetPosition();
                     writtenAny = false;
                 }
+
+                writtenAny = write(packer, module, observer, _bonesInfo[b], ref cache) || writtenAny;
             }
 
             if (writtenAny && packer.positionInBits > 0)
@@ -329,13 +405,13 @@ namespace PurrNet
             }
         }
 
-        private void SendPositions(PlayerID observer, DeltaModule module) =>
-            Pack(observer, module, ForwardPositions, WritePosition);
+        private void SendPositions(PlayerID observer, int MTU, DeltaModule module) =>
+            Pack(observer, MTU, module, ForwardPositions, WritePosition);
 
         bool WritePosition(BitPacker packer, DeltaModule module, PlayerID player, BoneInfo info, ref PackedUInt cachedKey)
         {
             var newPos = CompressPosition(info.localPosition);
-            return module.Write(packer, player, info.posHash, newPos, ref cachedKey);
+            return module.Write<Vector3Int>(packer, player, info.posKeyHash, newPos, ref cachedKey);
         }
 
         private void ForwardPositions(PlayerID observer, PackedUInt startingIdx, PackedUInt count, BitPacker data)
@@ -350,7 +426,7 @@ namespace PurrNet
             RPCInfo info = default)
         {
             using (data)
-                ReadPositions(default, startingIdx, count, data, _clientDeltaModule);
+                ReadPositions(info.sender, startingIdx, count, data, _clientDeltaModule);
         }
 
         [ServerRpc(channel: Channel.Unreliable)]
@@ -369,6 +445,9 @@ namespace PurrNet
             if (_bonesInfo == null)
                 return;
 
+            if (!ValidateBoneRange(startingIdx, count))
+                return;
+
             uint lastIndex = startingIdx + count;
             PackedUInt cache = default;
 
@@ -376,18 +455,18 @@ namespace PurrNet
             {
                 var boneInfo = _bonesInfo[(int)i];
                 Vector3Int newPos = default;
-                module.Read(packer, boneInfo.posHash, sender, ref newPos, ref cache);
+                module.Read<Vector3Int>(packer, boneInfo.posKeyHash, sender, ref newPos, ref cache);
                 _positions[i].Add(DecompressPosition(newPos));
             }
         }
 
-        private void SendRotations(PlayerID observer, DeltaModule module)
-            => Pack(observer, module, ForwardRotations, WriteRotation);
+        private void SendRotations(PlayerID observer, int MTU, DeltaModule module)
+            => Pack(observer, MTU, module, ForwardRotations, WriteRotation);
 
         bool WriteRotation(BitPacker packer, DeltaModule module, PlayerID player, BoneInfo info, ref PackedUInt cachedKey)
         {
             var newRot = CompressEuler(info.localRotation.eulerAngles);
-            return module.Write(packer, player, info.rotHash, newRot, ref cachedKey);
+            return module.Write<Vector3Int>(packer, player, info.rotKeyHash, newRot, ref cachedKey);
         }
 
         private void ForwardRotations(PlayerID observer, PackedUInt startingIdx, PackedUInt count, BitPacker data)
@@ -421,6 +500,9 @@ namespace PurrNet
             if (_bonesInfo == null)
                 return;
 
+            if (!ValidateBoneRange(startingIdx, count))
+                return;
+
             uint lastIndex = startingIdx + count;
             PackedUInt cache = default;
 
@@ -428,18 +510,18 @@ namespace PurrNet
             {
                 var boneInfo = _bonesInfo[(int)i];
                 Vector3Int newRot = default;
-                module.Read(packer, boneInfo.rotHash, sender, ref newRot, ref cache);
+                module.Read<Vector3Int>(packer, boneInfo.rotKeyHash, sender, ref newRot, ref cache);
                 _rotations[i].Add(Quaternion.Euler(DecompressEuler(newRot)));
             }
         }
 
-        private void SendScales(PlayerID observer, DeltaModule module)
-            => Pack(observer, module, ForwardScales, WriteScale);
+        private void SendScales(PlayerID observer, int MTU, DeltaModule module)
+            => Pack(observer, MTU, module, ForwardScales, WriteScale);
 
         bool WriteScale(BitPacker packer, DeltaModule module, PlayerID player, BoneInfo info, ref PackedUInt cachedKey)
         {
             var newScale = CompressScale(info.localScale);
-            return module.Write(packer, player, info.scaleHash, newScale, ref cachedKey);
+            return module.Write<Vector3Int>(packer, player, info.scaleKeyHash, newScale, ref cachedKey);
         }
 
         private void ForwardScales(PlayerID observer, PackedUInt startingIdx, PackedUInt count, BitPacker data)
@@ -464,7 +546,6 @@ namespace PurrNet
             {
                 if (!_ownerAuth)
                     return;
-
                 ReadScales(info.sender, startingIdx, count, data, _serverDeltaModule);
             }
         }
@@ -474,6 +555,9 @@ namespace PurrNet
             if (_bonesInfo == null)
                 return;
 
+            if (!ValidateBoneRange(startingIdx, count))
+                return;
+
             uint lastIndex = startingIdx + count;
             PackedUInt cache = default;
 
@@ -481,7 +565,7 @@ namespace PurrNet
             {
                 var boneInfo = _bonesInfo[(int)i];
                 Vector3Int newScale = default;
-                module.Read(packer, boneInfo.scaleHash, sender, ref newScale, ref cache);
+                module.Read<Vector3Int>(packer, boneInfo.scaleKeyHash, sender, ref newScale, ref cache);
                 _scales[i].Add(DecompressScale(newScale));
             }
         }

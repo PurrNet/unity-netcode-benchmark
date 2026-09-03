@@ -1,10 +1,12 @@
 using System;
-using System.Threading.Tasks;
+using PurrNet.Packing;
+using PurrNet.Transports;
+using PurrNet.Utils;
 using UnityEngine;
 
 namespace PurrNet.Modules
 {
-    public class TickManager : INetworkModule, IUpdate
+    public class TickManager : INetworkModule, IUpdate, IPromoteToServerModule
     {
         /// <summary>
         /// Tracks local ticks starting from client connection to the server for synchronization.
@@ -18,7 +20,7 @@ namespace PurrNet.Modules
         {
             get
             {
-                if (_networkManager.isServer)
+                if (_asServer)
                     return localTick;
                 return _syncedTick;
             }
@@ -51,15 +53,7 @@ namespace PurrNet.Modules
         /// <summary>
         /// Gives the exact step of the tick, including the floating point.
         /// </summary>
-        public double localPreciseTick
-        {
-            get => localTick + floatingPoint;
-            private set
-            {
-                if (value <= 0) throw new ArgumentOutOfRangeException(nameof(value));
-                localPreciseTick = value;
-            }
-        }
+        public double localPreciseTick => localTick + floatingPoint;
 
         /// <summary>
         /// The amount of ticks per second
@@ -79,33 +73,112 @@ namespace PurrNet.Modules
         public event Action onPreTick, onTick, onPostTick;
         public event Action onReliablePreTick, onReliableTick, onReliablePostTick;
 
+        private readonly PurrAction<ITickListener> _tickListeners = new(static listener => listener.OnTick(), 256);
+
+        /// <summary>
+        /// Lower clamp for <see cref="tickPacingScale"/>.
+        /// </summary>
+        public const double minTickPacingScale = 0.98d;
+
+        /// <summary>
+        /// Upper clamp for <see cref="tickPacingScale"/>.
+        /// </summary>
+        public const double maxTickPacingScale = 1.02d;
+
+        private double _tickPacingScale = 1d;
+
+        /// <summary>
+        /// Wall-clock multiplier applied to the tick accumulation interval. Values below 1 fire
+        /// ticks slightly faster, values above 1 slightly slower. Clamped to
+        /// [<see cref="minTickPacingScale"/>, <see cref="maxTickPacingScale"/>]. The simulation
+        /// tick delta is unaffected; only the real time between ticks bends.
+        /// </summary>
+        public double tickPacingScale
+        {
+            get => _tickPacingScale;
+            set
+            {
+                if (double.IsNaN(value))
+                    return;
+
+                var clamped = Math.Clamp(value, minTickPacingScale, maxTickPacingScale);
+                if (clamped == _tickPacingScale)
+                    return;
+
+                // rebase the current fractional phase onto the new interval so the
+                // precise tick clocks stay monotonic across a scale change
+                var now = Time.unscaledTimeAsDouble;
+                var elapsed = now - _lastTickTime;
+                if (elapsed > 0)
+                    _lastTickTime = now - elapsed * (clamped / _tickPacingScale);
+
+                _tickPacingScale = clamped;
+            }
+        }
+
+        /// <summary>
+        /// Wall-clock time of the most recent tick boundary, in Time.unscaledTimeAsDouble seconds.
+        /// </summary>
+        public double lastTickTime => _lastTickTime;
+
         private readonly INetworkManager _networkManager;
+        private bool _asServer;
+
         private uint _syncedTick;
         private float _lastSyncTime = -99;
-        private float _lastTickTime;
+        private double _lastTickTime;
         private const int MaxTickPerFrame = 5;
 
-        public TickManager(int tickRate, INetworkManager nm)
+        private readonly BroadcastModule _broadcaster;
+
+        public TickManager(int tickRate, INetworkManager nm, BroadcastModule broadcaster, bool asServer)
         {
-            _lastTickTime = Time.unscaledTime;
+            _asServer = asServer;
+            _lastTickTime = Time.unscaledTimeAsDouble;
             _networkManager = nm;
             tickDelta = 1f / tickRate;
             tickDeltaDouble = 1d / tickRate;
+            _broadcaster = broadcaster;
             this.tickRate = tickRate;
         }
 
         public void Enable(bool asServer)
         {
+            if (asServer)
+            {
+                _broadcaster.Subscribe<TickManagerRequestLocalTick>(OnClientRequestedPing);
+            }
+            else
+            {
+                _broadcaster.Subscribe<TickManagerResponseLocalTick>(OnServerRespondedPing);
+            }
         }
 
         public void Disable(bool asServer)
         {
+            if (asServer)
+            {
+                _broadcaster.Unsubscribe<TickManagerRequestLocalTick>(OnClientRequestedPing);
+            }
+            else
+            {
+                _broadcaster.Unsubscribe<TickManagerResponseLocalTick>(OnServerRespondedPing);
+            }
         }
+
+        public void PromoteToServerModule()
+        {
+            Disable(false);
+            _asServer = true;
+            Enable(true);
+        }
+
+        public void PostPromoteToServerModule() { }
 
         public void Update()
         {
             HandleTick();
-            floatingPoint += Time.unscaledDeltaTime * tickRate;
+            floatingPoint = (Time.unscaledTimeAsDouble - _lastTickTime) / (tickDeltaDouble * _tickPacingScale);
 
             if (_networkManager.isServer || !_networkManager.isClient)
                 return;
@@ -125,12 +198,13 @@ namespace PurrNet.Modules
         private void HandleTick()
         {
             int ticksHandled = 0;
+            double interval = tickDeltaDouble * _tickPacingScale;
 
-            while (_lastTickTime + tickDelta <= Time.unscaledTime)
+            while (_lastTickTime + interval <= Time.unscaledTimeAsDouble)
             {
-                _lastTickTime += tickDelta;
+                _lastTickTime += interval;
+                _syncedTick++;
                 localTick++;
-                syncedTick++;
                 floatingPoint = 0;
 
                 bool triggerNormalTicks = ticksHandled < MaxTickPerFrame;
@@ -140,7 +214,10 @@ namespace PurrNet.Modules
                 onReliablePreTick?.Invoke();
 
                 if (triggerNormalTicks)
+                {
                     onTick?.Invoke();
+                    _tickListeners.Invoke();
+                }
                 onReliableTick?.Invoke();
 
                 if (triggerNormalTicks)
@@ -149,9 +226,16 @@ namespace PurrNet.Modules
 
                 ticksHandled++;
             }
-
-            /*if (ticksHandled >= MaxTickPerFrame)
-                _lastTickTime = Time.unscaledTime;*/
+        }
+        
+        public void AddTickListener(ITickListener listener)
+        {
+            _tickListeners.Add(listener);
+        }
+        
+        public void RemoveTickListener(ITickListener listener)
+        {
+            _tickListeners.Remove(listener);
         }
 
         /// <summary>
@@ -199,21 +283,16 @@ namespace PurrNet.Modules
             return time * tickRate;
         }
 
-        private async void HandleTickSync()
+        private void HandleTickSync()
         {
             try
             {
-                if (_networkManager.isOffline)
-                    return;
-
-                if (!_networkManager.HasModule<RPCModule>(_networkManager.isServer))
-                    return;
-
                 float requestSendTime = Time.unscaledTime;
-                var rawServerTick = await RPCClass.RequestServerTick();
-                rtt = Time.unscaledTime - requestSendTime;
-                float halfRTT = (float)rtt / 2;
-                syncedTick = rawServerTick + TimeToTick(halfRTT);
+
+                _broadcaster.SendToServer(new TickManagerRequestLocalTick
+                {
+                    requestTime = requestSendTime
+                });
             }
             catch
             {
@@ -221,13 +300,33 @@ namespace PurrNet.Modules
             }
         }
 
-        private static class RPCClass
+        private void OnServerRespondedPing(Connection conn, TickManagerResponseLocalTick data, bool asServer)
         {
-            [ServerRpc(requireOwnership: false)]
-            public static Task<uint> RequestServerTick(RPCInfo info = default)
-            {
-                return Task.FromResult(info.manager.tickModule.localTick);
-            }
+            rtt = Time.unscaledTime - data.requestTime;
+            float halfRTT = (float)rtt / 2;
+            syncedTick = data.tick + TimeToTick(halfRTT);
         }
+
+        private void OnClientRequestedPing(Connection conn, TickManagerRequestLocalTick data, bool asServer)
+        {
+            var packet = new TickManagerResponseLocalTick
+            {
+                requestTime = data.requestTime,
+                tick = localTick
+            };
+
+            _broadcaster.Send(conn, packet);
+        }
+    }
+
+    public struct TickManagerRequestLocalTick : IPackedAuto
+    {
+        public float requestTime;
+    }
+
+    public struct TickManagerResponseLocalTick : IPackedAuto
+    {
+        public float requestTime;
+        public uint tick;
     }
 }

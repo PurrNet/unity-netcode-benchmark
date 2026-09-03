@@ -13,14 +13,30 @@ namespace PurrNet
 
         readonly List<PlayerID> _reconcilePlayers = new List<PlayerID>();
 
-        protected override void OnObserverAdded(PlayerID player)
+        // set when a reconcile went out while the animator was disabled and thus
+        // couldn't include animation state (Play/layer weights); once the animator
+        // is active again a full reconcile is re-sent
+        private bool _needsStateReconcile;
+
+        protected override void OnObserverAdded(PlayerID player, bool isSpawner)
         {
-            Reconcile(player);
+            if (isSpawner)
+                return;
+
+            using var data = NetAnimatorActionBatch.CreateReconcile(
+                _dontSyncHashes, _animator, false, _boolValues, _floatValues, _intValues);
+            ReconcileState(player, data);
             _reconcilePlayers.Add(player);
+
+            if (_animator && !_animator.isActiveAndEnabled)
+                _needsStateReconcile = true;
         }
 
         public void OnTick(float delta)
         {
+            ApplyPendingAnimatorParameterState();
+            TryCatchUpStateReconcile();
+
             if (!IsController(_ownerAuth))
             {
                 if (_dirty.Count > 0)
@@ -28,9 +44,26 @@ namespace PurrNet
                 return;
             }
 
-            if (_autoSyncParameters)
-                CheckForParameterChanges();
-            SendDirtyActions();
+            FlushImmediately();
+        }
+
+        private void TryCatchUpStateReconcile()
+        {
+            if (!_needsStateReconcile || !_animator || !_animator.isActiveAndEnabled)
+                return;
+
+            _needsStateReconcile = false;
+
+            if (IsController(_ownerAuth))
+            {
+                Reconcile();
+            }
+            else if (isServer)
+            {
+                using var data = NetAnimatorActionBatch.CreateReconcile(
+                    _dontSyncHashes, _animator, false, _boolValues, _floatValues, _intValues);
+                ApplyActionsOnObservers(data);
+            }
         }
 
         /// <summary>
@@ -42,7 +75,11 @@ namespace PurrNet
             if (!IsController(_ownerAuth))
                 return;
 
-            using var data = NetAnimatorActionBatch.CreateReconcile(_dontSyncHashes, _animator, isIk);
+            if (!isIk && _animator && !_animator.isActiveAndEnabled)
+                _needsStateReconcile = true;
+
+            using var data = NetAnimatorActionBatch.CreateReconcile(
+                _dontSyncHashes, _animator, isIk, _boolValues, _floatValues, _intValues);
 
             if (isServer)
             {
@@ -66,7 +103,11 @@ namespace PurrNet
             if (!IsController(_ownerAuth))
                 return;
 
-            using var data = NetAnimatorActionBatch.CreateReconcile(_dontSyncHashes, _animator, isIk);
+            if (!isIk && _animator && !_animator.isActiveAndEnabled)
+                _needsStateReconcile = true;
+
+            using var data = NetAnimatorActionBatch.CreateReconcile(
+                _dontSyncHashes, _animator, isIk, _boolValues, _floatValues, _intValues);
 
             if (isServer)
             {
@@ -83,7 +124,8 @@ namespace PurrNet
             if (!IsController(_ownerAuth))
                 return;
 
-            using var data = NetAnimatorActionBatch.CreateTimeReconcile(_dontSyncHashes, _animator);
+            using var data = NetAnimatorActionBatch.CreateTimeReconcile(
+                _dontSyncHashes, _animator, _boolValues, _floatValues, _intValues);
 
             if (isServer)
             {
@@ -107,47 +149,69 @@ namespace PurrNet
                 {
                     case NetAnimatorAction.SetBool:
                     {
-                        RemovePast(i, action, (a, b)
+                        i -= RemovePast(i, action, (a, b)
                             => a._bool.nameHash == b._bool.nameHash);
                         break;
                     }
                     case NetAnimatorAction.SetFloat:
                     {
-                        RemovePast(i, action, (a, b)
+                        i -= RemovePast(i, action, (a, b)
                             => a._float.nameHash == b._float.nameHash);
                         break;
                     }
                     case NetAnimatorAction.SetInteger:
                     {
-                        RemovePast(i, action, (a, b)
+                        i -= RemovePast(i, action, (a, b)
                             => a._integer.nameHash == b._integer.nameHash);
                         break;
                     }
                     case NetAnimatorAction.SetTrigger:
                     {
-                        RemovePast(i, action, (a, b)
+                        i -= RemovePast(i, action, (a, b)
                             => a._trigger.nameHash == b._trigger.nameHash);
+                        break;
+                    }
+                    case NetAnimatorAction.SetLayerWeight:
+                    {
+                        i -= RemovePast(i, action, (a, b)
+                            => a._setLayerWeight.layerIndex.value == b._setLayerWeight.layerIndex.value);
                         break;
                     }
                     case NetAnimatorAction.SetSpeed:
                     {
-                        RemovePast(i, action, (_, _) => true);
+                        i -= RemovePast(i, action, (_, _) => true);
                         break;
                     }
                 }
             }
         }
 
-        private void RemovePast(int i, NetAnimatorRPC action, Func<NetAnimatorRPC, NetAnimatorRPC, bool> match)
+        private int RemovePast(int i, NetAnimatorRPC action, Func<NetAnimatorRPC, NetAnimatorRPC, bool> match)
         {
+            int removed = 0;
             for (var j = i - 1; j >= 0; j--)
             {
                 if (_dirty[j].type == action.type && match(_dirty[j], action))
                 {
-                    _dirty.RemoveAt(i);
-                    break;
+                    _dirty.RemoveAt(j);
+                    removed++;
                 }
             }
+
+            return removed;
+        }
+
+        /// <summary>
+        /// Send pending actions.
+        /// (if auto sync enabled it gathers changed params first)
+        /// </summary>
+        public void FlushImmediately()
+        {
+            ApplyPendingAnimatorParameterState();
+
+            if (_autoSyncParameters)
+                CheckForParameterChanges();
+            SendDirtyActions();
         }
 
         private void SendDirtyActions()
@@ -249,17 +313,67 @@ namespace PurrNet
 
             for (var i = 0; i < actions.actions.Count; i++)
             {
-                bool isIk = actions.actions[i].type is
+                var action = actions.actions[i];
+
+                if (!ResolveParamRef(ref action))
+                    continue;
+
+                bool hasCachedValue = CacheActionState(action);
+                if (!canApplyAnimatorParameters && IsCachedStateAction(action.type))
+                {
+                    if (hasCachedValue)
+                        _hasPendingAnimatorParameterState = true;
+                    else if (action.type is NetAnimatorAction.SetTrigger or NetAnimatorAction.ResetTrigger)
+                        QueuePendingTrigger(action);
+                    continue;
+                }
+
+                bool isIk = action.type is
                     NetAnimatorAction.SetIKPosition or NetAnimatorAction.SetIKRotation or
                     NetAnimatorAction.SetIKHintPosition or NetAnimatorAction.SetLookAtPosition or
                     NetAnimatorAction.SetBoneLocalRotation or NetAnimatorAction.SetIKHintPositionWeight or
                     NetAnimatorAction.SetIKPositionWeight or NetAnimatorAction.SetIKRotationWeight or
-                    NetAnimatorAction.SetBodyPosition or NetAnimatorAction.SetBodyRotation;
+                    NetAnimatorAction.SetBodyPosition or NetAnimatorAction.SetBodyRotation or
+                    NetAnimatorAction.SetLookAtWeight;
 
                 if (!isIk)
-                    actions.actions[i].Apply(_animator);
-                else _ikActions.Add(actions.actions[i]);
+                    action.Apply(_animator);
+                else _ikActions.Add(action);
             }
+        }
+
+        private bool ResolveParamRef(ref NetAnimatorRPC action)
+        {
+            switch (action.type)
+            {
+                case NetAnimatorAction.SetBool:
+                    return ResolveParamHash(ref action._bool.nameHash, action._bool.paramIndexPlusOne);
+                case NetAnimatorAction.SetFloat:
+                    return ResolveParamHash(ref action._float.nameHash, action._float.paramIndexPlusOne);
+                case NetAnimatorAction.SetInteger:
+                    return ResolveParamHash(ref action._integer.nameHash, action._integer.paramIndexPlusOne);
+                case NetAnimatorAction.SetTrigger:
+                    return ResolveParamHash(ref action._trigger.nameHash, action._trigger.paramIndexPlusOne);
+                case NetAnimatorAction.ResetTrigger:
+                    return ResolveParamHash(ref action._resetTrigger.nameHash, action._resetTrigger.paramIndexPlusOne);
+                default:
+                    return true;
+            }
+        }
+
+        private bool ResolveParamHash(ref int nameHash, int paramIndexPlusOne)
+        {
+            if (paramIndexPlusOne <= 0)
+                return true;
+
+            var parameters = GetCachedParameters();
+            int index = paramIndexPlusOne - 1;
+
+            if (index >= parameters.Length)
+                return false;
+
+            nameHash = parameters[index].nameHash;
+            return true;
         }
     }
 }

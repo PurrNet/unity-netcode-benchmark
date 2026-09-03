@@ -73,16 +73,22 @@ namespace PurrNet.Codegen
 
         public static TypeReference Import(this ModuleDefinition module, TypeReference member)
         {
+            if (member != null && member.Module == module)
+                return member;
             return module.ImportReference(member);
         }
 
         public static MethodReference Import(this ModuleDefinition module, MethodReference member)
         {
+            if (member != null && member.Module == module)
+                return member;
             return module.ImportReference(member);
         }
 
         public static FieldReference Import(this ModuleDefinition module, FieldReference member)
         {
+            if (member != null && member.Module == module)
+                return member;
             return module.ImportReference(member);
         }
 
@@ -136,6 +142,21 @@ namespace PurrNet.Codegen
             }
 
             return null;
+        }
+
+        public static bool TryGetMethod(this TypeDefinition type, string name, bool isGeneric, out MethodDefinition result)
+        {
+            for (var i = 0; i < type.Methods.Count; i++)
+            {
+                if (type.Methods[i].Name == name && type.Methods[i].HasGenericParameters == isGeneric)
+                {
+                    result = type.Methods[i];
+                    return true;
+                }
+            }
+
+            result = null;
+            return false;
         }
 
         public static MethodDefinition GetMethod(this TypeDefinition type, string name, bool isGeneric = false)

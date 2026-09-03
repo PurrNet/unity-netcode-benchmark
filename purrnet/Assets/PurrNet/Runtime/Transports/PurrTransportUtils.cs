@@ -18,7 +18,9 @@ namespace PurrNet.Transports
         public string apiEndpoint;
         public string host;
         public int restPort;
+        [Obsolete("Use `udpPortV2` instead.")]
         public int udpPort;
+        public int udpPortV2;
         public int webSocketsPort;
         public string region;
     }
@@ -37,7 +39,9 @@ namespace PurrNet.Transports
         public bool ssl;
         public string secret;
         public int port;
+        [Obsolete]
         public int udpPort;
+        public int udpPortV2;
     }
 
     [UsedImplicitly]
@@ -48,7 +52,9 @@ namespace PurrNet.Transports
         public string secret;
         public string host;
         public int port;
+        [Obsolete]
         public int udpPort;
+        public int udpPortV2;
     }
 
     public static class PurrTransportUtils
@@ -73,7 +79,7 @@ namespace PurrNet.Transports
             for (var i = 0; i < count; i++)
             {
                 if (cts is { IsCancellationRequested: true })
-                    return Task.FromCanceled<T>(cts.Token).Result;
+                    throw new OperationCanceledException(cts.Token);
 
                 if (i > 0)
                     await UnityLatestUpdate.WaitSeconds(1f);
@@ -95,6 +101,19 @@ namespace PurrNet.Transports
         internal static async Task<ClientJoinInfo> Join(string server, string roomName, CancellationTokenSource cts)
         {
             return await Retry<ClientJoinInfo>(10, () => ActualClientJoinInfo(server, roomName), cts);
+        }
+
+        internal static async Task<bool> RoomExistsAsync(string server, string roomName)
+        {
+            try
+            {
+                await ActualClientJoinInfo(server, roomName);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private static async Task<ClientJoinInfo> ActualClientJoinInfo(string server, string roomName)
@@ -156,6 +175,18 @@ namespace PurrNet.Transports
             return await Retry<float>(10, () => ActualPing(url));
         }
 
+        /// <summary>
+        /// HTTP round trip to a relay's API endpoint in milliseconds.
+        /// Useful for comparing regions without allocating or joining a room.
+        /// The first request warms up the connection so the TLS handshake is not counted.
+        /// </summary>
+        public static async Task<float> PingRelayAsync(RelayServer server)
+        {
+            var url = $"{server.apiEndpoint}/ping";
+            await ActualPing(url);
+            return await ActualPing(url) * 1000f;
+        }
+
         private static async Task<float> ActualPing(string url)
         {
 #if UNITY_WEB
@@ -184,7 +215,7 @@ namespace PurrNet.Transports
 
             string master = $"{server}servers";
             var response = await Get(master);
-            if (response == null)
+            if (string.IsNullOrEmpty(response))
                 return default;
             return JsonUtility.FromJson<Relayers>(response);
         }

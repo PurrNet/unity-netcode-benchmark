@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using PurrNet.Packing;
 
 namespace PurrNet.Transports
@@ -84,10 +85,11 @@ namespace PurrNet.Transports
 
         public override string ToString()
         {
-            string str = $"LENGTH: {length} DATA: ";
+            var sb = new StringBuilder(16 + length * 3);
+            sb.Append("LENGTH: ").Append(length).Append(" DATA: ");
             for (int i = 0; i < length; i++)
-                str += data[i + offset].ToString("X2") + " ";
-            return str;
+                sb.Append(data[i + offset].ToString("X2")).Append(' ');
+            return sb.ToString();
         }
 
         public bool Equals(ByteData other)
@@ -102,6 +104,72 @@ namespace PurrNet.Transports
             }
 
             return true;
+        }
+    }
+
+    /// <summary>
+    /// Defines what happens when a packet exceeds the MTU on an unreliable channel.
+    /// </summary>
+    public enum MTUExceededBehaviour : byte
+    {
+        /// <summary>
+        /// Automatically upgrade the channel to ReliableOrdered so the packet is
+        /// fragmented and delivered reliably. Logs a warning.
+        /// </summary>
+        UpgradeToReliable = 0,
+
+        /// <summary>
+        /// Drop the packet and log a warning. Preserves unreliable semantics.
+        /// </summary>
+        Drop = 1,
+
+        /// <summary>
+        /// Split the message into unreliable MTU-sized fragments. The message is only
+        /// delivered when every fragment arrives; missing fragments are not retransmitted.
+        /// </summary>
+        Fragment = 2
+    }
+
+    /// <summary>
+    /// Per-RPC override for what happens when the RPC exceeds the MTU on an unreliable channel.
+    /// Ignored on <see cref="Channel.UnreliableSequenced"/>: sequencing is a channel-wide
+    /// property, so the NetworkManager setting governs that whole channel.
+    /// </summary>
+    public enum MTUBehaviour : byte
+    {
+        /// <summary>
+        /// Follow the behaviour configured on the NetworkManager.
+        /// </summary>
+        NetworkManager = 0,
+
+        /// <inheritdoc cref="MTUExceededBehaviour.UpgradeToReliable"/>
+        UpgradeToReliable = 1,
+
+        /// <inheritdoc cref="MTUExceededBehaviour.Drop"/>
+        Drop = 2,
+
+        /// <inheritdoc cref="MTUExceededBehaviour.Fragment"/>
+        Fragment = 3
+    }
+
+    public static class MTUBehaviourExtensions
+    {
+        public static MTUExceededBehaviour Resolve(this MTUBehaviour value, MTUExceededBehaviour fallback)
+        {
+            switch (value)
+            {
+                case MTUBehaviour.UpgradeToReliable: return MTUExceededBehaviour.UpgradeToReliable;
+                case MTUBehaviour.Drop: return MTUExceededBehaviour.Drop;
+                case MTUBehaviour.Fragment: return MTUExceededBehaviour.Fragment;
+                default: return fallback;
+            }
+        }
+
+        public static MTUExceededBehaviour? AsOverride(this MTUBehaviour value)
+        {
+            if (value == MTUBehaviour.NetworkManager)
+                return null;
+            return value.Resolve(default);
         }
     }
 
@@ -170,6 +238,28 @@ namespace PurrNet.Transports
                 _ => throw new ArgumentOutOfRangeException(nameof(channel), channel, null)
             };
         }
+
+        /// <summary>
+        /// Round trip time in milliseconds for a connection, or -1 when the transport
+        /// has not measured it yet or does not support it.
+        /// On the client side the connection argument is ignored.
+        /// </summary>
+        int GetRoundTripTime(Connection conn, bool asServer)
+        {
+            return -1;
+        }
+
+        /// <summary>
+        /// Whether <see cref="GetRoundTripTime"/> can ever return a value on this transport.
+        /// When false a ping reports connect time only instead of waiting for a measurement.
+        /// </summary>
+        bool measuresRoundTripTime => false;
+
+        /// <summary>
+        /// Short human readable description of the link the local client is currently using,
+        /// for example which relay region or whether it is a direct P2P session. Null when the transport has nothing to add.
+        /// </summary>
+        string clientLinkDescription => null;
 
         bool shouldServerSendKeepAlive => false;
 

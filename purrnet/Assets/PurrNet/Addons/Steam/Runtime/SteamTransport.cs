@@ -9,11 +9,13 @@
 using System;
 using System.Collections.Generic;
 using PurrNet.Transports;
+using PurrConnectionState = PurrNet.Transports.ConnectionState;
 using UnityEngine;
 
 namespace PurrNet.Steam
 {
     [DefaultExecutionOrder(-100)]
+    [AddComponentMenu("PurrNet/Transport/Steam Transport")]
     public partial class SteamTransport : GenericTransport, ITransport
     {
         [Header("Server Settings")] [SerializeField]
@@ -56,6 +58,15 @@ namespace PurrNet.Steam
             return false;
         }
 
+        public bool measuresRoundTripTime => true;
+
+        public int GetRoundTripTime(Connection conn, bool asServer)
+        {
+            if (asServer)
+                return _server?.GetRoundTripTime(conn.connectionId) ?? -1;
+            return _client?.GetRoundTripTime() ?? -1;
+        }
+
         public int GetMTU(Connection target, Channel channel, bool asServer)
         {
             return channel switch
@@ -78,9 +89,9 @@ namespace PurrNet.Steam
 
         public IReadOnlyList<Connection> connections => _connections;
 
-        private ConnectionState _listenerState = ConnectionState.Disconnected;
+        private PurrConnectionState _listenerState = PurrConnectionState.Disconnected;
 
-        public ConnectionState listenerState
+        public PurrNet.Transports.ConnectionState listenerState
         {
             get => _listenerState;
             private set
@@ -93,9 +104,9 @@ namespace PurrNet.Steam
             }
         }
 
-        private ConnectionState _clientState = ConnectionState.Disconnected;
+        private PurrConnectionState _clientState = PurrConnectionState.Disconnected;
 
-        public ConnectionState clientState
+        public PurrNet.Transports.ConnectionState clientState
         {
             get => _clientState;
             private set
@@ -119,11 +130,13 @@ namespace PurrNet.Steam
 
         protected override void StartClientInternal()
         {
+            SetTelemetryAppId();
             Connect(_address, _serverPort);
         }
 
         protected override void StartServerInternal()
         {
+            SetTelemetryAppId();
             Listen(_serverPort);
         }
 
@@ -132,9 +145,10 @@ namespace PurrNet.Steam
             if (_server != null)
                 StopListening();
 
-            listenerState = ConnectionState.Connecting;
+            listenerState = PurrConnectionState.Connecting;
 
             _server = new SteamServer();
+            _connections.Clear();
 
             if (_peerToPeer)
                 _server.ListenP2P(_dedicatedServer);
@@ -142,12 +156,12 @@ namespace PurrNet.Steam
 
             if (_server.listening)
             {
-                listenerState = ConnectionState.Connected;
+                listenerState = PurrConnectionState.Connected;
             }
             else
             {
-                listenerState = ConnectionState.Disconnecting;
-                listenerState = ConnectionState.Disconnected;
+                listenerState = PurrConnectionState.Disconnecting;
+                listenerState = PurrConnectionState.Disconnected;
             }
 
             _server.onDataReceived += OnServerData;
@@ -174,10 +188,10 @@ namespace PurrNet.Steam
 
         public void StopListening()
         {
-            if (listenerState != ConnectionState.Disconnected)
-                listenerState = ConnectionState.Disconnecting;
+            if (listenerState != PurrConnectionState.Disconnected)
+                listenerState = PurrConnectionState.Disconnecting;
             _server?.Stop();
-            listenerState = ConnectionState.Disconnected;
+            listenerState = PurrConnectionState.Disconnected;
             _server = null;
         }
 
@@ -202,12 +216,12 @@ namespace PurrNet.Steam
             onDataReceived?.Invoke(new Connection(-1), data, false);
         }
 
-        private void OnClientStateChanged(ConnectionState state)
+        private void OnClientStateChanged(PurrConnectionState state)
         {
-            if (state == ConnectionState.Connected)
+            if (state == PurrConnectionState.Connected)
                 onConnected?.Invoke(new Connection(0), false);
 
-            if (state == ConnectionState.Disconnected)
+            if (state == PurrConnectionState.Disconnected)
                 onDisconnected?.Invoke(new Connection(0), DisconnectReason.ClientRequest, false);
 
             clientState = state;
@@ -243,7 +257,7 @@ namespace PurrNet.Steam
             if (_server == null)
                 return;
 
-            if (listenerState is not ConnectionState.Connected)
+            if (listenerState is not PurrConnectionState.Connected)
                 return;
 
             if (!target.isValid)
@@ -273,10 +287,37 @@ namespace PurrNet.Steam
             _client?.ReceiveMessages();
         }
 
+        public void UnityUpdate(float delta)
+        {
+            ReceiveMessages(delta);
+        }
+
         public void SendMessages(float delta)
         {
             _server?.SendMessages();
             _client?.SendMessages();
         }
+        
+        public ulong GetSteamID(Connection conn)
+        {
+            return _server?.GetSteamID(conn.connectionId) ?? 0;
+        }
+
+#if STEAMWORKS_NET_PACKAGE && !DISABLESTEAMWORKS
+        void SetTelemetryAppId()
+        {
+            try
+            {
+                var appId = Steamworks.SteamUtils.GetAppID();
+                PurrInternalTelemetry.TransportMetadata["steam_app_id"] = appId.m_AppId.ToString();
+            }
+            catch
+            {
+                // Steamworks may not be initialized
+            }
+        }
+#else
+        void SetTelemetryAppId() { }
+#endif
     }
 }
