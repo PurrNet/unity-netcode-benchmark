@@ -32,7 +32,15 @@ on:
       procs_per_loadgen:
         description: "Client processes per loadgen runner"
         required: true
-        default: "12"
+        default: "24"
+      procs_last_loadgen:
+        description: "Client processes on the last loadgen runner (empty = same as the others)"
+        required: false
+        default: ""
+      loadgen_runner:
+        description: "runs-on label for loadgen runners (empty = same as runner)"
+        required: false
+        default: "blacksmith-8vcpu-ubuntu-2404"
       bench_seconds:
         description: "Steady-state measurement window per test, seconds"
         required: true
@@ -76,6 +84,14 @@ on:
       procs_per_loadgen:
         type: string
         required: true
+      procs_last_loadgen:
+        type: string
+        required: false
+        default: ""
+      loadgen_runner:
+        type: string
+        required: false
+        default: ""
       bench_seconds:
         type: string
         required: true
@@ -131,6 +147,8 @@ jobs:
       measured_matrix: ${{ steps.gen.outputs.measured_matrix }}
       loadgen_matrix: ${{ steps.gen.outputs.loadgen_matrix }}
       player: ${{ steps.gen.outputs.player }}
+      procs_last: ${{ steps.gen.outputs.procs_last }}
+      loadgen_runner: ${{ steps.gen.outputs.loadgen_runner }}
     steps:
       - id: gen
         run: |
@@ -138,8 +156,18 @@ jobs:
           MEASURED=${{ inputs.measured_clients }}
           LG_JOBS=${{ inputs.loadgen_jobs }}
           LG_PROCS=${{ inputs.procs_per_loadgen }}
-          TOTAL=$(( MEASURED + LG_JOBS * LG_PROCS ))
+          LG_LAST="${{ inputs.procs_last_loadgen }}"
+          [ -z "$LG_LAST" ] || [ "$LG_LAST" -le 0 ] && LG_LAST=$LG_PROCS
+          if [ "$LG_JOBS" -gt 0 ]; then
+            TOTAL=$(( MEASURED + (LG_JOBS - 1) * LG_PROCS + LG_LAST ))
+          else
+            TOTAL=$MEASURED
+          fi
           echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
+          echo "procs_last=$LG_LAST" >> "$GITHUB_OUTPUT"
+          LG_RUNNER="${{ inputs.loadgen_runner }}"
+          [ -z "$LG_RUNNER" ] && LG_RUNNER="${{ inputs.runner }}"
+          echo "loadgen_runner=$LG_RUNNER" >> "$GITHUB_OUTPUT"
           if [ -n "${{ inputs.player_artifact }}" ]; then
             echo "player=${{ inputs.player_artifact }}" >> "$GITHUB_OUTPUT"
           else
@@ -367,7 +395,7 @@ jobs:
     name: Loadgen ${{ matrix.idx }}
     needs: [build, prep]
     if: ${{ !cancelled() && needs.prep.result == 'success' && needs.build.result != 'failure' && needs.prep.outputs.loadgen_matrix != '[]' }}
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ needs.prep.outputs.loadgen_runner }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -404,9 +432,15 @@ jobs:
             NET_ARGS=(-serverHost "$SERVER_IP" -port "$BENCH_PORT" -netIface tailscale0)
           fi
 
+          PROCS=${{ inputs.procs_per_loadgen }}
+          if [ "${{ matrix.idx }}" -eq "${{ inputs.loadgen_jobs }}" ]; then
+            PROCS=${{ needs.prep.outputs.procs_last }}
+          fi
+          echo "Starting $PROCS client processes on this runner ($(nproc) vCPU)"
+
           PIDS=()
           declare -A PROC_BY_PID=()
-          for p in $(seq 1 ${{ inputs.procs_per_loadgen }}); do
+          for p in $(seq 1 "$PROCS"); do
             # Concurrent xvfb-run -a calls can pick the same display; give each a private one.
             DISPLAY_NUM=$((100 + p))
             timeout --signal=TERM --kill-after=10s 15m \

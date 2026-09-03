@@ -64,8 +64,30 @@ How a run works (same design as PurrNet's own benchmark CI):
 
 Dispatch inputs: `netcodes` (default all five), `sizes` (default `10,25,50,100`),
 `bench_seconds` (20), `bench_objects` (100), `profiling` (development builds add a
-CPU-by-profiler-marker table), `runner` (`runs-on` label, see below) and `region`
-(Photon Cloud region for Fusion).
+CPU-by-profiler-marker table), `runner` (`runs-on` label, see below), `region`
+(Photon Cloud region for Fusion), plus the parallelism knobs below.
+
+### Parallelism and run time
+
+Runs are laid out size-major: with `max_parallel` (default 5) all selected netcodes run side by
+side at 10 connections, then at 25, and so on. Each run uses 1 server runner,
+`measured_clients` (default 10) single-process client runners, and enough `loadgen_runner`
+machines (default `blacksmith-8vcpu-ubuntu-2404`, `loadgen_procs` = 24 client processes each,
+3 per vCPU) to reach the connection count, so a 100-connection run is 15 runners and the full
+five-netcode matrix peaks at about 75 runners. The whole default matrix takes roughly 35 to 40
+minutes wall time including builds.
+
+Two limits to keep in mind when raising parallelism:
+
+- **Tailscale devices.** Every runner joins the tailnet as an ephemeral device for the duration
+  of its job, and ephemeral nodes linger for a few minutes after a job ends. The Personal plan
+  allows 100 devices; if runs start failing at the "Connect Tailscale" step, lower `max_parallel`
+  or move to a plan with a higher device limit.
+- **Blacksmith concurrency** is a per-plan vCPU budget shown in the Blacksmith dashboard; jobs
+  beyond it queue rather than fail, which shows up as servers waiting for runners.
+
+For a quick reference run while iterating on one netcode use something like
+`netcodes: purrnet`, `sizes: 10,100`, `bench_seconds: 10`. That finishes in about 12 minutes.
 
 ### What is measured
 
