@@ -43,9 +43,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Blacksmith's drop-in cache (colocated with its runners, larger allowance than GitHub's 10 GB);
+      # falls back to GitHub's cache backend automatically when the job runs on a GitHub-hosted runner.
       - name: Restore Library cache
         id: cache-library
-        uses: actions/cache/restore@v4
+        uses: useblacksmith/cache/restore@v5
         with:
           path: ${{ inputs.netcode }}/Library
           key: Library-${{ inputs.netcode }}-${{ inputs.profiling && 'dev' || 'rel' }}-${{ hashFiles(format('{0}/Assets/**', inputs.netcode), format('{0}/Packages/**', inputs.netcode), format('{0}/ProjectSettings/**', inputs.netcode), 'Shared/**') }}
@@ -72,7 +74,7 @@ jobs:
 
       - name: Save Library cache
         if: always() && steps.cache-library.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: useblacksmith/cache/save@v5
         with:
           path: ${{ inputs.netcode }}/Library
           key: ${{ steps.cache-library.outputs.cache-primary-key }}
