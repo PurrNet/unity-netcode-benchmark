@@ -197,7 +197,7 @@ const NAMES = { purrnet: "PurrNet", fishnet: "FishNet", mirror: "Mirror", ngo: "
 const TESTS = ["MoveY", "MoveAllAxis", "MoveWander", "SendRPC", "Static", "SpawnChurn", "ClientInput", "SyncVars"];
 const TEST_DESC = {
   MoveY: "N objects, sine on Y", MoveAllAxis: "N objects, sine on a random axis", MoveWander: "N objects, wander (position + rotation)",
-  SendRPC: "N objects, 1 observers RPC (int) per tick", Static: "N objects, never touched", SpawnChurn: "N alive, N/50 despawned + spawned per tick",
+  SendRPC: "N objects, 1 observers RPC (float) per tick", Static: "N objects, never touched", SpawnChurn: "N alive, N/50 despawned + spawned per tick",
   ClientInput: "1 object, each client sends 1 RPC per tick", SyncVars: "N objects, 1 synced field changed per tick"
 };
 const kb = v => v == null ? null : v / 1024;
@@ -390,6 +390,10 @@ function buildNotes() {
     else if (r.connections !== s)
       items.push(`${NAMES[n]} at ${s}: ran with ${r.connections} clients`);
     if (r.meta.serverError) items.push(`${NAMES[n]} at ${s}: server reported ${r.meta.serverError}`);
+    // A test measured on fewer clients than connected means some clients never observed its
+    // spawn/despawn transition (state delivery lagged); the average still stands, on fewer samples.
+    const short = TESTS.filter(t => r.clients[t] && r.clients[t].n < r.meta.measuredClients).map(t => `${t} (${r.clients[t].n}/${r.meta.measuredClients})`);
+    if (short.length) items.push(`${NAMES[n]} at ${s}: measured on fewer clients than connected: ${short.join(", ")}`);
   }));
   const ul = document.getElementById("warnings");
   ul.innerHTML = items.map(t => `<li>${t}</li>`).join("");

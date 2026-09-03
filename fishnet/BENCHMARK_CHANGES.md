@@ -97,11 +97,18 @@ Profiler-marker prefixes used for the development-build CPU table: `FishNet`, `T
 - `SinMoveYBehaviour` skips movement while `BenchRegistry.MovementEnabled` is false (Static and
   SpawnChurn tests reuse the MoveY prefab).
 - `SendRPCBehaviour` drives three tests depending on `BenchRegistry.Mode`:
-  - `Broadcast` (SendRPC): unchanged, one `[ObserversRpc]` with one `int` per tick.
-  - `ClientInput`: clients call `[ServerRpc(RequireOwnership = false)] ServerInput(Vector3, int)`
+  - `Broadcast` (SendRPC): one `[ObserversRpc]` with one `float` per tick (the upstream benchmark
+    sent an `int`; see below).
+  - `ClientInput`: clients call `[ServerRpc(RequireOwnership = false)] ServerInput(Vector3, float)`
     at 20 Hz from `Update`; the server counts arrivals.
-  - `SyncVars`: the server changes one of four `SyncVar<T>` fields (`int`, `int`, `float`,
+  - `SyncVars`: the server changes one of four `SyncVar<T>` fields (`float`, `float`, `float`,
     `Vector3`) per tick.
+- **Why floats.** FishNet's writer varint-packs integers automatically (an `int` in
+  [-10000, 10000] costs 2 to 3 bytes), while Mirror, NGO and Fusion write 4 bytes and PurrNet only
+  packs when the field is declared `PackedInt`. The upstream PurrNet project had switched its RPC
+  argument to `PackedInt` to match FishNet, but its SyncVars were still plain `int`. Floats are
+  4 bytes on every netcode, so every project now sends floats and the RPC / SyncVar tests compare
+  message framing and batching rather than integer encoding.
 
 ## 6. Runtime behaviour the harness overrides at run time (no file change)
 

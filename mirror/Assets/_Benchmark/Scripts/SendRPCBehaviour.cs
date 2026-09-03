@@ -4,15 +4,17 @@ using TMPro;
 using UnityEngine;
 
 // Drives three benchmark tests depending on BenchRegistry.Mode:
-//   Broadcast   (SendRPC)     server -> all clients, one observers RPC with one int per tick
+//   Broadcast   (SendRPC)     server -> all clients, one observers RPC with one float per tick
 //   ClientInput (ClientInput) every client -> server, one small RPC per tick
 //   SyncVars    (SyncVars)    server changes one of four synced fields per tick
+// Payloads are floats on purpose: some netcodes varint-pack integers by default and others do not,
+// floats are 4 bytes everywhere, so the tests compare framing and batching rather than int encoding.
 public class SendRPCBehaviour : NetworkBehaviour
 {
     [SerializeField] TMP_Text _text;
 
-    [SyncVar] private int _syncA;
-    [SyncVar] private int _syncB;
+    [SyncVar] private float _syncA;
+    [SyncVar] private float _syncB;
     [SyncVar] private float _syncC;
     [SyncVar] private Vector3 _syncD;
 
@@ -41,7 +43,7 @@ public class SendRPCBehaviour : NetworkBehaviour
         if (BenchRegistry.Mode != BenchMode.ClientInput) return;
 
         if (BenchRegistry.Due(ref _inputAcc, Time.deltaTime, 1f / BenchRegistry.ClientInputHz))
-            CmdServerInput(Random.insideUnitSphere, ++_seq);
+            CmdServerInput(Random.insideUnitSphere, Time.time);
     }
 
     private void OnTick()
@@ -49,7 +51,7 @@ public class SendRPCBehaviour : NetworkBehaviour
         switch (BenchRegistry.Mode)
         {
             case BenchMode.Broadcast:
-                var v = Random.Range(-10000, 10000);
+                var v = Random.Range(-10000f, 10000f);
                 SomeData(v);
                 _text.SetText(v.ToString());
                 break;
@@ -63,21 +65,21 @@ public class SendRPCBehaviour : NetworkBehaviour
     {
         switch (_seq++ & 3)
         {
-            case 0: _syncA = Random.Range(-10000, 10000); break;
-            case 1: _syncB = Random.Range(0, 100); break;
+            case 0: _syncA = Random.Range(-10000f, 10000f); break;
+            case 1: _syncB = Random.Range(0f, 100f); break;
             case 2: _syncC = Random.value; break;
             default: _syncD = Random.insideUnitSphere * 100f; break;
         }
     }
 
     [ClientRpc]
-    private void SomeData(int data)
+    private void SomeData(float data)
     {
         _text.SetText(data.ToString());
     }
 
     [Command(requiresAuthority = false)]
-    private void CmdServerInput(Vector3 direction, int tick)
+    private void CmdServerInput(Vector3 direction, float clientTime)
     {
         BenchRegistry.ServerInputsReceived++;
     }

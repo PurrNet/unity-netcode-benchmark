@@ -352,12 +352,12 @@ namespace PurrNet.NetBench
             var remaining = new List<int>(_tests);
             float clientWindow = Mathf.Max(1f, _benchSeconds - 1f);
 
+            bool disconnected = false;
             while (remaining.Count > 0)
             {
                 if (!_adapter.IsClientConnected)
                 {
-                    Debug.LogWarning("[NetBench] Disconnected from server; ending run.");
-                    _run.error = "disconnected";
+                    disconnected = true;
                     break;
                 }
 
@@ -395,7 +395,23 @@ namespace PurrNet.NetBench
                 ResetMode();
             }
 
-            Finish(_run.error == null ? 0 : 1);
+            // The server disconnecting everyone is how a run ends. A client that recorded some tests
+            // but not all missed a spawn/despawn transition (a netcode delivery finding, recorded in
+            // `error` and visible in the report), not a harness failure; only a client that never
+            // measured anything fails the job.
+            if (disconnected && remaining.Count > 0)
+            {
+                var missed = new List<string>();
+                for (int i = 0; i < remaining.Count; i++)
+                    missed.Add(TestNames[remaining[i]]);
+                int recorded = _tests.Length - remaining.Count;
+                _run.error = $"missed tests: {string.Join(",", missed)}";
+                Debug.LogWarning($"[NetBench] Disconnected with {remaining.Count} test(s) never observed ({string.Join(",", missed)}); recorded {recorded}/{_tests.Length}.");
+                Finish(recorded > 0 ? 0 : 1);
+                yield break;
+            }
+
+            Finish(0);
         }
 
         private void ReadTickRate()
