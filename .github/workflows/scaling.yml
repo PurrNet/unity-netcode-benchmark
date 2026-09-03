@@ -33,9 +33,9 @@ on:
         required: false
         default: false
       runner:
-        description: "runs-on label for benchmark jobs (ubuntu-latest, or e.g. blacksmith-4vcpu-ubuntu-2404 for consistent hardware)"
+        description: "runs-on label for build + benchmark jobs (blacksmith-4vcpu-ubuntu-2404 = fixed hardware; ubuntu-latest = GitHub-hosted)"
         required: false
-        default: "ubuntu-latest"
+        default: "blacksmith-4vcpu-ubuntu-2404"
       region:
         description: "Photon Cloud region (Fusion only)"
         required: false
@@ -44,7 +44,7 @@ on:
 jobs:
   prep:
     name: Plan runs
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     outputs:
       netcode_matrix: ${{ steps.gen.outputs.netcode_matrix }}
       bench_matrix: ${{ steps.gen.outputs.bench_matrix }}
@@ -124,7 +124,7 @@ jobs:
     name: Render scaling tables
     needs: [prep, bench]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - name: Checkout (for aggregation scripts)
         uses: actions/checkout@v4

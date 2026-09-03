@@ -10,7 +10,8 @@ name: Benchmark
 # MoveY / MoveAllAxis / MoveWander / SendRPC with `bench_objects` objects each, `bench_seconds` of
 # steady state per test. Results are per-process JSON files aggregated by bench-aggregate.sh.
 #
-# Job budget (Team plan = 60 concurrent): server (1) + measured (N) + loadgen (M) <= 60.
+# Job budget: server (1) + measured (N) + loadgen (M) must fit the runner pool's concurrency
+# (GitHub Team plan = 60 concurrent jobs; check the Blacksmith plan's concurrency limit too).
 
 on:
   workflow_dispatch:
@@ -54,9 +55,9 @@ on:
         required: false
         default: false
       runner:
-        description: "runs-on label for all jobs (e.g. ubuntu-latest, blacksmith-4vcpu-ubuntu-2404)"
+        description: "runs-on label for benchmark jobs (blacksmith-4vcpu-ubuntu-2404 = fixed hardware; ubuntu-latest = GitHub-hosted)"
         required: false
-        default: "ubuntu-latest"
+        default: "blacksmith-4vcpu-ubuntu-2404"
       region:
         description: "Photon Cloud region (Fusion only)"
         required: false
@@ -95,7 +96,7 @@ on:
       runner:
         type: string
         required: false
-        default: "ubuntu-latest"
+        default: "blacksmith-4vcpu-ubuntu-2404"
       region:
         type: string
         required: false
@@ -124,7 +125,7 @@ jobs:
 
   prep:
     name: Compute matrices
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     outputs:
       total: ${{ steps.gen.outputs.total }}
       measured_matrix: ${{ steps.gen.outputs.measured_matrix }}
@@ -469,7 +470,7 @@ jobs:
     name: Aggregate results
     needs: [prep, server, clients]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - name: Checkout (for aggregation scripts)
         uses: actions/checkout@v4

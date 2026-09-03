@@ -78,10 +78,10 @@ Caveats worth keeping in mind when reading results:
   downstream is one stream to the relay rather than `N` client streams; compare Fusion on the
   per-client tables. Its Photon plan is capped at 100 CCU and the server counts as one, so the
   100-connection point runs with 99 clients.
-- **Machines differ.** GitHub-hosted runners are not pinned to one CPU model; the summary prints
-  the server CPU model per datapoint so rows can be compared honestly. For repeatable CPU numbers
-  set `runner` to a fixed-hardware pool (e.g. a Blacksmith label such as
-  `blacksmith-4vcpu-ubuntu-2404` once the Blacksmith GitHub App is installed on the org).
+- **Machines.** Jobs default to Blacksmith's `blacksmith-4vcpu-ubuntu-2404` pool (fixed hardware
+  generation, so CPU numbers are comparable across runs). Set `runner: ubuntu-latest` to fall
+  back to GitHub-hosted runners, whose CPU model varies; the summary prints the server CPU model
+  per datapoint either way.
 - Release builds are the default; development builds (`profiling`) enable the marker table but
   add profiler overhead.
 
