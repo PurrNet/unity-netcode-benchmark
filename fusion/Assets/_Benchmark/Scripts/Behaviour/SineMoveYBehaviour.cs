@@ -27,6 +27,7 @@ namespace StinkySteak.FusionBenchmark
         public override void FixedUpdateNetwork()
         {
             if (!Object.HasStateAuthority) return;
+            if (!BenchRegistry.MovementEnabled) return;
 
             _wrapper.NetworkUpdate(transform);
         }

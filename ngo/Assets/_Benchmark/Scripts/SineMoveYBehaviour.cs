@@ -31,6 +31,7 @@ namespace StinkySteak.NGOBenchmark
         private void OnTick()
         {
             if (!IsServer) return;
+            if (!BenchRegistry.MovementEnabled) return;
 
             _wrapper.NetworkUpdate(transform);
         }

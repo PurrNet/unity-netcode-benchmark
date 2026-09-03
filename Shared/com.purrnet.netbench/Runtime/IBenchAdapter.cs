@@ -41,8 +41,10 @@ namespace PurrNet.NetBench
         /// <summary>Client-side round-trip time estimate in milliseconds (0 if unknown).</summary>
         double ClientRttMs { get; }
 
-        /// <summary>Server: spawn <paramref name="count"/> instances of the given test's prefab. Returns spawned count.</summary>
-        int SpawnTest(int test, int count);
+        /// <summary>Server: spawn <paramref name="count"/> instances of the prefab in the given slot (1..4). Returns spawned count.</summary>
+        int SpawnTest(int slot, int count);
+        /// <summary>Server: despawn the <paramref name="count"/> oldest objects spawned by <see cref="SpawnTest"/> (SpawnChurn).</summary>
+        void DespawnOldest(int count);
         /// <summary>Server: despawn everything spawned by <see cref="SpawnTest"/>.</summary>
         void DespawnAll();
 

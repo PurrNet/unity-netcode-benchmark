@@ -27,9 +27,15 @@ The server spawns `N` objects and replicates them to every client:
 | MoveAllAxis | Moves it on a sine wave along a random 3D direction |
 | MoveWander | Wander steering: position **and** rotation change |
 | SendRPC | Sends one observers RPC carrying one `int` |
+| Static | Nothing. Objects are spawned and never touched (baseline cost of idle networked objects, per-object keepalives) |
+| SpawnChurn | Despawns the N/50 oldest objects and spawns N/50 new ones every tick, keeping N alive (spawn payload, allocation / GC pressure) |
+| ClientInput | One hub object; every **client** sends one small server RPC (`Vector3` + `int`) per tick. Measures server ingest scaling with client count |
+| SyncVars | Changes one of four synced fields (`int`, `int`, `float`, `Vector3`) per object per tick, via each netcode's variable sync (SyncVar / NetworkVariable / [Networked]) |
 
-An **Idle** window (connected, nothing spawned) is measured first and used as the per-netcode
-CPU baseline.
+The last four reuse the MoveY and SendRPC prefabs with movement disabled or a different
+`BenchRegistry.Mode`, so no extra assets are involved. An **Idle** window (connected, nothing
+spawned) is measured first and used as the per-netcode CPU baseline. The `-tests` argument
+(default `1,2,3,4,5,6,7,8`) selects which run.
 
 ## Automated runs
 

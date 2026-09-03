@@ -11,27 +11,40 @@ namespace PurrNet.NetBench
     /// scene's GUIGame (an <see cref="IBenchAdapter"/>) is then driven through the same scenario on
     /// every netcode:
     ///
-    ///   server: listen -> wait for -count clients -> Idle window -> for each test: spawn N objects,
+    ///   server: listen -> wait for -count clients -> Idle window -> for each test: spawn objects,
     ///           warm up, measure, slack, despawn, cool down -> write -results JSON -> quit
     ///   client: connect (retrying) -> Idle window -> for each test seen via BenchRegistry:
     ///           warm up, measure (slightly shorter than the server window) -> wait for despawn
     ///           -> write -results JSON -> quit
     ///
+    /// Tests (ids for -tests): 1 MoveY, 2 MoveAllAxis, 3 MoveWander, 4 SendRPC, 5 Static,
+    /// 6 SpawnChurn, 7 ClientInput, 8 SyncVars. Tests 5-8 reuse the MoveY / SendRPC prefabs with
+    /// movement disabled or a different BenchRegistry.Mode, so no extra assets are needed.
+    ///
     /// Arguments:
     ///   -role server|client   -count N (server: expected clients)   -serverHost H  -port P
-    ///   -session S -region R -photonAppId ID (relay netcodes)       -tests 1,2,3,4
+    ///   -session S -region R -photonAppId ID (relay netcodes)       -tests 1,2,3,4,5,6,7,8
     ///   -benchSeconds S (20)  -warmupSeconds S (3)  -idleSeconds S (5)  -benchObjects N (100)
     ///   -connectTimeout S (120)  -maxRunSeconds S (900)  -fps N (60)  -netIface NAME (auto)
     ///   -results PATH  -loadgen (client is load only, not a measured sample)
     /// </summary>
     public sealed class BenchRunner : MonoBehaviour
     {
-        public static readonly string[] TestNames = { "Idle", "MoveY", "MoveAllAxis", "MoveWander", "SendRPC" };
+        public static readonly string[] TestNames =
+        {
+            "Idle", "MoveY", "MoveAllAxis", "MoveWander", "SendRPC", "Static", "SpawnChurn", "ClientInput", "SyncVars"
+        };
+
+        private const int TestStatic = 5;
+        private const int TestSpawnChurn = 6;
+        private const int TestClientInput = 7;
+        private const int TestSyncVars = 8;
 
         private const float SlackSeconds = 1.5f;
         private const float CooldownSeconds = 2f;
         private const float ClientRetrySeconds = 15f;
         private const float RttSampleInterval = 0.1f;
+        private const float ChurnInterval = 0.05f;
 
         private static bool s_started;
 
@@ -108,7 +121,7 @@ namespace PurrNet.NetBench
             _iface = ResolveIface(CommandLine.Get("-netIface"));
 
             var tests = new List<int>();
-            foreach (var part in CommandLine.Get("-tests", "1,2,3,4").Split(','))
+            foreach (var part in CommandLine.Get("-tests", "1,2,3,4,5,6,7,8").Split(','))
             {
                 if (int.TryParse(part.Trim(), out var t) && t > 0 && t < TestNames.Length)
                     tests.Add(t);
@@ -158,6 +171,20 @@ namespace PurrNet.NetBench
             }
 
             return null;
+        }
+
+        private static void ApplyMode(int test)
+        {
+            BenchRegistry.MovementEnabled = test != TestStatic && test != TestSpawnChurn;
+            BenchRegistry.Mode = test == TestClientInput ? BenchMode.ClientInput
+                : test == TestSyncVars ? BenchMode.SyncVars
+                : BenchMode.Broadcast;
+        }
+
+        private static void ResetMode()
+        {
+            BenchRegistry.MovementEnabled = true;
+            BenchRegistry.Mode = BenchMode.Broadcast;
         }
 
         private IEnumerator Run()
@@ -257,17 +284,22 @@ namespace PurrNet.NetBench
             for (int i = 0; i < _tests.Length; i++)
             {
                 int test = _tests[i];
+                int slot = BenchRegistry.SlotOf(test);
+                int count = test == TestClientInput ? 1 : _objects;
                 int spawned = 0;
-                if (!Try(() => spawned = _adapter.SpawnTest(test, _objects), $"SpawnTest({test})"))
+
+                ApplyMode(test);
+                if (!Try(() => spawned = _adapter.SpawnTest(slot, count), $"SpawnTest({test})"))
                     yield break;
 
-                Debug.Log($"[NetBench] Test {test} {TestNames[test]}: spawned {spawned} objects, warming up {_warmupSeconds}s");
+                Debug.Log($"[NetBench] Test {test} {TestNames[test]}: spawned {spawned} objects (mode={BenchRegistry.Mode}, movement={BenchRegistry.MovementEnabled}), warming up {_warmupSeconds}s");
                 yield return new WaitForSecondsRealtime(_warmupSeconds);
                 yield return Window(test, _benchSeconds);
 
                 // Let late-starting client windows finish before the objects vanish.
                 yield return new WaitForSecondsRealtime(SlackSeconds);
                 Try(() => _adapter.DespawnAll(), "DespawnAll");
+                ResetMode();
                 yield return new WaitForSecondsRealtime(CooldownSeconds);
             }
 
@@ -314,7 +346,7 @@ namespace PurrNet.NetBench
             _run.connectedAtStart = 1;
             _run.tickRate = _adapter.TickRate;
 
-            if (BenchRegistry.ActiveTest() == 0)
+            if (BenchRegistry.ActiveSlot() == 0)
                 yield return Window(0, _idleSeconds);
 
             var remaining = new List<int>(_tests);
@@ -329,20 +361,38 @@ namespace PurrNet.NetBench
                     break;
                 }
 
-                int active = BenchRegistry.ActiveTest();
-                if (active == 0 || !remaining.Contains(active))
+                // The server runs tests in list order and despawns between them, so the first
+                // remaining test that uses the active prefab slot is the one being run.
+                int slot = BenchRegistry.ActiveSlot();
+                int test = 0;
+                if (slot != 0)
+                {
+                    for (int i = 0; i < remaining.Count; i++)
+                    {
+                        if (BenchRegistry.SlotOf(remaining[i]) == slot)
+                        {
+                            test = remaining[i];
+                            break;
+                        }
+                    }
+                }
+
+                if (test == 0)
                 {
                     yield return null;
                     continue;
                 }
 
-                Debug.Log($"[NetBench] Test {active} {TestNames[active]} detected ({BenchRegistry.Count(active)} objects), warming up {_warmupSeconds}s");
+                ApplyMode(test);
+                Debug.Log($"[NetBench] Test {test} {TestNames[test]} detected ({BenchRegistry.Count(slot)} objects, mode={BenchRegistry.Mode}), warming up {_warmupSeconds}s");
                 yield return new WaitForSecondsRealtime(_warmupSeconds);
-                yield return Window(active, clientWindow);
-                remaining.Remove(active);
+                yield return Window(test, clientWindow);
+                remaining.Remove(test);
 
-                while (BenchRegistry.Count(active) > 0 && _adapter.IsClientConnected)
+                while (BenchRegistry.Count(slot) > 0 && _adapter.IsClientConnected)
                     yield return new WaitForSecondsRealtime(0.1f);
+
+                ResetMode();
             }
 
             Finish(_run.error == null ? 0 : 1);
@@ -353,12 +403,17 @@ namespace PurrNet.NetBench
             var load = new LoadSampler();
             var markers = new MarkerSampler();
             var rtts = new List<double>();
+            int slot = BenchRegistry.SlotOf(test);
+            bool churn = _isServer && test == TestSpawnChurn;
+            int churnCount = Mathf.Max(1, _objects / 50);
 
             load.Begin(_iface);
             markers.Begin(_adapter.ProfilerMarkerPrefixes);
+            long inputs0 = BenchRegistry.ServerInputsReceived;
 
             double elapsed = 0;
             float nextRtt = 0;
+            float churnAcc = 0;
             bool truncated = false;
 
             while (elapsed < seconds)
@@ -382,13 +437,19 @@ namespace PurrNet.NetBench
                     }
                 }
 
-                if (test != 0 && BenchRegistry.Count(test) == 0)
+                if (churn && BenchRegistry.Due(ref churnAcc, dt, ChurnInterval))
+                {
+                    _adapter.DespawnOldest(churnCount);
+                    _adapter.SpawnTest(slot, churnCount);
+                }
+
+                if (test != 0 && BenchRegistry.Count(slot) == 0)
                 {
                     truncated = true;
                     break;
                 }
 
-                if (test == 0 && BenchRegistry.ActiveTest() != 0)
+                if (test == 0 && BenchRegistry.ActiveSlot() != 0)
                 {
                     truncated = true;
                     break;
@@ -397,12 +458,14 @@ namespace PurrNet.NetBench
 
             var stats = load.End();
             var cpuMarkers = markers.End();
+            long inputs = BenchRegistry.ServerInputsReceived - inputs0;
+            double wall = Math.Max(0.001, stats.wallSeconds);
 
             var result = new TestResult
             {
                 test = test,
                 name = TestNames[test],
-                objects = BenchRegistry.Count(test),
+                objects = BenchRegistry.Count(slot),
                 windowSeconds = stats.wallSeconds,
                 connections = _isServer ? _adapter.ConnectedClientCount : 1,
                 truncated = truncated,
@@ -418,10 +481,11 @@ namespace PurrNet.NetBench
                 managedHeapBytes = stats.managedHeapBytes,
                 peakRssBytes = stats.peakRssBytes,
                 iface = _iface,
+                inputsReceived = inputs,
+                inputsPerSec = inputs / wall,
                 cpuMarkers = cpuMarkers
             };
 
-            double wall = Math.Max(0.001, stats.wallSeconds);
             if (stats.ifaceDelta.valid)
             {
                 result.txBytes = stats.ifaceDelta.txBytes;
@@ -450,7 +514,7 @@ namespace PurrNet.NetBench
             Debug.Log($"[NetBench] {result.name}: objects={result.objects} conns={result.connections} window={result.windowSeconds:F1}s " +
                       $"cpu={result.cpuPercent:F1}% frame={result.avgFrameMs:F2}ms p95={result.p95FrameMs:F2}ms " +
                       $"tx={result.txBytesPerSec:F0}B/s rx={result.rxBytesPerSec:F0}B/s rttP50={result.rttP50Ms:F1}ms " +
-                      $"gc={result.gcCollections} rss={result.peakRssBytes / 1048576}MB truncated={truncated}");
+                      $"inputs/s={result.inputsPerSec:F0} gc={result.gcCollections} rss={result.peakRssBytes / 1048576}MB truncated={truncated}");
         }
 
         private bool Try(Action action, string what)
@@ -495,6 +559,7 @@ namespace PurrNet.NetBench
                 return;
 
             _finished = true;
+            ResetMode();
             WriteResults();
 
             try

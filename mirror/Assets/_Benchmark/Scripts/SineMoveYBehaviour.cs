@@ -26,6 +26,7 @@ namespace StinkySteak.MirrorBenchmark
         private void FixedUpdate()
         {
             if (isClient) return;
+            if (!BenchRegistry.MovementEnabled) return;
 
             _wrapper.NetworkUpdate(transform);
         }

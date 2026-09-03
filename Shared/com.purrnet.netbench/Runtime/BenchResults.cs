@@ -46,6 +46,10 @@ namespace PurrNet.NetBench
         public double txPacketsPerSec;
         public double rxPacketsPerSec;
 
+        // Server: client input RPCs received during the window (ClientInput test).
+        public long inputsReceived;
+        public double inputsPerSec;
+
         public int rttSamples;
         public double rttAvgMs;
         public double rttP50Ms;

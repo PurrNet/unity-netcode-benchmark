@@ -105,6 +105,18 @@ namespace StinkySteak.FishnetBenchmark
             return count;
         }
 
+        public void DespawnOldest(int count)
+        {
+            int n = Mathf.Min(count, _spawned.Count);
+            for (int i = 0; i < n; i++)
+            {
+                if (_spawned[i] != null)
+                    _networkManager.ServerManager.Despawn(_spawned[i]);
+            }
+
+            _spawned.RemoveRange(0, n);
+        }
+
         public void DespawnAll()
         {
             for (int i = 0; i < _spawned.Count; i++)

@@ -69,7 +69,7 @@ jq -r --argjson versions "$VERSIONS_JSON" --arg window "$WINDOW" --arg objects "
   + "| Netcode | Version |\n|---|---|\n"
   + ( [ $netcodes[] as $n | "| \($n) | \($versions[$n] // "?") |" ] | join("\n") )
   + "\n| unity | \($versions.unity // "?") |\n\n"
-  + "Every netcode runs the same scenario: the server spawns N objects and replicates them to every client (MoveY / MoveAllAxis / MoveWander move them each tick; SendRPC fires one observers-RPC with one int per object per tick). "
+  + "Every netcode runs the same scenario: the server spawns N objects and replicates them to every client. MoveY / MoveAllAxis / MoveWander move them each tick; SendRPC fires one observers-RPC with one int per object per tick; Static spawns them and never touches them; SpawnChurn keeps N alive while despawning and spawning N/50 per tick; ClientInput spawns one hub object and every client sends one small server RPC (Vector3 + int) per tick; SyncVars changes one of four synced fields per object per tick. "
   + "Server numbers come from the single server process; client numbers are averages over the single-process measured clients. "
   + "On-wire bandwidth is read from the network interface (headers, ACKs and resends included). CPU is the whole process, all threads, as % of one core with the frame loop capped at 60 fps; the Idle row (connected, nothing spawned) is the per-netcode baseline and is subtracted in the \"CPU − idle\" tables. "
   + "Fusion is relay-based: its server talks to Photon Cloud, so its *server* downstream is one stream to the relay, not N client streams — compare Fusion on the per-client tables.\n\n"
@@ -78,12 +78,14 @@ jq -r --argjson versions "$VERSIONS_JSON" --arg window "$WINDOW" --arg objects "
   + table("Clients connected at start / expected · measured clients"; "\(.meta.connectedAtStart)/\(.meta.expectedClients) · \(.meta.measuredClients)\(if .meta.serverError != null then " ⚠️ \(.meta.serverError)" else "" end)")
   + "### Idle baseline (connected, nothing spawned)\n\n"
   + table("Server CPU % · frame p95 ms"; "\(.server.Idle.cpuPercent | r1)% · \(.server.Idle.p95FrameMs | r2) ms")
-  + ( [ ("MoveY", "MoveAllAxis", "MoveWander", "SendRPC") as $t
+  + ( [ ("MoveY", "MoveAllAxis", "MoveWander", "SendRPC", "Static", "SpawnChurn", "ClientInput", "SyncVars") as $t
         | "### \($t)\n\n"
         + table("\($t) — server downstream on-wire (KB/s, all clients)"; .server[$t].txBytesPerSec | kb)
         + table("\($t) — per-client downstream on-wire (KB/s, client-measured)"; .clients[$t].rxBytesPerSec | kb)
         + table("\($t) — server upstream on-wire (KB/s, all clients)"; .server[$t].rxBytesPerSec | kb)
-        + table("\($t) — server CPU % minus idle (raw)"; . as $d | "\(($d.server[$t].cpuPercent - idleCpu($d)) | r1)% (\($d.server[$t].cpuPercent | r1)%)")
+        + table("\($t) — per-client upstream on-wire (KB/s, client-measured)"; .clients[$t].txBytesPerSec | kb)
+        + ( if $t == "ClientInput" then table("ClientInput — server input RPCs received per second (expected ≈ 20 × connections)"; .server[$t].inputsPerSec | if . == null then "-" else floor end) else "" end )
+        + table("\($t) — server CPU % minus idle (raw)"; . as $d | ($d.server[$t].cpuPercent) as $c | if $c == null then "-" else "\(($c - idleCpu($d)) | r1)% (\($c | r1)%)" end)
         + table("\($t) — server frame avg / p95 / p99 (ms)"; "\(.server[$t].avgFrameMs | r2) / \(.server[$t].p95FrameMs | r2) / \(.server[$t].p99FrameMs | r2)")
         + table("\($t) — server GC collections · peak RSS"; "\(.server[$t].gcCollections // "-") · \(((.server[$t].peakRssBytes // 0) / 1048576) | floor) MB")
         + table("\($t) — client RTT p50 / p95 (ms, netcode-reported)"; "\(.clients[$t].rttP50Ms | r2) / \(.clients[$t].rttP95Ms | r2)")
