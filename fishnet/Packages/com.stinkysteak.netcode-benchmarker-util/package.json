@@ -1,0 +1,16 @@
+{
+  "name": "com.stinkysteak.netcode-benchmarker-util",
+  "version": "0.1.0",
+  "displayName": "Netcode Benchmarker Util",
+  "description": "Module to benchmark unity netcodes",
+  "unity": "2021.3",
+  "documentationUrl": "https://github.com/StinkySteak/netcode-benchmarker-util",
+  "changelogUrl": "https://github.com/StinkySteak/netcode-benchmarker-util/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/StinkySteak/netcode-benchmarker-util/blob/main/LICENSE",
+  "author": {
+    "name": "Stinkysteak",
+    "email": "stinkysteak@steaksoft.com",
+    "url": "https://steaksoft.net"
+  },
+  "_fingerprint": "92df704899bed405c18cacdc721105899dd2c2d3"
+}

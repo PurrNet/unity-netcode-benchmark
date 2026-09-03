@@ -1,0 +1,159 @@
+name: Netcode Scaling Benchmark
+
+# Builds every selected netcode once (in parallel), then runs the distributed benchmark for each
+# netcode at each connection count, strictly one run at a time (a 100-connection run alone needs
+# ~59 concurrent jobs of the 60-job org cap), and finally renders a cross-netcode scaling table
+# with charts into the job summary.
+#
+# Fusion's Photon plan is capped at 100 CCU and the dedicated server itself counts as one, so its
+# 100-connection point runs with 99 clients.
+
+on:
+  workflow_dispatch:
+    inputs:
+      netcodes:
+        description: "Comma-separated netcodes to run"
+        required: true
+        default: "purrnet,fishnet,mirror,ngo,fusion"
+      sizes:
+        description: "Comma-separated connection counts"
+        required: true
+        default: "10,25,50,100"
+      bench_seconds:
+        description: "Steady-state measurement window per test, seconds"
+        required: true
+        default: "20"
+      bench_objects:
+        description: "Objects spawned per test"
+        required: true
+        default: "100"
+      profiling:
+        description: "Development builds (adds a CPU-by-marker table; release builds give cleaner absolute CPU numbers)"
+        type: boolean
+        required: false
+        default: false
+      runner:
+        description: "runs-on label for benchmark jobs (ubuntu-latest, or e.g. blacksmith-4vcpu-ubuntu-2404 for consistent hardware)"
+        required: false
+        default: "ubuntu-latest"
+      region:
+        description: "Photon Cloud region (Fusion only)"
+        required: false
+        default: "us"
+
+jobs:
+  prep:
+    name: Plan runs
+    runs-on: ubuntu-latest
+    outputs:
+      netcode_matrix: ${{ steps.gen.outputs.netcode_matrix }}
+      bench_matrix: ${{ steps.gen.outputs.bench_matrix }}
+    steps:
+      - id: gen
+        run: |
+          set -eu
+          NETCODES=$(echo "${{ inputs.netcodes }}" | tr ',' '\n' | sed 's/ //g' | grep -v '^$')
+          SIZES=$(echo "${{ inputs.sizes }}" | tr ',' '\n' | sed 's/ //g' | grep -v '^$')
+          for n in $NETCODES; do
+            case "$n" in purrnet|fishnet|mirror|ngo|fusion) ;; *) echo "::error::Unknown netcode '$n'"; exit 1;; esac
+          done
+          echo "netcode_matrix=$(printf '%s\n' $NETCODES | jq -R . | jq -s -c .)" >> "$GITHUB_OUTPUT"
+
+          # Up to 57 connections fit as single-process measured runners (server + 57 + 2 spare < 60).
+          # Larger sizes add 4 loadgen runners x 12 processes and measure the remainder.
+          ENTRIES=""
+          for n in $NETCODES; do
+            CAP=200
+            [ "$n" = "fusion" ] && CAP=99
+            for s in $SIZES; do
+              TOTAL=$s
+              [ "$TOTAL" -gt "$CAP" ] && TOTAL=$CAP
+              if [ "$TOTAL" -le 57 ]; then
+                MEASURED=$TOTAL; LG=0; PROCS=0
+              else
+                LG=4; PROCS=12; MEASURED=$((TOTAL - LG * PROCS))
+                if [ "$MEASURED" -lt 1 ]; then
+                  echo "::error::Size $s too small for the loadgen split"; exit 1
+                fi
+              fi
+              ENTRIES="$ENTRIES{\"netcode\":\"$n\",\"size\":\"$s\",\"measured\":\"$MEASURED\",\"loadgen\":\"$LG\",\"procs\":\"$PROCS\",\"tag\":\"c$s\"},"
+            done
+          done
+          MATRIX="{\"include\":[${ENTRIES%,}]}"
+          echo "$MATRIX" | jq .
+          echo "bench_matrix=$(echo "$MATRIX" | jq -c .)" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build
+    needs: prep
+    strategy:
+      fail-fast: false
+      matrix:
+        netcode: ${{ fromJSON(needs.prep.outputs.netcode_matrix) }}
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+    with:
+      netcode: ${{ matrix.netcode }}
+      profiling: ${{ inputs.profiling }}
+      runner: ${{ inputs.runner }}
+
+  bench:
+    name: ${{ matrix.netcode }} @ ${{ matrix.size }}
+    needs: [prep, build]
+    if: ${{ !cancelled() && needs.prep.result == 'success' }}
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix: ${{ fromJSON(needs.prep.outputs.bench_matrix) }}
+    uses: ./.github/workflows/benchmark.yml
+    secrets: inherit
+    with:
+      netcode: ${{ matrix.netcode }}
+      measured_clients: ${{ matrix.measured }}
+      loadgen_jobs: ${{ matrix.loadgen }}
+      procs_per_loadgen: ${{ matrix.procs }}
+      bench_seconds: ${{ inputs.bench_seconds }}
+      bench_objects: ${{ inputs.bench_objects }}
+      tag: ${{ matrix.tag }}
+      player_artifact: player-${{ matrix.netcode }}
+      profiling: ${{ inputs.profiling }}
+      runner: ${{ inputs.runner }}
+      region: ${{ inputs.region }}
+
+  combine:
+    name: Render scaling tables
+    needs: [prep, bench]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (for aggregation scripts)
+        uses: actions/checkout@v4
+
+      - name: Download scaling datapoints
+        uses: actions/download-artifact@v4
+        with:
+          pattern: bench-scaling-*
+          path: all
+          merge-multiple: true
+
+      - name: Render scaling curve
+        run: |
+          bash .github/scripts/versions.sh > all/versions.json
+          cat all/versions.json
+          bash .github/scripts/bench-scaling.sh \
+            all \
+            "${{ inputs.bench_seconds }}" \
+            "${{ inputs.bench_objects }}" \
+            all/versions.json \
+            results-out
+
+      - name: Upload combined results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            all/
+            results-out/
+          if-no-files-found: warn
+          retention-days: 90

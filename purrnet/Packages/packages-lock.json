@@ -1,5 +1,11 @@
 {
   "dependencies": {
+    "com.purrnet.netbench": {
+      "version": "file:../../Shared/com.purrnet.netbench",
+      "depth": 0,
+      "source": "local",
+      "dependencies": {}
+    },
     "com.stinkysteak.netcode-benchmarker-util": {
       "version": "file:com.stinkysteak.netcode-benchmarker-util",
       "depth": 0,

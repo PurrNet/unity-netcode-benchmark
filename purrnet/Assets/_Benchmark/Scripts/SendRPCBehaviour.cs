@@ -1,4 +1,5 @@
 using PurrNet;
+using PurrNet.NetBench;
 using PurrNet.Packing;
 using TMPro;
 using UnityEngine;
@@ -6,6 +7,16 @@ using UnityEngine;
 public class SendRPCBehaviour : NetworkBehaviour
 {
     [SerializeField] TMP_Text _text;
+
+    protected override void OnSpawned(bool asServer)
+    {
+        BenchRegistry.Spawned(4);
+    }
+
+    protected override void OnDespawned(bool asServer)
+    {
+        BenchRegistry.Despawned(4);
+    }
 
     private void FixedUpdate()
     {

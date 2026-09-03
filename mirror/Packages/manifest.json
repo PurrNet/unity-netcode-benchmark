@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "com.purrnet.netbench": "file:../../Shared/com.purrnet.netbench",
     "com.stinkysteak.netcode-benchmarker-util": "https://github.com/StinkySteak/netcode-benchmarker-util.git",
     "com.stinkysteak.simulationtimer": "https://github.com/StinkySteak/Unity-Simulation-Timer.git",
     "com.tayx.graphy": "https://github.com/Tayx94/graphy.git",

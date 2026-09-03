@@ -1,0 +1,502 @@
+name: Benchmark
+
+# One benchmark run for one netcode at one connection count. Mirrors PurrNet's distributed
+# benchmark: a server runner plus many client runners meet over a Tailscale overlay; single-process
+# "measured" client runners provide clean per-client numbers, multi-process "loadgen" runners only
+# add connection load. Fusion is relay-based (Photon Cloud), so its processes talk to the cloud
+# instead of to each other; the tailnet is still used as the start barrier.
+#
+# Every process runs the same BenchRunner scenario (Shared/com.purrnet.netbench): Idle window, then
+# MoveY / MoveAllAxis / MoveWander / SendRPC with `bench_objects` objects each, `bench_seconds` of
+# steady state per test. Results are per-process JSON files aggregated by bench-aggregate.sh.
+#
+# Job budget (Team plan = 60 concurrent): server (1) + measured (N) + loadgen (M) <= 60.
+
+on:
+  workflow_dispatch:
+    inputs:
+      netcode:
+        description: "Netcode project to benchmark"
+        type: choice
+        required: true
+        options: [purrnet, fishnet, mirror, ngo, fusion]
+      measured_clients:
+        description: "Single-instance client runners (each reports clean stats)"
+        required: true
+        default: "10"
+      loadgen_jobs:
+        description: "Multi-process client runners (not measured; load only)"
+        required: true
+        default: "0"
+      procs_per_loadgen:
+        description: "Client processes per loadgen runner"
+        required: true
+        default: "12"
+      bench_seconds:
+        description: "Steady-state measurement window per test, seconds"
+        required: true
+        default: "20"
+      bench_objects:
+        description: "Objects spawned per test (moving objects / RPC emitters)"
+        required: true
+        default: "100"
+      tag:
+        description: "Run discriminator (artifact names, tailnet hostnames)"
+        required: false
+        default: "solo"
+      player_artifact:
+        description: "Prebuilt player artifact to reuse (empty = build now)"
+        required: false
+        default: ""
+      profiling:
+        description: "Development build (only used when building here)"
+        type: boolean
+        required: false
+        default: false
+      runner:
+        description: "runs-on label for all jobs (e.g. ubuntu-latest, blacksmith-4vcpu-ubuntu-2404)"
+        required: false
+        default: "ubuntu-latest"
+      region:
+        description: "Photon Cloud region (Fusion only)"
+        required: false
+        default: "us"
+  workflow_call:
+    inputs:
+      netcode:
+        type: string
+        required: true
+      measured_clients:
+        type: string
+        required: true
+      loadgen_jobs:
+        type: string
+        required: true
+      procs_per_loadgen:
+        type: string
+        required: true
+      bench_seconds:
+        type: string
+        required: true
+      bench_objects:
+        type: string
+        required: true
+      tag:
+        type: string
+        required: true
+      player_artifact:
+        type: string
+        required: false
+        default: ""
+      profiling:
+        type: boolean
+        required: false
+        default: false
+      runner:
+        type: string
+        required: false
+        default: "ubuntu-latest"
+      region:
+        type: string
+        required: false
+        default: "us"
+
+env:
+  NETCODE: ${{ inputs.netcode }}
+  TAG: ${{ inputs.tag }}
+  SERVER_HOST: nb-${{ inputs.netcode }}-${{ github.run_id }}-${{ inputs.tag }}
+  # NOT named PORT: a bare `PORT` env var is auto-bound by several daemons on the runner.
+  BENCH_PORT: "7777"
+  PHOTON_REGION: ${{ inputs.region }}
+  # Optional override of the AppIdFusion stored in fusion/Assets/Photon/Fusion/Resources/PhotonAppSettings.asset.
+  PHOTON_APP_ID: ${{ secrets.PHOTON_APP_ID }}
+
+jobs:
+  build:
+    name: Build
+    if: ${{ inputs.player_artifact == '' }}
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+    with:
+      netcode: ${{ inputs.netcode }}
+      profiling: ${{ inputs.profiling }}
+      runner: ${{ inputs.runner }}
+
+  prep:
+    name: Compute matrices
+    runs-on: ubuntu-latest
+    outputs:
+      total: ${{ steps.gen.outputs.total }}
+      measured_matrix: ${{ steps.gen.outputs.measured_matrix }}
+      loadgen_matrix: ${{ steps.gen.outputs.loadgen_matrix }}
+      player: ${{ steps.gen.outputs.player }}
+    steps:
+      - id: gen
+        run: |
+          set -eu
+          MEASURED=${{ inputs.measured_clients }}
+          LG_JOBS=${{ inputs.loadgen_jobs }}
+          LG_PROCS=${{ inputs.procs_per_loadgen }}
+          TOTAL=$(( MEASURED + LG_JOBS * LG_PROCS ))
+          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
+          if [ -n "${{ inputs.player_artifact }}" ]; then
+            echo "player=${{ inputs.player_artifact }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "player=player-${{ inputs.netcode }}" >> "$GITHUB_OUTPUT"
+          fi
+          if [ "$MEASURED" -gt 0 ]; then
+            echo "measured_matrix=$(seq 1 "$MEASURED" | jq -R . | jq -s -c .)" >> "$GITHUB_OUTPUT"
+          else
+            echo "measured_matrix=[]" >> "$GITHUB_OUTPUT"
+          fi
+          if [ "$LG_JOBS" -gt 0 ]; then
+            echo "loadgen_matrix=$(seq 1 "$LG_JOBS" | jq -R . | jq -s -c .)" >> "$GITHUB_OUTPUT"
+          else
+            echo "loadgen_matrix=[]" >> "$GITHUB_OUTPUT"
+          fi
+
+  server:
+    name: Server
+    needs: [build, prep]
+    if: ${{ !cancelled() && needs.prep.result == 'success' && needs.build.result != 'failure' }}
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 30
+    steps:
+      - name: Download player
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.prep.outputs.player }}
+          path: player
+
+      - &prepare_player
+        name: Prepare player
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y xvfb >/dev/null
+          chmod +x "$PWD/player/NetBench"
+          mkdir -p results logs
+          echo "CPU: $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2- | xargs) x$(nproc)"
+
+      - name: Connect Tailscale
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          hostname: ${{ env.SERVER_HOST }}
+
+      - &wait_for_runners
+        name: Wait for benchmark runners
+        run: |
+          EXPECTED=$((${{ inputs.measured_clients }} + ${{ inputs.loadgen_jobs }}))
+          MEASURED_PREFIX="nb-${NETCODE}-cli-${GITHUB_RUN_ID}-${TAG}-"
+          LOADGEN_PREFIX="nb-${NETCODE}-lg-${GITHUB_RUN_ID}-${TAG}-"
+          READY=0
+          for i in $(seq 1 300); do
+            READY=$(tailscale status --json 2>/dev/null | jq --arg measured "$MEASURED_PREFIX" --arg loadgen "$LOADGEN_PREFIX" \
+              '([.Self] + [.Peer[]? | select(.Online == true)]) | [.[] | (.HostName // "") | select(startswith($measured) or startswith($loadgen))] | length') || READY=0
+            if [ "$READY" -ge "$EXPECTED" ]; then
+              echo "Benchmark runners ready: $READY/$EXPECTED"
+              exit 0
+            fi
+            if [ $((i % 15)) -eq 0 ]; then
+              echo "Waiting for benchmark runners: $READY/$EXPECTED"
+            fi
+            sleep 2
+          done
+          echo "::error::Only $READY/$EXPECTED benchmark runners joined the tailnet"
+          tailscale status || true
+          exit 1
+
+      - name: Run server
+        run: |
+          set -u
+          BIN="$PWD/player/NetBench"
+
+          if [ "$NETCODE" = "fusion" ]; then
+            NET_ARGS=(-session "nb-${GITHUB_RUN_ID}-${TAG}" -region "$PHOTON_REGION" -netIface eth0 -photonAppId "$PHOTON_APP_ID")
+          else
+            if ss -lun 2>/dev/null | grep -qE "[:.]${BENCH_PORT}\b"; then
+              echo "::error::UDP port $BENCH_PORT is already in use on the runner before the server started"
+              sudo ss -lunp 2>/dev/null || true
+              exit 1
+            fi
+            NET_ARGS=(-serverHost 0.0.0.0 -port "$BENCH_PORT" -netIface tailscale0)
+          fi
+
+          touch logs/server.log
+          tail -n +1 -F logs/server.log &
+          TAIL_PID=$!
+          trap 'kill "$TAIL_PID" 2>/dev/null || true' EXIT
+          STATUS=0
+          timeout --signal=TERM --kill-after=10s 15m \
+            xvfb-run -a --server-args="-screen 0 1024x768x24" \
+            "$BIN" -batchmode -nographics \
+            -role server -count ${{ needs.prep.outputs.total }} \
+            -benchSeconds ${{ inputs.bench_seconds }} -benchObjects ${{ inputs.bench_objects }} \
+            "${NET_ARGS[@]}" -connectTimeout 180 -maxRunSeconds 780 \
+            -results "$PWD/results/server.json" \
+            -logFile "$PWD/logs/server.log" || STATUS=$?
+          if [ "$STATUS" -ne 0 ]; then
+            echo "::error::Server exited with status $STATUS"
+            exit "$STATUS"
+          fi
+
+      - name: Tail server log on failure
+        if: failure()
+        run: tail -n 200 logs/server.log || true
+
+      - name: Upload server result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-result-${{ inputs.netcode }}-${{ inputs.tag }}-server
+          path: |
+            results/
+            logs/server.log
+          if-no-files-found: warn
+          retention-days: 14
+
+  clients:
+    name: Client ${{ matrix.idx }}
+    # Must NOT depend on `server`: clients run concurrently with it and discover it via the tailnet.
+    needs: [build, prep]
+    if: ${{ !cancelled() && needs.prep.result == 'success' && needs.build.result != 'failure' && needs.prep.outputs.measured_matrix != '[]' }}
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        idx: ${{ fromJSON(needs.prep.outputs.measured_matrix) }}
+    steps:
+      - name: Download player
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.prep.outputs.player }}
+          path: player
+
+      - *prepare_player
+
+      - name: Connect Tailscale
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          hostname: nb-${{ inputs.netcode }}-cli-${{ github.run_id }}-${{ inputs.tag }}-${{ matrix.idx }}
+
+      - *wait_for_runners
+
+      - &resolve_server
+        name: Resolve server
+        run: |
+          if [ "$NETCODE" = "fusion" ]; then
+            echo "SERVER_IP=cloud" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          SERVER_IP=""
+          REACHABLE=0
+          for i in $(seq 1 60); do
+            IP=$(tailscale ip -4 "$SERVER_HOST" 2>/dev/null | head -n1)
+            if [ -n "$IP" ]; then
+              SERVER_IP="$IP"
+              if tailscale ping -c 1 "$SERVER_HOST" >/dev/null 2>&1; then
+                REACHABLE=1
+                break
+              fi
+            fi
+            sleep 2
+          done
+          if [ -z "$SERVER_IP" ]; then
+            echo "::error::Server node $SERVER_HOST never appeared in the tailnet"
+            tailscale status || true
+            exit 1
+          fi
+          if [ "$REACHABLE" -ne 1 ]; then
+            echo "::error::Server node $SERVER_HOST is visible ($SERVER_IP) but not reachable (check tailnet ACL tag:ci -> tag:ci)"
+            tailscale status || true
+            exit 1
+          fi
+          echo "Server resolved to $SERVER_IP"
+          echo "SERVER_IP=$SERVER_IP" >> "$GITHUB_ENV"
+
+      - name: Run client
+        run: |
+          set -u
+          BIN="$PWD/player/NetBench"
+          if [ "$NETCODE" = "fusion" ]; then
+            NET_ARGS=(-session "nb-${GITHUB_RUN_ID}-${TAG}" -region "$PHOTON_REGION" -netIface eth0 -photonAppId "$PHOTON_APP_ID")
+          else
+            NET_ARGS=(-serverHost "$SERVER_IP" -port "$BENCH_PORT" -netIface tailscale0)
+          fi
+
+          touch logs/client-${{ matrix.idx }}.log
+          tail -n +1 -F logs/client-${{ matrix.idx }}.log &
+          TAIL_PID=$!
+          trap 'kill "$TAIL_PID" 2>/dev/null || true' EXIT
+          STATUS=0
+          timeout --signal=TERM --kill-after=10s 15m \
+            xvfb-run -a --server-args="-screen 0 1024x768x24" \
+            "$BIN" -batchmode -nographics \
+            -role client \
+            -benchSeconds ${{ inputs.bench_seconds }} -benchObjects ${{ inputs.bench_objects }} \
+            "${NET_ARGS[@]}" -connectTimeout 180 -maxRunSeconds 780 \
+            -results "$PWD/results/client-${{ matrix.idx }}.json" \
+            -logFile "$PWD/logs/client-${{ matrix.idx }}.log" || STATUS=$?
+          if [ "$STATUS" -ne 0 ]; then
+            echo "::error::Client ${{ matrix.idx }} exited with status $STATUS"
+            exit "$STATUS"
+          fi
+
+      - name: Tail client log on failure
+        if: failure()
+        run: tail -n 200 logs/client-${{ matrix.idx }}.log || true
+
+      - name: Upload client result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-result-${{ inputs.netcode }}-${{ inputs.tag }}-client-${{ matrix.idx }}
+          path: results/
+          if-no-files-found: warn
+          retention-days: 14
+
+  loadgen:
+    name: Loadgen ${{ matrix.idx }}
+    needs: [build, prep]
+    if: ${{ !cancelled() && needs.prep.result == 'success' && needs.build.result != 'failure' && needs.prep.outputs.loadgen_matrix != '[]' }}
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        idx: ${{ fromJSON(needs.prep.outputs.loadgen_matrix) }}
+    steps:
+      - name: Download player
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.prep.outputs.player }}
+          path: player
+
+      - *prepare_player
+
+      - name: Connect Tailscale
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          hostname: nb-${{ inputs.netcode }}-lg-${{ github.run_id }}-${{ inputs.tag }}-${{ matrix.idx }}
+
+      - *wait_for_runners
+
+      - *resolve_server
+
+      - name: Run loadgen clients
+        run: |
+          set -u
+          BIN="$PWD/player/NetBench"
+          if [ "$NETCODE" = "fusion" ]; then
+            NET_ARGS=(-session "nb-${GITHUB_RUN_ID}-${TAG}" -region "$PHOTON_REGION" -netIface eth0 -photonAppId "$PHOTON_APP_ID")
+          else
+            NET_ARGS=(-serverHost "$SERVER_IP" -port "$BENCH_PORT" -netIface tailscale0)
+          fi
+
+          PIDS=()
+          declare -A PROC_BY_PID=()
+          for p in $(seq 1 ${{ inputs.procs_per_loadgen }}); do
+            # Concurrent xvfb-run -a calls can pick the same display; give each a private one.
+            DISPLAY_NUM=$((100 + p))
+            timeout --signal=TERM --kill-after=10s 15m \
+              xvfb-run --server-num="$DISPLAY_NUM" \
+              --error-file="$PWD/logs/xvfb-${{ matrix.idx }}-$p.log" \
+              --server-args="-screen 0 1024x768x24" \
+              "$BIN" -batchmode -nographics \
+              -role client -loadgen \
+              -benchSeconds ${{ inputs.bench_seconds }} -benchObjects ${{ inputs.bench_objects }} \
+              "${NET_ARGS[@]}" -connectTimeout 180 -maxRunSeconds 780 \
+              -results "$PWD/results/loadgen-${{ matrix.idx }}-$p.json" \
+              -logFile "$PWD/logs/loadgen-${{ matrix.idx }}-$p.log" &
+            PID=$!
+            PIDS+=("$PID")
+            PROC_BY_PID["$PID"]=$p
+          done
+
+          terminate_remaining() {
+            for pid in "${!PROC_BY_PID[@]}"; do
+              kill "$pid" 2>/dev/null || true
+            done
+            wait 2>/dev/null || true
+          }
+          trap terminate_remaining EXIT
+
+          REMAINING=${#PIDS[@]}
+          FAILED=0
+          while [ "$REMAINING" -gt 0 ]; do
+            STATUS=0
+            FINISHED_PID=""
+            wait -n -p FINISHED_PID "${!PROC_BY_PID[@]}" || STATUS=$?
+            PROC=${PROC_BY_PID[$FINISHED_PID]}
+            unset "PROC_BY_PID[$FINISHED_PID]"
+            REMAINING=$((REMAINING - 1))
+            if [ "$STATUS" -ne 0 ]; then
+              echo "::warning::Loadgen process $PROC exited with status $STATUS"
+              tail -n 60 "logs/loadgen-${{ matrix.idx }}-$PROC.log" || true
+              FAILED=$((FAILED + 1))
+            fi
+          done
+          trap - EXIT
+          if [ "$FAILED" -gt 0 ]; then
+            echo "::error::$FAILED loadgen processes failed"
+            exit 1
+          fi
+
+      - name: Tail loadgen logs on failure
+        if: failure()
+        run: tail -n 80 logs/*.log || true
+
+      - name: Upload loadgen diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-log-${{ inputs.netcode }}-${{ inputs.tag }}-loadgen-${{ matrix.idx }}
+          path: |
+            results/
+            logs/
+          if-no-files-found: warn
+          retention-days: 14
+
+  aggregate:
+    name: Aggregate results
+    needs: [prep, server, clients]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (for aggregation scripts)
+        uses: actions/checkout@v4
+
+      - name: Download all results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: bench-result-${{ inputs.netcode }}-${{ inputs.tag }}-*
+          path: all
+          merge-multiple: true
+
+      - name: Render summary
+        run: |
+          bash .github/scripts/bench-aggregate.sh \
+            all \
+            "${{ inputs.netcode }}" \
+            "${{ needs.prep.outputs.total }}" \
+            "${{ inputs.tag }}" \
+            "${{ inputs.bench_seconds }}" \
+            "${{ inputs.bench_objects }}" \
+            scaling
+
+      - name: Upload scaling datapoint
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-scaling-${{ inputs.netcode }}-${{ inputs.tag }}
+          path: scaling/
+          if-no-files-found: ignore
+          retention-days: 14

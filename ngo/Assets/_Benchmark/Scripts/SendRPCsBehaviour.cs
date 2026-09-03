@@ -1,3 +1,4 @@
+using PurrNet.NetBench;
 using TMPro;
 using Unity.Netcode;
 using UnityEngine;
@@ -8,9 +9,17 @@ public class SendRPCsBehaviour : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
+        BenchRegistry.Spawned(4);
         if (!IsServer) return;
 
         NetworkManager.NetworkTickSystem.Tick += OnTick;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        BenchRegistry.Despawned(4);
+        if (IsServer && NetworkManager != null && NetworkManager.NetworkTickSystem != null)
+            NetworkManager.NetworkTickSystem.Tick -= OnTick;
     }
 
     private void OnTick()

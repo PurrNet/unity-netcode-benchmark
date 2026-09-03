@@ -1,4 +1,5 @@
 using FishNet.Object;
+using PurrNet.NetBench;
 using TMPro;
 using UnityEngine;
 
@@ -8,9 +9,17 @@ public class SendRPCBehaviour : NetworkBehaviour
 
     public override void OnStartNetwork()
     {
+        BenchRegistry.Spawned(4);
         if (!IsServer) return;
 
         TimeManager.OnTick += OnTick;
+    }
+
+    public override void OnStopNetwork()
+    {
+        BenchRegistry.Despawned(4);
+        if (TimeManager != null)
+            TimeManager.OnTick -= OnTick;
     }
 
     private void OnTick()

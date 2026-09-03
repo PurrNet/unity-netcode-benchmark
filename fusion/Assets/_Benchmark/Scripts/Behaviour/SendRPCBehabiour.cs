@@ -1,4 +1,5 @@
 using Fusion;
+using PurrNet.NetBench;
 using TMPro;
 using UnityEngine;
 
@@ -11,6 +12,8 @@ public class SendRPCBehabiour : NetworkBehaviour
 
     public override void Spawned()
     {
+        BenchRegistry.Spawned(4);
+
         // apply on clients
         if (!Runner.IsServer)
         {
@@ -21,6 +24,11 @@ public class SendRPCBehabiour : NetworkBehaviour
             SpawnPos = transform.position;
             SpawnRot = transform.rotation;
         }
+    }
+
+    public override void Despawned(NetworkRunner runner, bool hasState)
+    {
+        BenchRegistry.Despawned(4);
     }
 
     public override void FixedUpdateNetwork()

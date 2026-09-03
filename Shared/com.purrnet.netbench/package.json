@@ -1,0 +1,7 @@
+{
+  "name": "com.purrnet.netbench",
+  "version": "1.0.0",
+  "displayName": "Netcode Benchmark Harness",
+  "description": "Netcode-agnostic headless benchmark orchestration (CLI args, measurement windows, CPU/bandwidth sampling, JSON results). Each netcode project implements IBenchAdapter in its GUIGame.",
+  "unity": "6000.0"
+}

@@ -1,4 +1,5 @@
 using Mirror;
+using PurrNet.NetBench;
 using StinkySteak.NetcodeBenchmark;
 using UnityEngine;
 
@@ -11,11 +12,16 @@ namespace StinkySteak.MirrorBenchmark
 
         public override void OnStartServer()
         {
+            BenchRegistry.Spawned(2);
             if (isClient) return;
 
             _config.ApplyConfig(ref _wrapper);
             _wrapper.NetworkStart(transform);
         }
+
+        public override void OnStopServer() => BenchRegistry.Despawned(2);
+        public override void OnStartClient() => BenchRegistry.Spawned(2);
+        public override void OnStopClient() => BenchRegistry.Despawned(2);
 
         private void FixedUpdate()
         {

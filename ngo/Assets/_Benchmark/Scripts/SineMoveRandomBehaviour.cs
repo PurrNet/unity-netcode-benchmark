@@ -1,3 +1,4 @@
+using PurrNet.NetBench;
 using StinkySteak.NetcodeBenchmark;
 using Unity.Netcode;
 using UnityEngine;
@@ -11,11 +12,19 @@ namespace StinkySteak.NGOBenchmark
 
         public override void OnNetworkSpawn()
         {
+            BenchRegistry.Spawned(2);
             if (!IsServer) return;
-            
+
             _config.ApplyConfig(ref _wrapper);
             _wrapper.NetworkStart(transform);
             NetworkManager.NetworkTickSystem.Tick += OnTick;
+        }
+
+        public override void OnNetworkDespawn()
+        {
+            BenchRegistry.Despawned(2);
+            if (IsServer && NetworkManager != null && NetworkManager.NetworkTickSystem != null)
+                NetworkManager.NetworkTickSystem.Tick -= OnTick;
         }
 
         private void OnTick()

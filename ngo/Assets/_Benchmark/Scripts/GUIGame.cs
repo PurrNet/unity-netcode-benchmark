@@ -1,13 +1,19 @@
+using System.Collections;
+using System.Collections.Generic;
+using PurrNet.NetBench;
 using StinkySteak.NetcodeBenchmark;
 using Unity.Netcode;
+using Unity.Netcode.Transports.UTP;
 using UnityEngine;
 
 namespace StinkySteak.NGOBenchmark
 {
-    public class GUIGame : BaseGUIGame
+    public class GUIGame : BaseGUIGame, IBenchAdapter
     {
         [SerializeField] private NetworkManager _networkManagerPrefab;
         private NetworkManager _networkManager;
+
+        private readonly List<NetworkObject> _spawned = new List<NetworkObject>();
 
         protected override void Initialize()
         {
@@ -61,6 +67,101 @@ namespace StinkySteak.NGOBenchmark
             ulong rtt = _networkManager.NetworkConfig.NetworkTransport.GetCurrentRtt(0);
 
             _textLatency.SetText("Latency: {0}ms", rtt);
+        }
+
+        // ---- IBenchAdapter ----
+
+        public string NetcodeName => "ngo";
+
+        public int TickRate => _networkManager != null ? (int)_networkManager.NetworkConfig.TickRate : 0;
+
+        public string[] ProfilerMarkerPrefixes => new[]
+        {
+            "Netcode", "NetworkManager", "NetworkUpdateLoop", "NetworkBehaviourUpdater", "UnityTransport", "NetworkObject", "NGO"
+        };
+
+        public void Configure(BenchConnectOptions options)
+        {
+            if (_networkManager.NetworkConfig.NetworkTransport is UnityTransport utp)
+                utp.SetConnectionData(options.host, options.port, "0.0.0.0");
+        }
+
+        public void StartBenchServer() => _networkManager.StartServer();
+
+        public void StartBenchClient() => _networkManager.StartClient();
+
+        public void RestartBenchClient()
+        {
+            StartCoroutine(RestartClientRoutine());
+        }
+
+        private IEnumerator RestartClientRoutine()
+        {
+            if (_networkManager.IsListening)
+            {
+                _networkManager.Shutdown();
+                // Shutdown completes on the next NetworkManager update.
+                yield return null;
+                yield return null;
+            }
+
+            _networkManager.StartClient();
+        }
+
+        public bool IsServerListening => _networkManager != null && _networkManager.IsServer && _networkManager.IsListening;
+
+        public bool IsClientConnected => _networkManager != null && _networkManager.IsConnectedClient;
+
+        public int ConnectedClientCount => _networkManager != null && _networkManager.IsServer ? _networkManager.ConnectedClientsIds.Count : 0;
+
+        public double ClientRttMs => _networkManager != null && _networkManager.IsConnectedClient
+            ? _networkManager.NetworkConfig.NetworkTransport.GetCurrentRtt(NetworkManager.ServerClientId)
+            : 0;
+
+        public int SpawnTest(int test, int count)
+        {
+            var prefab = GetTestPrefab(test);
+            if (prefab == null) return 0;
+
+            for (int i = 0; i < count; i++)
+            {
+                GameObject go = Instantiate(prefab);
+                go.transform.position = Random.insideUnitSphere * 10;
+                var no = go.GetComponent<NetworkObject>();
+                no.Spawn();
+                _spawned.Add(no);
+            }
+
+            return count;
+        }
+
+        public void DespawnAll()
+        {
+            for (int i = 0; i < _spawned.Count; i++)
+            {
+                if (_spawned[i] != null && _spawned[i].IsSpawned)
+                    _spawned[i].Despawn(true);
+            }
+
+            _spawned.Clear();
+        }
+
+        public void ShutdownBench()
+        {
+            if (_networkManager != null && _networkManager.IsListening)
+                _networkManager.Shutdown();
+        }
+
+        private GameObject GetTestPrefab(int test)
+        {
+            switch (test)
+            {
+                case 1: return _test_1.Prefab;
+                case 2: return _test_2.Prefab;
+                case 3: return _test_3.Prefab;
+                case 4: return _test_4.Prefab;
+                default: return null;
+            }
         }
     }
 }
