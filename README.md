@@ -9,6 +9,13 @@ hardware, with bandwidth, CPU, frame time and RTT compared side by side.
 <!-- BENCH:START -->
 _Last run 2026-09-03: PurrNet 1.23.0-beta.20 · FishNet 4.7.3 · Mirror 96.0.1 · NGO 2.13.2 · Fusion 2.1.2 Stable 2279 · Unity 6000.5.4f1 · 100 objects per test · 20 s windows · connections 10 / 50 / 100._
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/latest-dark.svg">
+  <img alt="Server downstream on-wire at 100 connections; Server CPU minus idle at 100 connections. Best value per row highlighted in green." src="docs/latest-light.svg">
+</picture>
+
+<details><summary>Same tables as text</summary>
+
 **Server downstream on-wire at 100 connections** (KB/s, lower is better)
 
 | Test | PurrNet | FishNet | Mirror | NGO | Fusion |
@@ -34,6 +41,8 @@ _Last run 2026-09-03: PurrNet 1.23.0-beta.20 · FishNet 4.7.3 · Mirror 96.0.1 �
 | SpawnChurn | 11.2 | 6.5 | 5.3 | **2.7** | 9.2 |
 | ClientInput | 1.0 | 3.3 | 1.9 | **0.2** | 14.9 |
 | SyncVars | 6.6 | **4.8** | 7.8 | 51.5 | 6.4 |
+
+</details>
 
 All metrics (per-client bandwidth, frame times, RTT, GC, memory, every connection count) are in the [interactive report](https://purrnet.github.io/unity-netcode-benchmark/), [workflow run](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/33774317390), [raw datapoints](docs/latest.json).
 <!-- BENCH:END -->

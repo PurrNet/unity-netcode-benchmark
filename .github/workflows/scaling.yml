@@ -202,7 +202,10 @@ jobs:
           python3 .github/scripts/render-report.py results-out/scaling.json results-out/report.html \
             --versions all/versions.json --run-url "$RUN_URL" --title "Netcode Scaling Report"
           python3 .github/scripts/render-summary.py results-out/scaling.json \
-            --versions all/versions.json --run-url "$RUN_URL" --report-url "$PAGES_URL" > results-out/latest.md
+            --versions all/versions.json --run-url "$RUN_URL" --report-url "$PAGES_URL" \
+            --svg-out results-out/svg > results-out/latest.md
+          # The Markdown references docs/latest-*.svg; the commit step copies them there.
+          sed -i 's#results-out/svg/#docs/#g' results-out/latest.md
           cat results-out/latest.md
 
       - name: Upload combined results
@@ -227,6 +230,7 @@ jobs:
           cp results-out/report.html docs/index.html
           cp results-out/scaling.json docs/latest.json
           cp results-out/latest.md docs/latest.md
+          cp results-out/svg/latest-light.svg results-out/svg/latest-dark.svg docs/
           python3 - <<'EOF'
           import re, pathlib
           readme = pathlib.Path("README.md")
