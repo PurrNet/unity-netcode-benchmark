@@ -313,9 +313,11 @@ jobs:
             exit 1
           fi
           if [ "$REACHABLE" -ne 1 ]; then
-            echo "::error::Server node $SERVER_HOST is visible ($SERVER_IP) but not reachable (check tailnet ACL tag:ci -> tag:ci)"
+            # `tailscale ping` can keep failing while the direct path is still being negotiated
+            # even though relayed (DERP) traffic already flows; the player retries its own
+            # connection for -connectTimeout seconds, so proceed instead of losing this client.
+            echo "::warning::Server node $SERVER_HOST is visible ($SERVER_IP) but tailscale ping did not succeed within 2 minutes; connecting anyway"
             tailscale status || true
-            exit 1
           fi
           echo "Server resolved to $SERVER_IP"
           echo "SERVER_IP=$SERVER_IP" >> "$GITHUB_ENV"
