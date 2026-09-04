@@ -389,6 +389,11 @@ namespace PurrNet.NetBench
                 yield return Window(test, clientWindow);
                 remaining.Remove(test);
 
+                // Nothing left to observe after the last test; a relay client may never see the
+                // host's final despawn or its own disconnect, so do not wait for either.
+                if (remaining.Count == 0)
+                    break;
+
                 while (BenchRegistry.Count(slot) > 0 && _adapter.IsClientConnected)
                     yield return new WaitForSecondsRealtime(0.1f);
 

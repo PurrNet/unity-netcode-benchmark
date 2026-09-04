@@ -89,9 +89,13 @@ jobs:
 
           # One session per connection count; the session itself runs the netcodes back to back
           # and works out measured / loadgen runner counts per netcode (see benchmark.yml).
+          # Fusion sessions share one Photon CCU plan, so each session waits for the smaller
+          # sessions to finish Fusion before starting its own (fusion_after).
           ENTRIES=""
+          AFTER=""
           for s in $SIZES; do
-            ENTRIES="$ENTRIES{\"size\":\"$s\",\"tag\":\"c$s\"},"
+            ENTRIES="$ENTRIES{\"size\":\"$s\",\"tag\":\"c$s\",\"fusion_after\":\"${AFTER#,}\"},"
+            AFTER="$AFTER,c$s"
           done
           MATRIX="{\"include\":[${ENTRIES%,}]}"
           echo "$MATRIX" | jq .
@@ -131,6 +135,7 @@ jobs:
       bench_seconds: ${{ inputs.bench_seconds }}
       bench_objects: ${{ inputs.bench_objects }}
       tag: ${{ matrix.tag }}
+      fusion_after: ${{ matrix.fusion_after }}
       build_players: false
       profiling: ${{ inputs.profiling }}
       runner: ${{ inputs.runner }}

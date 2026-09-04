@@ -10,7 +10,9 @@ name: Benchmark
 #
 # Sequencing: the server publishes the netcode it is about to run on a tiny HTTP endpoint over the
 # tailnet (the "phase"); clients launch the matching player only once the phase says so, so a
-# client that finished early can never attach to the previous netcode's server.
+# client that finished early can never attach to the previous netcode's server. Fusion always runs
+# last, and a session waits for the sessions named in `fusion_after` to finish before starting it:
+# Fusion sessions share one Photon CCU plan, so two connection counts must not run Fusion at once.
 #
 # Every process runs the same BenchRunner scenario (Shared/com.purrnet.netbench): Idle window, then
 # the eight tests with `bench_objects` objects each, `bench_seconds` of steady state per test.
@@ -58,6 +60,10 @@ on:
         description: "Run discriminator (artifact names, tailnet hostnames)"
         required: false
         default: "solo"
+      fusion_after:
+        description: "Comma-separated tags of sibling sessions (same run) that must finish before this session runs Fusion"
+        required: false
+        default: ""
       build_players:
         description: "Build the players here (off = reuse player-<netcode> artifacts from the calling workflow)"
         type: boolean
@@ -107,6 +113,10 @@ on:
       tag:
         type: string
         required: true
+      fusion_after:
+        type: string
+        required: false
+        default: ""
       build_players:
         type: boolean
         required: false
@@ -157,6 +167,10 @@ jobs:
           for n in $NETCODES; do
             case "$n" in purrnet|fishnet|mirror|ngo|fusion) ;; *) echo "::error::Unknown netcode '$n'"; exit 1;; esac
           done
+          # Fusion goes last so the cross-session Fusion wait (fusion_after) delays nothing else.
+          if printf '%s\n' $NETCODES | grep -qx fusion; then
+            NETCODES="$(printf '%s\n' $NETCODES | grep -vx fusion) fusion"
+          fi
           echo "netcode_list=$(printf '%s\n' $NETCODES | jq -R . | jq -s -c .)" >> "$GITHUB_OUTPUT"
 
           # Per netcode: total connections (Fusion capped), measured runners, loadgen runners and
@@ -296,6 +310,31 @@ jobs:
             echo "::group::[$IDX] $n server, $TOTAL connections"
 
             if [ "$n" = "fusion" ]; then
+              # One Photon CCU plan is shared by every session of this run: wait until the sibling
+              # sessions listed in fusion_after are past Fusion (phase beyond it, done, or offline).
+              SIBLINGS=$(echo "${{ inputs.fusion_after }}" | tr ',' ' ')
+              for sib in $SIBLINGS; do
+                SIB_HOST="nb-srv-${GITHUB_RUN_ID}-${sib}"
+                echo "Waiting for session $sib ($SIB_HOST) to finish Fusion"
+                for i in $(seq 1 600); do
+                  ONLINE=$(tailscale status --json 2>/dev/null | jq --arg h "$SIB_HOST" '[.Peer[]? | select(.HostName == $h and .Online == true)] | length' 2>/dev/null || echo 0)
+                  if [ "${ONLINE:-0}" -eq 0 ]; then
+                    echo "Session $sib is offline; treating it as finished"
+                    break
+                  fi
+                  SIB_IP=$(tailscale ip -4 "$SIB_HOST" 2>/dev/null | head -n1)
+                  SIB_PHASE=$(curl -fs --max-time 3 "http://${SIB_IP}:${PHASE_PORT}/phase" 2>/dev/null || true)
+                  SIB_IDX=${SIB_PHASE%% *}
+                  if [ "$SIB_PHASE" = "done" ] || { [ "$SIB_IDX" -gt "$IDX" ] 2>/dev/null; }; then
+                    echo "Session $sib is past Fusion (phase: $SIB_PHASE)"
+                    break
+                  fi
+                  if [ $((i % 12)) -eq 0 ]; then
+                    echo "Session $sib phase: ${SIB_PHASE:-unreachable}"
+                  fi
+                  sleep 5
+                done
+              done
               NET_ARGS=(-session "nb-${GITHUB_RUN_ID}-${TAG}" -region "$PHOTON_REGION" -netIface eth0 -photonAppId "$PHOTON_APP_ID")
             else
               for i in $(seq 1 30); do
@@ -420,8 +459,9 @@ jobs:
           #!/usr/bin/env bash
           # wait_for_phase.sh <index> <netcode>: blocks until the server announces this netcode.
           # Exit 0 = go, 1 = the server already moved past it or finished, 2 = the server never answered.
+          # Fusion can be held back while sibling sessions finish theirs, hence the long timeout.
           WANT_IDX="$1"; WANT="$2"
-          for i in $(seq 1 450); do
+          for i in $(seq 1 1500); do
             PHASE=$(curl -fs --max-time 3 "http://${SERVER_IP}:${PHASE_PORT}/phase" 2>/dev/null || true)
             case "$PHASE" in
               "$WANT_IDX $WANT") exit 0 ;;
