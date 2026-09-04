@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render the compact "Latest results" Markdown block that the workflow commits into README.md.
+"""Render the compact "Latest results" Markdown block (docs/latest.md, also the job summary).
 
 Usage: render-summary.py <scaling.json> [--versions versions.json] [--run-url URL] [--report-url URL] [--svg-out DIR]
 
@@ -282,7 +282,7 @@ def main():
         links.append(f"[interactive report]({args.report_url})")
     if args.run_url:
         links.append(f"[workflow run]({args.run_url})")
-    links.append("[raw datapoints](docs/latest.json)")
+    links.append("[raw datapoints](latest.json)")
     lines.append("Every metric per test (bandwidth, CPU, frame times, RTT, GC, memory) and every session are in the " + ", ".join(links) + ".")
     print("\n".join(lines))
 

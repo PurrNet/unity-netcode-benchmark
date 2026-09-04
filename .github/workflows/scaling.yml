@@ -210,8 +210,8 @@ jobs:
           python3 .github/scripts/render-summary.py results-out/scaling.json \
             --versions all/versions.json --run-url "$RUN_URL" --report-url "$PAGES_URL" \
             --svg-out results-out/svg > results-out/latest.md
-          # The Markdown references docs/latest-*.svg; the commit step copies them there.
-          sed -i 's#results-out/svg/#docs/#g' results-out/latest.md
+          # The Markdown lives in docs/ next to the SVGs it references.
+          sed -i 's#results-out/svg/##g' results-out/latest.md
           cat results-out/latest.md
           # Same block as the job summary, minus the picture (its SVGs are not reachable from here).
           sed '/<picture>/,/<\/picture>/d' results-out/latest.md >> "$GITHUB_STEP_SUMMARY"
@@ -227,9 +227,9 @@ jobs:
           if-no-files-found: warn
           retention-days: 90
 
-      # Commit the latest report + README block on the default branch only, and only when every
-      # planned datapoint exists (a partial run must not overwrite a complete one). A datapoint
-      # still exists when a few client jobs failed, so flaky clients do not block the update.
+      # Commit the latest report (docs/) on the default branch only, and only when every planned
+      # datapoint exists (a partial run must not overwrite a complete one). A datapoint still
+      # exists when a few client jobs failed, so flaky clients do not block the update.
       - name: Commit latest results to the repository
         if: ${{ steps.report.outputs.complete == 'true' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
         run: |
@@ -239,20 +239,9 @@ jobs:
           cp results-out/scaling.json docs/latest.json
           cp results-out/latest.md docs/latest.md
           cp results-out/svg/latest-light.svg results-out/svg/latest-dark.svg docs/
-          python3 - <<'EOF'
-          import re, pathlib
-          readme = pathlib.Path("README.md")
-          text = readme.read_text(encoding="utf-8")
-          block = pathlib.Path("docs/latest.md").read_text(encoding="utf-8").strip()
-          new = re.sub(r"<!-- BENCH:START -->.*?<!-- BENCH:END -->",
-                       "<!-- BENCH:START -->\n" + block + "\n<!-- BENCH:END -->", text, flags=re.S)
-          if new == text and "<!-- BENCH:START -->" not in text:
-              new = text.rstrip() + "\n\n## Latest results\n\n<!-- BENCH:START -->\n" + block + "\n<!-- BENCH:END -->\n"
-          readme.write_text(new, encoding="utf-8")
-          EOF
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add README.md docs/
+          git add docs/
           if git diff --cached --quiet; then
             echo "Nothing to commit"
             exit 0

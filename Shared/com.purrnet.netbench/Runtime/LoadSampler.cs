@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Runtime.InteropServices;
 using Unity.Profiling;
 using UnityEngine;
 
@@ -152,8 +153,40 @@ namespace PurrNet.NetBench
 
         private static double NowSeconds() => DateTime.UtcNow.Ticks / (double)TimeSpan.TicksPerSecond;
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct Timespec
+        {
+            public long tv_sec;
+            public long tv_nsec;
+        }
+
+        private const int ClockProcessCpuTimeId = 2;
+
+        [DllImport("libc.so.6", EntryPoint = "clock_gettime")]
+        private static extern int clock_gettime(int clockId, out Timespec ts);
+
+        private static bool s_cpuClockBroken;
+
+        /// <summary>
+        /// CPU time of the whole process, all threads. The process CPU clock has nanosecond resolution;
+        /// /proc/self/stat is the fallback and only has 10 ms ticks, which is 0.1 points on a 10 s window.
+        /// </summary>
         private static double ReadProcessCpuSeconds()
         {
+            if (!s_cpuClockBroken)
+            {
+                try
+                {
+                    if (clock_gettime(ClockProcessCpuTimeId, out var ts) == 0)
+                        return ts.tv_sec + ts.tv_nsec / 1e9;
+                }
+                catch (Exception)
+                {
+                    // Not Linux, or no libc by that name: fall through to /proc for the rest of the run.
+                }
+                s_cpuClockBroken = true;
+            }
+
             try
             {
                 var stat = File.ReadAllText("/proc/self/stat");
