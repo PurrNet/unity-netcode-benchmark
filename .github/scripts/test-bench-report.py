@@ -30,6 +30,49 @@ def sample(name):
 
 
 class DeliveryReportChecks(unittest.TestCase):
+    def test_fleet_artifact_layout_uses_each_session_and_only_measured_clients(self):
+        # Execute the actual workflow's aggregation shell, not a second implementation of it.
+        lines = (SCRIPTS.parent / 'workflows/benchmark.yml').read_text(encoding='utf-8').splitlines()
+        start = lines.index('      - name: Render per-session datapoints') + 2
+        script = []
+        for line in lines[start:]:
+            if line and not line.startswith('          '):
+                break
+            script.append(line[10:])
+        self.assertTrue(script)
+        with tempfile.TemporaryDirectory(prefix='bench-fleet-report-') as tmp:
+            root = Path(tmp)
+            scripts = root / '.github/scripts'
+            scripts.mkdir(parents=True)
+            shutil.copy2(SCRIPTS / 'bench-aggregate.sh', scripts / 'bench-aggregate.sh')
+            cases = []
+            for tick in (20, 60):
+                tag = f'c1t{tick}'
+                cases.append(dict(netcode='mirror', tag=tag, total=1))
+                results = root / 'all/results' / tag / 'mirror'
+                results.mkdir(parents=True)
+                server = dict(expectedClients=1, connectedAtStart=1, completed=True, tickRate=tick,
+                              targetFps=60, tests=[sample('SyncVars')])
+                client = copy.deepcopy(server)
+                client['measured'] = True
+                client['tests'][0]['syncObservedChangesPerSec'] = tick * 10
+                (results / 'server.json').write_text(json.dumps(server), encoding='utf-8')
+                (results / 'client-1.json').write_text(json.dumps(client), encoding='utf-8')
+                # Even if a diagnostic file were accidentally present, it must not enter the average.
+                client['measured'] = False
+                client['tests'][0]['syncObservedChangesPerSec'] = 99999
+                (results / 'loadgen-1-1.json').write_text(json.dumps(client), encoding='utf-8')
+            env = dict(os.environ, PLAN=json.dumps(dict(cases=cases)), BENCH_SECONDS='10', BENCH_OBJECTS='100',
+                       GITHUB_STEP_SUMMARY=(root / 'summary.md').as_posix())
+            subprocess.run([BASH, '-euo', 'pipefail', '-c', '\n'.join(script)], cwd=root, env=env,
+                           check=True, capture_output=True, text=True, encoding='utf-8', timeout=30)
+            self.assertEqual(len(list((root / 'scaling').glob('dp-*.json'))), 2)
+            for tick in (20, 60):
+                data = json.loads((root / f'scaling/dp-mirror-c1t{tick}.json').read_text(encoding='utf-8'))
+                self.assertEqual(data['tick'], tick)
+                self.assertEqual(data['meta']['measuredClients'], 1)
+                self.assertEqual(data['clients']['SyncVars']['syncObservedChangesPerSec'], tick * 10)
+
     def test_delivery_cases(self):
         for case in ('match', 'mismatch', 'client_incomplete', 'server_incomplete', 'legacy', 'missing_client', 'coalesced', 'no_observation', 'mixed_clients'):
             with self.subTest(case=case), tempfile.TemporaryDirectory(prefix='bench-report-') as tmp:

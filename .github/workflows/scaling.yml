@@ -1,13 +1,9 @@
 name: Netcode Scaling Benchmark
 
-# Builds every selected netcode once (in parallel), then runs one benchmark session per entry in
-# `sessions` (connections@tickHz, e.g. 100@60; up to max_parallel side by side). Inside a session
-# every netcode runs back to back on the same server machine and the same client machines, so
-# numbers within a session are comparable across netcodes. Finally renders the report.
+# Builds every selected netcode once (in parallel), then runs all requested sessions sequentially
+# on one prepared fleet. Every case launches fresh players; no measured cases overlap.
 #
-# Runner budget per session: 1 server + measured_clients + ceil((size - measured) / loadgen_procs)
-# loadgen runners, e.g. size 100 = 1 + 10 + 8 = 19 runners. Every runner joins the tailnet as an
-# ephemeral device, so max_parallel x 19 must stay under the Tailscale device limit.
+# Runner budget: the largest session's server + measured + loadgen runners (19 by default).
 #
 # Fusion's client count is capped by fusion_max_clients (Photon CCU plan). If Photon refuses a
 # connection the server proceeds with the clients it has after -connectTimeout, and the summary
@@ -58,7 +54,7 @@ on:
         required: false
         default: ""
       server_runner:
-        description: "runs-on label for the server job (bench-server = the dedicated Hetzner box, which runs one session at a time, so keep max_parallel at 1; empty = same as runner)"
+        description: "Server runner label (bench-server = dedicated Hetzner box; empty = same as runner)"
         required: false
         default: "bench-server"
       fusion_max_clients:
@@ -66,7 +62,7 @@ on:
         required: false
         default: "100"
       max_parallel:
-        description: "Benchmark sessions (connection counts) in flight at once. Every runner is a tailnet device: keep max_parallel x runners-per-session under your Tailscale device limit (100 on the Personal plan). bench-server runs one session at a time, so leave at 1 unless server_runner points elsewhere"
+        description: "Compatibility input: must be 1. The reused fleet runs all measurements sequentially."
         required: false
         default: "1"
 
@@ -83,43 +79,23 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       netcode_matrix: ${{ steps.gen.outputs.netcode_matrix }}
-      size_matrix: ${{ steps.gen.outputs.size_matrix }}
       expected: ${{ steps.gen.outputs.expected }}
-      max_parallel: ${{ steps.gen.outputs.max_parallel }}
     steps:
+      - uses: actions/checkout@v7
       - id: gen
-        run: |
-          set -eu
-          NETCODES=$(echo "${{ inputs.netcodes }}" | tr ',' '\n' | sed 's/ //g' | grep -v '^$')
-          SESSIONS=$(echo "${{ inputs.sessions }}" | tr ',' '\n' | sed 's/ //g' | grep -v '^$')
-          for n in $NETCODES; do
-            case "$n" in purrnet|fishnet|mirror|ngo|fusion) ;; *) echo "::error::Unknown netcode '$n'"; exit 1;; esac
-          done
-          echo "netcode_matrix=$(printf '%s\n' $NETCODES | jq -R . | jq -s -c .)" >> "$GITHUB_OUTPUT"
-          echo "max_parallel=${{ inputs.max_parallel }}" >> "$GITHUB_OUTPUT"
-
-          # One session per connections@tick entry; the session itself runs the netcodes back to
-          # back and works out measured / loadgen runner counts per netcode (see benchmark.yml).
-          # The tag (c100t60) names artifacts and tailnet hosts and tells the aggregator which
-          # row the datapoint belongs to. Fusion sessions share one Photon CCU plan, so each
-          # session waits for the earlier ones to finish Fusion before starting its own (fusion_after).
-          ENTRIES=""
-          AFTER=""
-          COUNT=0
-          for s in $SESSIONS; do
-            SIZE=${s%@*}
-            TICK=20
-            [ "$s" != "$SIZE" ] && TICK=${s#*@}
-            case "$SIZE$TICK" in *[!0-9]*) echo "::error::Bad session '$s' (want connections@tickHz)"; exit 1;; esac
-            TAG="c${SIZE}t${TICK}"
-            ENTRIES="$ENTRIES{\"size\":\"$SIZE\",\"tick\":\"$TICK\",\"tag\":\"$TAG\",\"fusion_after\":\"${AFTER#,}\"},"
-            AFTER="$AFTER,$TAG"
-            COUNT=$((COUNT + 1))
-          done
-          MATRIX="{\"include\":[${ENTRIES%,}]}"
-          echo "$MATRIX" | jq .
-          echo "size_matrix=$(echo "$MATRIX" | jq -c .)" >> "$GITHUB_OUTPUT"
-          echo "expected=$(( $(printf '%s\n' $NETCODES | wc -l) * COUNT ))" >> "$GITHUB_OUTPUT"
+        env:
+          NETCODES: ${{ inputs.netcodes }}
+          SESSIONS: ${{ inputs.sessions }}
+          MEASURED_CLIENTS: ${{ inputs.measured_clients }}
+          LOADGEN_PROCS: ${{ inputs.loadgen_procs }}
+          FUSION_MAX_CLIENTS: ${{ inputs.fusion_max_clients }}
+          BENCH_SECONDS: ${{ inputs.bench_seconds }}
+          BENCH_OBJECTS: ${{ inputs.bench_objects }}
+          MAX_PARALLEL: ${{ inputs.max_parallel }}
+          RUNNER: ${{ inputs.runner }}
+          LOADGEN_RUNNER: ${{ inputs.loadgen_runner }}
+          SERVER_RUNNER: ${{ inputs.server_runner }}
+        run: python3 .github/scripts/bench-fleet.py plan
 
   build:
     name: Build
@@ -136,26 +112,19 @@ jobs:
       runner: ${{ inputs.runner }}
 
   bench:
-    name: ${{ matrix.size }} connections @ ${{ matrix.tick }} Hz
+    name: Sequential benchmark fleet
     needs: [prep, build]
-    if: ${{ !cancelled() && needs.prep.result == 'success' }}
-    strategy:
-      fail-fast: false
-      max-parallel: ${{ fromJSON(needs.prep.outputs.max_parallel) }}
-      matrix: ${{ fromJSON(needs.prep.outputs.size_matrix) }}
+    if: ${{ !cancelled() && needs.prep.result == 'success' && needs.build.result == 'success' }}
     uses: ./.github/workflows/benchmark.yml
     secrets: inherit
     with:
       netcodes: ${{ inputs.netcodes }}
-      size: ${{ matrix.size }}
+      sessions: ${{ inputs.sessions }}
       measured_clients: ${{ inputs.measured_clients }}
       loadgen_procs: ${{ inputs.loadgen_procs }}
       fusion_max_clients: ${{ inputs.fusion_max_clients }}
       bench_seconds: ${{ inputs.bench_seconds }}
       bench_objects: ${{ inputs.bench_objects }}
-      tick_rate: ${{ matrix.tick }}
-      tag: ${{ matrix.tag }}
-      fusion_after: ${{ matrix.fusion_after }}
       build_players: false
       profiling: ${{ inputs.profiling }}
       runner: ${{ inputs.runner }}
@@ -191,6 +160,8 @@ jobs:
 
       - name: Render interactive report
         id: report
+        env:
+          BENCH_RESULT: ${{ needs.bench.result }}
         run: |
           set -eu
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
@@ -198,7 +169,7 @@ jobs:
           COUNT=$(jq 'length' results-out/scaling.json 2>/dev/null || echo 0)
           EXPECTED=${{ needs.prep.outputs.expected }}
           COMPLETE=false
-          [ "$COUNT" -ge "$EXPECTED" ] && [ "$COUNT" -gt 0 ] && COMPLETE=true
+          [ "$COUNT" -eq "$EXPECTED" ] && [ "$COUNT" -gt 0 ] && [ "$BENCH_RESULT" = "success" ] && COMPLETE=true
           echo "Datapoints: $COUNT of $EXPECTED planned (complete=$COMPLETE)"
           echo "count=$COUNT" >> "$GITHUB_OUTPUT"
           echo "complete=$COMPLETE" >> "$GITHUB_OUTPUT"
@@ -228,8 +199,8 @@ jobs:
           retention-days: 90
 
       # Commit the latest report (docs/) on the default branch only, and only when every planned
-      # datapoint exists (a partial run must not overwrite a complete one). A datapoint still
-      # exists when a few client jobs failed, so flaky clients do not block the update.
+      # datapoint exists and fleet coordination succeeded. Partial results remain downloadable;
+      # a missing worker or failed completion barrier must not replace the published report.
       - name: Commit latest results to the repository
         if: ${{ steps.report.outputs.complete == 'true' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
         run: |

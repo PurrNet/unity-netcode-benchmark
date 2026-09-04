@@ -43,9 +43,19 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # No restore prefix: a finished player is reusable only for identical build inputs.
+      # ProjectSettings includes the Unity version; the workflow includes the builder/configuration.
+      - name: Restore finished player
+        id: cache-player
+        uses: actions/cache/restore@v6
+        with:
+          path: build/player-package/
+          key: Player-v1-Linux-IL2CPP-${{ inputs.netcode }}-${{ inputs.profiling && 'dev' || 'rel' }}-${{ hashFiles(format('{0}/Assets/**', inputs.netcode), format('{0}/Packages/**', inputs.netcode), format('{0}/ProjectSettings/**', inputs.netcode), 'Shared/**', '.github/workflows/build.yml', '.github/scripts/package-player.py') }}
+
       # GitHub's cache (10 GB per repo). The Blacksmith drop-in used before this does not fall back
       # on GitHub-hosted runners despite its docs: restore and save both fail with 401.
       - name: Restore Library cache
+        if: steps.cache-player.outputs.cache-hit != 'true'
         id: cache-library
         uses: actions/cache/restore@v6
         with:
@@ -55,6 +65,7 @@ jobs:
             Library-${{ inputs.netcode }}-${{ inputs.profiling && 'dev' || 'rel' }}-
 
       - name: Build StandaloneLinux64 player (IL2CPP)
+        if: steps.cache-player.outputs.cache-hit != 'true'
         uses: game-ci/unity-builder@v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
@@ -73,15 +84,44 @@ jobs:
           customParameters: ${{ inputs.profiling && '-devBuild' || '' }}
 
       - name: Save Library cache
-        if: always() && steps.cache-library.outputs.cache-hit != 'true'
+        if: ${{ !cancelled() && steps.cache-player.outputs.cache-hit != 'true' && steps.cache-library.outcome == 'success' && steps.cache-library.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v6
         with:
           path: ${{ inputs.netcode }}/Library
           key: ${{ steps.cache-library.outputs.cache-primary-key }}
 
+      - name: Separate runtime and build diagnostics
+        if: steps.cache-player.outputs.cache-hit != 'true'
+        env:
+          PLAYER_KEY: ${{ steps.cache-player.outputs.cache-primary-key }}
+        run: python3 .github/scripts/package-player.py package --key "$PLAYER_KEY" --revision "$GITHUB_SHA"
+
+      - name: Verify finished player
+        env:
+          PLAYER_KEY: ${{ steps.cache-player.outputs.cache-primary-key }}
+        run: python3 .github/scripts/package-player.py verify --key "$PLAYER_KEY"
+
+      - name: Save finished player
+        if: steps.cache-player.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: build/player-package/
+          key: ${{ steps.cache-player.outputs.cache-primary-key }}
+
       - name: Upload player artifact
         uses: actions/upload-artifact@v7
         with:
           name: player-${{ inputs.netcode }}
-          path: build/StandaloneLinux64/
+          path: build/player-package/runtime/
+          if-no-files-found: error
           retention-days: 1
+
+      - name: Upload build diagnostics
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-diagnostics-${{ inputs.netcode }}
+          path: |
+            build/player-package/diagnostics/
+            build/player-package/runtime/build-provenance.json
+          if-no-files-found: error
+          retention-days: 14

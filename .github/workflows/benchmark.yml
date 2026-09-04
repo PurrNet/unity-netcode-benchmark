@@ -1,241 +1,148 @@
 name: Benchmark
 
-# One benchmark session for one connection count: every selected netcode runs back to back on
-# the SAME server runner and the SAME client runners, so the CPU numbers of one connection count
-# come from one machine and are comparable across netcodes. Mirrors PurrNet's distributed
-# benchmark: a server runner plus many client runners meet over a Tailscale overlay; single-process
-# "measured" client runners provide clean per-client numbers, multi-process "loadgen" runners only
-# add connection load. Fusion is relay-based (Photon Cloud), so its processes talk to the cloud
-# instead of to each other; the tailnet is still used as the start barrier.
-#
-# Sequencing: the server publishes the netcode it is about to run on a tiny HTTP endpoint over the
-# tailnet (the "phase"); clients launch the matching player only once the phase says so, so a
-# client that finished early can never attach to the previous netcode's server. Fusion always runs
-# last, and a session waits for the sessions named in `fusion_after` to finish before starting it:
-# Fusion sessions share one Photon CCU plan, so two connection counts must not run Fusion at once.
-#
-# Every process runs the same BenchRunner scenario (Shared/com.purrnet.netbench): Idle window, then
-# the seven tests with `bench_objects` objects each, `bench_seconds` of steady state per test.
-# Results are per-process JSON files aggregated per netcode by bench-aggregate.sh.
-#
-# Job budget: server (1) + measured (N) + loadgen (M) must fit the runner pool's concurrency
-# (GitHub Team plan = 60 concurrent jobs; check the Blacksmith plan's concurrency limit too).
+# One prepared fleet for the entire suite. Fresh players for each case, all cases sequential.
+# Loadgen processes share only their own (unmeasured) runner. Workers not needed in a smaller
+# session sit out. Completion acknowledgements gate the next case; uploads happen after the suite.
 
 on:
   workflow_dispatch:
     inputs:
       netcodes:
-        description: "Comma-separated netcodes to run back to back on the same machines"
+        description: "Comma-separated netcodes (Fusion runs last in each session)"
         required: true
         default: "purrnet,fishnet,mirror,ngo,fusion"
-      size:
-        description: "Connections per netcode (Fusion is capped by fusion_max_clients)"
-        required: true
-        default: "10"
-      measured_clients:
-        description: "Single-instance client runners (each reports clean stats)"
-        required: true
-        default: "10"
-      loadgen_procs:
-        description: "Client processes per loadgen runner (3 per vCPU is the tested ratio; ubuntu-latest has 4)"
-        required: true
-        default: "12"
-      loadgen_runner:
-        description: "runs-on label for loadgen runners (empty = same as runner)"
-        required: false
+      sessions:
+        description: "Sequential connections@tickHz sessions; empty uses size and tick_rate"
         default: ""
-      server_runner:
-        description: "runs-on label for the server job (bench-server = the dedicated Hetzner box, one session at a time; empty = same as runner)"
-        required: false
-        default: "bench-server"
-      fusion_max_clients:
-        description: "Client cap for Fusion (Photon CCU plan limit)"
-        required: false
-        default: "100"
-      bench_seconds:
-        description: "Steady-state measurement window per test, seconds (Idle and Static always use 5)"
-        required: true
+      size:
+        description: "Connections when sessions is empty"
         default: "10"
-      bench_objects:
-        description: "Objects spawned per test (moving objects / RPC emitters)"
-        required: true
-        default: "100"
       tick_rate:
-        description: "Network tick rate in Hz, applied to every netcode (0 = each project's configured rate)"
-        required: false
+        description: "Tick rate when sessions is empty (0 preserves project configuration)"
         default: "20"
       tag:
-        description: "Run discriminator (artifact names, tailnet hostnames)"
-        required: false
+        description: "Result tag when sessions is empty"
         default: "solo"
-      fusion_after:
-        description: "Comma-separated tags of sibling sessions (same run) that must finish before this session runs Fusion"
-        required: false
-        default: ""
+      measured_clients:
+        description: "Single-process measured client runners"
+        default: "10"
+      loadgen_procs:
+        description: "Processes per unmeasured loadgen runner"
+        default: "12"
+      fusion_max_clients:
+        description: "Fusion connection cap (Photon CCU plan limit)"
+        default: "100"
+      bench_seconds:
+        description: "Measurement seconds per test (Idle and Static remain 5)"
+        default: "10"
+      bench_objects:
+        description: "Objects per test"
+        default: "100"
       build_players:
-        description: "Build the players here (off = reuse player-<netcode> artifacts from the calling workflow)"
+        description: "Build players (off requires player artifacts already in this workflow run)"
         type: boolean
-        required: false
         default: true
       profiling:
-        description: "Development build (only used when building here)"
+        description: "Development builds"
         type: boolean
-        required: false
         default: false
       runner:
-        description: "runs-on label for client jobs (ubuntu-latest = GitHub-hosted, free for public repos; blacksmith-4vcpu-ubuntu-2404 = fixed hardware)"
-        required: false
+        description: "Build and measured-client runner label"
         default: "ubuntu-latest"
+      loadgen_runner:
+        description: "Loadgen runner label (empty uses runner)"
+        default: ""
+      server_runner:
+        description: "Server runner label (empty uses runner)"
+        default: "bench-server"
       region:
-        description: "Photon Cloud region (Fusion only; eu is closest to bench-server)"
-        required: false
+        description: "Photon Cloud region"
         default: "eu"
   workflow_call:
     inputs:
       netcodes:
         type: string
         required: true
+      sessions:
+        type: string
+        default: ""
       size:
         type: string
-        required: true
-      measured_clients:
-        type: string
-        required: true
-      loadgen_procs:
-        type: string
-        required: true
-      loadgen_runner:
-        type: string
-        required: false
-        default: ""
-      server_runner:
-        type: string
-        required: false
-        default: ""
-      fusion_max_clients:
-        type: string
-        required: false
-        default: "100"
-      bench_seconds:
-        type: string
-        required: true
-      bench_objects:
-        type: string
-        required: true
+        default: "10"
       tick_rate:
         type: string
-        required: false
         default: "20"
       tag:
         type: string
-        required: true
-      fusion_after:
+        default: "solo"
+      measured_clients:
         type: string
-        required: false
-        default: ""
+        default: "10"
+      loadgen_procs:
+        type: string
+        default: "12"
+      fusion_max_clients:
+        type: string
+        default: "100"
+      bench_seconds:
+        type: string
+        default: "10"
+      bench_objects:
+        type: string
+        default: "100"
       build_players:
         type: boolean
-        required: false
         default: false
       profiling:
         type: boolean
-        required: false
         default: false
       runner:
         type: string
-        required: false
         default: "ubuntu-latest"
+      loadgen_runner:
+        type: string
+        default: ""
+      server_runner:
+        type: string
+        default: ""
       region:
         type: string
-        required: false
-        default: "us"
+        default: "eu"
 
 env:
-  TAG: ${{ inputs.tag }}
-  SERVER_HOST: nb-srv-${{ github.run_id }}-${{ inputs.tag }}
-  # NOT named PORT: a bare `PORT` env var is auto-bound by several daemons on the runner.
+  SERVER_HOST: nb-srv-${{ github.run_id }}-${{ github.run_attempt }}-fleet
   BENCH_PORT: "7777"
   PHASE_PORT: "8788"
+  BENCH_SECONDS: ${{ inputs.bench_seconds }}
+  BENCH_OBJECTS: ${{ inputs.bench_objects }}
   PHOTON_REGION: ${{ inputs.region }}
-  # Optional override of the AppIdFusion stored in fusion/Assets/Photon/Fusion/Resources/PhotonAppSettings.asset.
   PHOTON_APP_ID: ${{ secrets.PHOTON_APP_ID }}
 
 jobs:
   prep:
-    name: Plan session
+    name: Plan fleet
     runs-on: ubuntu-latest
     outputs:
-      netcode_list: ${{ steps.gen.outputs.netcode_list }}
-      plan: ${{ steps.gen.outputs.plan }}
-      max_measured: ${{ steps.gen.outputs.max_measured }}
-      max_loadgen: ${{ steps.gen.outputs.max_loadgen }}
-      measured_matrix: ${{ steps.gen.outputs.measured_matrix }}
-      loadgen_matrix: ${{ steps.gen.outputs.loadgen_matrix }}
-      loadgen_runner: ${{ steps.gen.outputs.loadgen_runner }}
-      server_runner: ${{ steps.gen.outputs.server_runner }}
+      netcode_matrix: ${{ steps.plan.outputs.netcode_matrix }}
+      worker_matrix: ${{ steps.plan.outputs.worker_matrix }}
+      plan: ${{ steps.plan.outputs.plan }}
+      server_runner: ${{ steps.plan.outputs.server_runner }}
     steps:
-      - id: gen
-        run: |
-          set -eu
-          NETCODES=$(echo "${{ inputs.netcodes }}" | tr ',' '\n' | sed 's/ //g' | grep -v '^$')
-          SIZE=${{ inputs.size }}
-          MEASURED_MAX=${{ inputs.measured_clients }}
-          PROCS=${{ inputs.loadgen_procs }}
-          for n in $NETCODES; do
-            case "$n" in purrnet|fishnet|mirror|ngo|fusion) ;; *) echo "::error::Unknown netcode '$n'"; exit 1;; esac
-          done
-          # Fusion goes last so the cross-session Fusion wait (fusion_after) delays nothing else.
-          if printf '%s\n' $NETCODES | grep -qx fusion; then
-            NETCODES="$(printf '%s\n' $NETCODES | grep -vx fusion) fusion"
-          fi
-          echo "netcode_list=$(printf '%s\n' $NETCODES | jq -R . | jq -s -c .)" >> "$GITHUB_OUTPUT"
-
-          # Per netcode: total connections (Fusion capped), measured runners, loadgen runners and
-          # the process count on the last loadgen runner. The job matrices use the maxima; a runner
-          # whose index is above a netcode's count simply sits out that netcode.
-          PLAN="{}"
-          MAX_MEASURED=0
-          MAX_LG=0
-          for n in $NETCODES; do
-            CAP=200
-            [ "$n" = "fusion" ] && CAP=${{ inputs.fusion_max_clients }}
-            TOTAL=$SIZE
-            [ "$TOTAL" -gt "$CAP" ] && TOTAL=$CAP
-            MEASURED=$TOTAL
-            [ "$MEASURED" -gt "$MEASURED_MAX" ] && MEASURED=$MEASURED_MAX
-            REST=$((TOTAL - MEASURED))
-            if [ "$REST" -le 0 ]; then
-              LG=0; LAST=0
-            else
-              LG=$(( (REST + PROCS - 1) / PROCS ))
-              LAST=$(( REST - (LG - 1) * PROCS ))
-            fi
-            [ "$MEASURED" -gt "$MAX_MEASURED" ] && MAX_MEASURED=$MEASURED
-            [ "$LG" -gt "$MAX_LG" ] && MAX_LG=$LG
-            PLAN=$(echo "$PLAN" | jq -c --arg n "$n" --argjson total "$TOTAL" --argjson measured "$MEASURED" \
-              --argjson lg "$LG" --argjson procs "$PROCS" --argjson last "$LAST" \
-              '. + {($n): {total: $total, measured: $measured, loadgen: $lg, procs: $procs, procs_last: $last}}')
-          done
-          echo "$PLAN" | jq .
-          echo "plan=$PLAN" >> "$GITHUB_OUTPUT"
-          echo "max_measured=$MAX_MEASURED" >> "$GITHUB_OUTPUT"
-          echo "max_loadgen=$MAX_LG" >> "$GITHUB_OUTPUT"
-          LG_RUNNER="${{ inputs.loadgen_runner }}"
-          [ -z "$LG_RUNNER" ] && LG_RUNNER="${{ inputs.runner }}"
-          echo "loadgen_runner=$LG_RUNNER" >> "$GITHUB_OUTPUT"
-          SRV_RUNNER="${{ inputs.server_runner }}"
-          [ -z "$SRV_RUNNER" ] && SRV_RUNNER="${{ inputs.runner }}"
-          echo "server_runner=$SRV_RUNNER" >> "$GITHUB_OUTPUT"
-          if [ "$MAX_MEASURED" -gt 0 ]; then
-            echo "measured_matrix=$(seq 1 "$MAX_MEASURED" | jq -R . | jq -s -c .)" >> "$GITHUB_OUTPUT"
-          else
-            echo "measured_matrix=[]" >> "$GITHUB_OUTPUT"
-          fi
-          if [ "$MAX_LG" -gt 0 ]; then
-            echo "loadgen_matrix=$(seq 1 "$MAX_LG" | jq -R . | jq -s -c .)" >> "$GITHUB_OUTPUT"
-          else
-            echo "loadgen_matrix=[]" >> "$GITHUB_OUTPUT"
-          fi
+      - uses: actions/checkout@v7
+      - id: plan
+        env:
+          NETCODES: ${{ inputs.netcodes }}
+          SESSIONS: ${{ inputs.sessions }}
+          SIZE: ${{ inputs.size }}
+          TICK_RATE: ${{ inputs.tick_rate }}
+          TAG: ${{ inputs.tag }}
+          MEASURED_CLIENTS: ${{ inputs.measured_clients }}
+          LOADGEN_PROCS: ${{ inputs.loadgen_procs }}
+          FUSION_MAX_CLIENTS: ${{ inputs.fusion_max_clients }}
+          RUNNER: ${{ inputs.runner }}
+          LOADGEN_RUNNER: ${{ inputs.loadgen_runner }}
+          SERVER_RUNNER: ${{ inputs.server_runner }}
+        run: python3 .github/scripts/bench-fleet.py plan
 
   build:
     name: Build
@@ -244,7 +151,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        netcode: ${{ fromJSON(needs.prep.outputs.netcode_list) }}
+        netcode: ${{ fromJSON(needs.prep.outputs.netcode_matrix) }}
     uses: ./.github/workflows/build.yml
     secrets: inherit
     with:
@@ -253,33 +160,28 @@ jobs:
       runner: ${{ inputs.runner }}
 
   server:
-    name: Server
-    needs: [build, prep]
-    if: ${{ !cancelled() && needs.prep.result == 'success' && needs.build.result != 'failure' }}
+    name: Server (all sessions)
+    needs: [prep, build]
+    if: ${{ !cancelled() && needs.prep.result == 'success' && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
     runs-on: ${{ needs.prep.outputs.server_runner }}
-    timeout-minutes: 150
+    timeout-minutes: 360
     env:
       PLAN: ${{ needs.prep.outputs.plan }}
-      NETCODE_LIST: ${{ join(fromJSON(needs.prep.outputs.netcode_list), ' ') }}
     steps:
+      - &checkout
+        uses: actions/checkout@v7
       - &download_players
-        name: Download players
+        name: Download runtime players once
         uses: actions/download-artifact@v8
         with:
           pattern: player-*
           path: players
-
       - &prepare_players
-        name: Prepare players
+        name: Prepare all sessions before joining the fleet
         run: |
           sudo apt-get update -qq && sudo apt-get install -y xvfb >/dev/null
-          rm -rf results logs phase
-          for n in $NETCODE_LIST; do
-            chmod +x "$PWD/players/player-$n/NetBench"
-            mkdir -p "results/$n" "logs/$n"
-          done
+          python3 .github/scripts/bench-fleet.py prepare
           echo "CPU: $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2- | xargs) x$(nproc)"
-
       - name: Connect Tailscale
         id: tailscale
         continue-on-error: true
@@ -289,7 +191,6 @@ jobs:
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
           hostname: ${{ env.SERVER_HOST }}
-
       - name: Connect Tailscale (retry)
         if: steps.tailscale.outcome == 'failure'
         uses: tailscale/github-action@v3
@@ -298,453 +199,73 @@ jobs:
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
           hostname: ${{ env.SERVER_HOST }}
-
-      - &wait_for_runners
-        name: Wait for benchmark runners
+      - name: Run sequential suite with process-exit barriers
         run: |
-          EXPECTED=$((${{ needs.prep.outputs.max_measured }} + ${{ needs.prep.outputs.max_loadgen }}))
-          MEASURED_PREFIX="nb-cli-${GITHUB_RUN_ID}-${TAG}-"
-          LOADGEN_PREFIX="nb-lg-${GITHUB_RUN_ID}-${TAG}-"
-          READY=0
+          export CONTROL_BIND="$(tailscale ip -4 | head -n1)"
+          test -n "$CONTROL_BIND"
+          python3 .github/scripts/bench-fleet.py server
+      - name: Upload all server results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: bench-result-fleet-server
+          path: |
+            results/
+            logs/
+          if-no-files-found: warn
+          retention-days: 14
+
+  workers:
+    name: ${{ matrix.id }} (all sessions)
+    # Matrix concurrency is the client/loadgen population of ONE benchmark, not parallel cases.
+    needs: [prep, build]
+    if: ${{ !cancelled() && needs.prep.result == 'success' && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prep.outputs.worker_matrix) }}
+    env:
+      PLAN: ${{ needs.prep.outputs.plan }}
+      WORKER_ID: ${{ matrix.id }}
+    steps:
+      - *checkout
+      - *download_players
+      - *prepare_players
+      - name: Connect Tailscale
+        id: tailscale
+        continue-on-error: true
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          hostname: nb-${{ matrix.id }}-${{ github.run_id }}-${{ github.run_attempt }}-fleet
+      - name: Connect Tailscale (retry)
+        if: steps.tailscale.outcome == 'failure'
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          hostname: nb-${{ matrix.id }}-${{ github.run_id }}-${{ github.run_attempt }}-fleet
+      - name: Resolve coordinator and run fresh players for each case
+        id: suite
+        run: |
           for i in $(seq 1 300); do
-            READY=$(tailscale status --json 2>/dev/null | jq --arg measured "$MEASURED_PREFIX" --arg loadgen "$LOADGEN_PREFIX" \
-              '([.Self] + [.Peer[]? | select(.Online == true)]) | [.[] | (.HostName // "") | select(startswith($measured) or startswith($loadgen))] | length') || READY=0
-            if [ "$READY" -ge "$EXPECTED" ]; then
-              echo "Benchmark runners ready: $READY/$EXPECTED"
-              exit 0
-            fi
-            if [ $((i % 15)) -eq 0 ]; then
-              echo "Waiting for benchmark runners: $READY/$EXPECTED"
-            fi
+            SERVER_IP=$(tailscale ip -4 "$SERVER_HOST" 2>/dev/null | head -n1) || true
+            if [ -n "$SERVER_IP" ]; then break; fi
             sleep 2
           done
-          if [ $((READY * 10)) -ge $((EXPECTED * 9)) ]; then
-            echo "::warning::Only $READY/$EXPECTED benchmark runners joined the tailnet; running with the clients that are here"
-            exit 0
-          fi
-          echo "::error::Only $READY/$EXPECTED benchmark runners joined the tailnet"
-          tailscale status || true
-          exit 1
-
-      - name: Run servers, one netcode after another
-        run: |
-          set -u
-          # The phase file tells the client runners which netcode to launch; they poll it over the
-          # tailnet and never start a player for netcode k before this server is about to listen for it.
-          [ -n "${BENCH_CPUS:-}" ] && echo "Server player pinned to CPUs $BENCH_CPUS"
-          mkdir -p phase
-          echo "wait" > phase/phase
-          python3 -m http.server "$PHASE_PORT" --bind 0.0.0.0 --directory phase >/dev/null 2>&1 &
-          PHASE_PID=$!
-          trap 'kill "$PHASE_PID" 2>/dev/null || true' EXIT
-
-          FAILED=""
-          IDX=0
-          for n in $NETCODE_LIST; do
-            IDX=$((IDX + 1))
-            BIN="$PWD/players/player-$n/NetBench"
-            TOTAL=$(echo "$PLAN" | jq -r --arg n "$n" '.[$n].total')
-            echo "::group::[$IDX] $n server, $TOTAL connections"
-
-            if [ "$n" = "fusion" ]; then
-              # One Photon CCU plan is shared by every session of this run: wait until the sibling
-              # sessions listed in fusion_after are past Fusion (phase beyond it, done, or offline).
-              SIBLINGS=$(echo "${{ inputs.fusion_after }}" | tr ',' ' ')
-              for sib in $SIBLINGS; do
-                SIB_HOST="nb-srv-${GITHUB_RUN_ID}-${sib}"
-                echo "Waiting for session $sib ($SIB_HOST) to finish Fusion"
-                for i in $(seq 1 600); do
-                  ONLINE=$(tailscale status --json 2>/dev/null | jq --arg h "$SIB_HOST" '[.Peer[]? | select(.HostName == $h and .Online == true)] | length' 2>/dev/null || echo 0)
-                  if [ "${ONLINE:-0}" -eq 0 ]; then
-                    echo "Session $sib is offline; treating it as finished"
-                    break
-                  fi
-                  SIB_IP=$(tailscale ip -4 "$SIB_HOST" 2>/dev/null | head -n1)
-                  SIB_PHASE=$(curl -fs --max-time 3 "http://${SIB_IP}:${PHASE_PORT}/phase" 2>/dev/null || true)
-                  SIB_IDX=${SIB_PHASE%% *}
-                  if [ "$SIB_PHASE" = "done" ] || { [ "$SIB_IDX" -gt "$IDX" ] 2>/dev/null; }; then
-                    echo "Session $sib is past Fusion (phase: $SIB_PHASE)"
-                    break
-                  fi
-                  if [ $((i % 12)) -eq 0 ]; then
-                    echo "Session $sib phase: ${SIB_PHASE:-unreachable}"
-                  fi
-                  sleep 5
-                done
-              done
-              PUB_IFACE=$(ip route get 1.1.1.1 2>/dev/null | sed -n 's/.* dev \([^ ]*\).*/\1/p' | head -n1)
-              NET_ARGS=(-session "nb-${GITHUB_RUN_ID}-${TAG}" -region "$PHOTON_REGION" -netIface "${PUB_IFACE:-eth0}" -photonAppId "$PHOTON_APP_ID")
-            else
-              for i in $(seq 1 30); do
-                ss -lun 2>/dev/null | grep -qE "[:.]${BENCH_PORT}\b" || break
-                sleep 1
-              done
-              if ss -lun 2>/dev/null | grep -qE "[:.]${BENCH_PORT}\b"; then
-                echo "::error::UDP port $BENCH_PORT is still in use before the $n server started"
-                sudo ss -lunp 2>/dev/null || true
-                FAILED="$FAILED $n"
-                echo "::endgroup::"
-                continue
-              fi
-              NET_ARGS=(-serverHost 0.0.0.0 -port "$BENCH_PORT" -netIface tailscale0)
-            fi
-
-            echo "$IDX $n" > phase/phase.tmp && mv phase/phase.tmp phase/phase
-            touch "logs/$n/server.log"
-            tail -n +1 -F "logs/$n/server.log" &
-            TAIL_PID=$!
-            STATUS=0
-            timeout --signal=TERM --kill-after=10s 15m \
-              xvfb-run -a --server-args="-screen 0 1024x768x24" \
-              ${BENCH_CPUS:+taskset -c "$BENCH_CPUS"} \
-              "$BIN" -batchmode -nographics \
-              -role server -count "$TOTAL" \
-              -benchSeconds ${{ inputs.bench_seconds }} -benchObjects ${{ inputs.bench_objects }} -tickRate ${{ inputs.tick_rate }} \
-              "${NET_ARGS[@]}" -connectTimeout 180 -maxRunSeconds 780 \
-              -results "$PWD/results/$n/server.json" \
-              -logFile "$PWD/logs/$n/server.log" || STATUS=$?
-            kill "$TAIL_PID" 2>/dev/null || true
-            if [ "$STATUS" -ne 0 ]; then
-              # The player rewrites its results after every test, so a server that died mid-session
-              # still leaves a datapoint that says how far it got; only a missing file fails the job.
-              if [ -s "results/$n/server.json" ]; then
-                echo "::warning::$n server exited with status $STATUS after $(jq '.tests | length' "results/$n/server.json") tests; its datapoint is marked as not completed"
-              else
-                echo "::error::$n server exited with status $STATUS and left no results"
-                FAILED="$FAILED $n"
-              fi
-              tail -n 100 "logs/$n/server.log" || true
-            fi
-            echo "::endgroup::"
-          done
-
-          echo "done" > phase/phase.tmp && mv phase/phase.tmp phase/phase
-          # Give clients that are between netcodes a moment to read the final phase.
-          sleep 20
-          if [ -n "$FAILED" ]; then
-            echo "::error::Server left no results for:$FAILED"
-            exit 1
-          fi
-
-      - name: Upload server results
-        if: always()
+          test -n "$SERVER_IP"
+          export SERVER_IP
+          python3 .github/scripts/bench-fleet.py worker
+      - name: Upload all worker results after the suite
+        # An unexpected network/process failure must not begin uploads during another measurement.
+        if: ${{ always() && steps.suite.outputs.released == 'true' }}
         uses: actions/upload-artifact@v7
         with:
-          name: bench-result-${{ inputs.tag }}-server
-          path: |
-            results/
-            logs/
-          if-no-files-found: warn
-          retention-days: 14
-
-  clients:
-    name: Client ${{ matrix.idx }}
-    # Must NOT depend on `server`: clients run concurrently with it and discover it via the tailnet.
-    needs: [build, prep]
-    if: ${{ !cancelled() && needs.prep.result == 'success' && needs.build.result != 'failure' && needs.prep.outputs.measured_matrix != '[]' }}
-    runs-on: ${{ inputs.runner }}
-    timeout-minutes: 150
-    strategy:
-      fail-fast: false
-      matrix:
-        idx: ${{ fromJSON(needs.prep.outputs.measured_matrix) }}
-    env:
-      PLAN: ${{ needs.prep.outputs.plan }}
-      NETCODE_LIST: ${{ join(fromJSON(needs.prep.outputs.netcode_list), ' ') }}
-    steps:
-      - *download_players
-
-      - *prepare_players
-
-      - name: Connect Tailscale
-        id: tailscale
-        continue-on-error: true
-        uses: tailscale/github-action@v3
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
-          hostname: nb-cli-${{ github.run_id }}-${{ inputs.tag }}-${{ matrix.idx }}
-
-      - name: Connect Tailscale (retry)
-        if: steps.tailscale.outcome == 'failure'
-        uses: tailscale/github-action@v3
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
-          hostname: nb-cli-${{ github.run_id }}-${{ inputs.tag }}-${{ matrix.idx }}
-
-      - *wait_for_runners
-
-      - &resolve_server
-        name: Resolve server
-        run: |
-          SERVER_IP=""
-          REACHABLE=0
-          for i in $(seq 1 60); do
-            IP=$(tailscale ip -4 "$SERVER_HOST" 2>/dev/null | head -n1)
-            if [ -n "$IP" ]; then
-              SERVER_IP="$IP"
-              if tailscale ping -c 1 "$SERVER_HOST" >/dev/null 2>&1; then
-                REACHABLE=1
-                break
-              fi
-            fi
-            sleep 2
-          done
-          if [ -z "$SERVER_IP" ]; then
-            echo "::error::Server node $SERVER_HOST never appeared in the tailnet"
-            tailscale status || true
-            exit 1
-          fi
-          if [ "$REACHABLE" -ne 1 ]; then
-            # `tailscale ping` can keep failing while the direct path is still being negotiated
-            # even though relayed (DERP) traffic already flows; the player retries its own
-            # connection for -connectTimeout seconds, so proceed instead of losing this client.
-            echo "::warning::Server node $SERVER_HOST is visible ($SERVER_IP) but tailscale ping did not succeed within 2 minutes; connecting anyway"
-            tailscale status || true
-          fi
-          echo "Server resolved to $SERVER_IP"
-          echo "SERVER_IP=$SERVER_IP" >> "$GITHUB_ENV"
-
-      - &define_wait_for_phase
-        name: Define phase helper
-        run: |
-          cat > wait_for_phase.sh <<'EOF'
-          #!/usr/bin/env bash
-          # wait_for_phase.sh <index> <netcode>: blocks until the server announces this netcode.
-          # Exit 0 = go, 1 = the server already moved past it or finished, 2 = the server never answered.
-          # Fusion can be held back while sibling sessions finish theirs, hence the long timeout.
-          WANT_IDX="$1"; WANT="$2"
-          for i in $(seq 1 1500); do
-            PHASE=$(curl -fs --max-time 3 "http://${SERVER_IP}:${PHASE_PORT}/phase" 2>/dev/null || true)
-            case "$PHASE" in
-              "$WANT_IDX $WANT") exit 0 ;;
-              done) exit 1 ;;
-              "") ;;
-              wait) ;;
-              *)
-                CUR_IDX=${PHASE%% *}
-                if [ "$CUR_IDX" -gt "$WANT_IDX" ] 2>/dev/null; then exit 1; fi ;;
-            esac
-            sleep 2
-          done
-          exit 2
-          EOF
-          chmod +x wait_for_phase.sh
-
-      - name: Run clients, one netcode after another
-        run: |
-          set -u
-          FAILED=""
-          IDX=0
-          for n in $NETCODE_LIST; do
-            IDX=$((IDX + 1))
-            MEASURED=$(echo "$PLAN" | jq -r --arg n "$n" '.[$n].measured')
-            if [ "${{ matrix.idx }}" -gt "$MEASURED" ]; then
-              echo "[$IDX] $n: this runner is not needed (measured clients: $MEASURED)"
-              continue
-            fi
-            echo "::group::[$IDX] $n client ${{ matrix.idx }}"
-            ./wait_for_phase.sh "$IDX" "$n"; PHASE_STATUS=$?
-            if [ "$PHASE_STATUS" -eq 1 ]; then
-              echo "::warning::$n: the server already moved on; skipping"
-              echo "::endgroup::"
-              continue
-            elif [ "$PHASE_STATUS" -ne 0 ]; then
-              echo "::error::$n: no phase announcement from the server"
-              FAILED="$FAILED $n"
-              echo "::endgroup::"
-              break
-            fi
-
-            BIN="$PWD/players/player-$n/NetBench"
-            if [ "$n" = "fusion" ]; then
-              PUB_IFACE=$(ip route get 1.1.1.1 2>/dev/null | sed -n 's/.* dev \([^ ]*\).*/\1/p' | head -n1)
-              NET_ARGS=(-session "nb-${GITHUB_RUN_ID}-${TAG}" -region "$PHOTON_REGION" -netIface "${PUB_IFACE:-eth0}" -photonAppId "$PHOTON_APP_ID")
-            else
-              NET_ARGS=(-serverHost "$SERVER_IP" -port "$BENCH_PORT" -netIface tailscale0)
-            fi
-
-            LOG="logs/$n/client-${{ matrix.idx }}.log"
-            touch "$LOG"
-            tail -n +1 -F "$LOG" &
-            TAIL_PID=$!
-            STATUS=0
-            timeout --signal=TERM --kill-after=10s 15m \
-              xvfb-run -a --server-args="-screen 0 1024x768x24" \
-              "$BIN" -batchmode -nographics \
-              -role client \
-              -benchSeconds ${{ inputs.bench_seconds }} -benchObjects ${{ inputs.bench_objects }} -tickRate ${{ inputs.tick_rate }} \
-              "${NET_ARGS[@]}" -connectTimeout 180 -maxRunSeconds 780 \
-              -results "$PWD/results/$n/client-${{ matrix.idx }}.json" \
-              -logFile "$PWD/$LOG" || STATUS=$?
-            kill "$TAIL_PID" 2>/dev/null || true
-            if [ "$STATUS" -ne 0 ]; then
-              echo "::error::$n client ${{ matrix.idx }} exited with status $STATUS"
-              tail -n 100 "$LOG" || true
-              FAILED="$FAILED $n"
-            fi
-            echo "::endgroup::"
-          done
-          if [ -n "$FAILED" ]; then
-            echo "::error::Client ${{ matrix.idx }} failed for:$FAILED"
-            exit 1
-          fi
-
-      - name: Upload client results
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: bench-result-${{ inputs.tag }}-client-${{ matrix.idx }}
-          path: |
-            results/
-            logs/
-          if-no-files-found: warn
-          retention-days: 14
-
-  loadgen:
-    name: Loadgen ${{ matrix.idx }}
-    needs: [build, prep]
-    if: ${{ !cancelled() && needs.prep.result == 'success' && needs.build.result != 'failure' && needs.prep.outputs.loadgen_matrix != '[]' }}
-    runs-on: ${{ needs.prep.outputs.loadgen_runner }}
-    timeout-minutes: 150
-    strategy:
-      fail-fast: false
-      matrix:
-        idx: ${{ fromJSON(needs.prep.outputs.loadgen_matrix) }}
-    env:
-      PLAN: ${{ needs.prep.outputs.plan }}
-      NETCODE_LIST: ${{ join(fromJSON(needs.prep.outputs.netcode_list), ' ') }}
-    steps:
-      - *download_players
-
-      - *prepare_players
-
-      - name: Connect Tailscale
-        id: tailscale
-        continue-on-error: true
-        uses: tailscale/github-action@v3
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
-          hostname: nb-lg-${{ github.run_id }}-${{ inputs.tag }}-${{ matrix.idx }}
-
-      - name: Connect Tailscale (retry)
-        if: steps.tailscale.outcome == 'failure'
-        uses: tailscale/github-action@v3
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
-          hostname: nb-lg-${{ github.run_id }}-${{ inputs.tag }}-${{ matrix.idx }}
-
-      - *wait_for_runners
-
-      - *resolve_server
-
-      - *define_wait_for_phase
-
-      - name: Run loadgen clients, one netcode after another
-        run: |
-          set -u
-          FAILED=""
-          IDX=0
-          for n in $NETCODE_LIST; do
-            IDX=$((IDX + 1))
-            LG=$(echo "$PLAN" | jq -r --arg n "$n" '.[$n].loadgen')
-            if [ "${{ matrix.idx }}" -gt "$LG" ]; then
-              echo "[$IDX] $n: this runner is not needed (loadgen runners: $LG)"
-              continue
-            fi
-            PROCS=$(echo "$PLAN" | jq -r --arg n "$n" '.[$n].procs')
-            if [ "${{ matrix.idx }}" -eq "$LG" ]; then
-              PROCS=$(echo "$PLAN" | jq -r --arg n "$n" '.[$n].procs_last')
-            fi
-            echo "::group::[$IDX] $n loadgen ${{ matrix.idx }}: $PROCS client processes on $(nproc) vCPU"
-            ./wait_for_phase.sh "$IDX" "$n"; PHASE_STATUS=$?
-            if [ "$PHASE_STATUS" -eq 1 ]; then
-              echo "::warning::$n: the server already moved on; skipping"
-              echo "::endgroup::"
-              continue
-            elif [ "$PHASE_STATUS" -ne 0 ]; then
-              echo "::error::$n: no phase announcement from the server"
-              FAILED="$FAILED $n"
-              echo "::endgroup::"
-              break
-            fi
-
-            BIN="$PWD/players/player-$n/NetBench"
-            if [ "$n" = "fusion" ]; then
-              PUB_IFACE=$(ip route get 1.1.1.1 2>/dev/null | sed -n 's/.* dev \([^ ]*\).*/\1/p' | head -n1)
-              NET_ARGS=(-session "nb-${GITHUB_RUN_ID}-${TAG}" -region "$PHOTON_REGION" -netIface "${PUB_IFACE:-eth0}" -photonAppId "$PHOTON_APP_ID")
-            else
-              NET_ARGS=(-serverHost "$SERVER_IP" -port "$BENCH_PORT" -netIface tailscale0)
-            fi
-
-            PIDS=()
-            declare -A PROC_BY_PID=()
-            for p in $(seq 1 "$PROCS"); do
-              # Concurrent xvfb-run -a calls can pick the same display; give each a private one.
-              DISPLAY_NUM=$((100 + p))
-              timeout --signal=TERM --kill-after=10s 15m \
-                xvfb-run --server-num="$DISPLAY_NUM" \
-                --error-file="$PWD/logs/$n/xvfb-${{ matrix.idx }}-$p.log" \
-                --server-args="-screen 0 1024x768x24" \
-                "$BIN" -batchmode -nographics \
-                -role client -loadgen \
-                -benchSeconds ${{ inputs.bench_seconds }} -benchObjects ${{ inputs.bench_objects }} -tickRate ${{ inputs.tick_rate }} \
-                "${NET_ARGS[@]}" -connectTimeout 180 -maxRunSeconds 780 \
-                -results "$PWD/results/$n/loadgen-${{ matrix.idx }}-$p.json" \
-                -logFile "$PWD/logs/$n/loadgen-${{ matrix.idx }}-$p.log" &
-              PID=$!
-              PIDS+=("$PID")
-              PROC_BY_PID["$PID"]=$p
-            done
-
-            terminate_remaining() {
-              for pid in "${!PROC_BY_PID[@]}"; do
-                kill "$pid" 2>/dev/null || true
-              done
-              wait 2>/dev/null || true
-            }
-            trap terminate_remaining EXIT
-
-            REMAINING=${#PIDS[@]}
-            PROC_FAILED=0
-            while [ "$REMAINING" -gt 0 ]; do
-              STATUS=0
-              FINISHED_PID=""
-              wait -n -p FINISHED_PID "${!PROC_BY_PID[@]}" || STATUS=$?
-              PROC=${PROC_BY_PID[$FINISHED_PID]}
-              unset "PROC_BY_PID[$FINISHED_PID]"
-              REMAINING=$((REMAINING - 1))
-              if [ "$STATUS" -ne 0 ]; then
-                echo "::warning::$n loadgen process $PROC exited with status $STATUS"
-                tail -n 60 "logs/$n/loadgen-${{ matrix.idx }}-$PROC.log" || true
-                PROC_FAILED=$((PROC_FAILED + 1))
-              fi
-            done
-            trap - EXIT
-            unset PROC_BY_PID
-            if [ "$PROC_FAILED" -gt 0 ]; then
-              echo "::error::$n: $PROC_FAILED loadgen processes failed"
-              FAILED="$FAILED $n"
-            fi
-            echo "::endgroup::"
-          done
-          if [ -n "$FAILED" ]; then
-            echo "::error::Loadgen ${{ matrix.idx }} failed for:$FAILED"
-            exit 1
-          fi
-
-      - name: Upload loadgen diagnostics
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: bench-log-${{ inputs.tag }}-loadgen-${{ matrix.idx }}
+          name: ${{ matrix.role == 'loadgen' && 'bench-log' || 'bench-result' }}-fleet-${{ matrix.id }}
           path: |
             results/
             logs/
@@ -752,53 +273,39 @@ jobs:
           retention-days: 14
 
   aggregate:
-    name: Aggregate results
-    needs: [prep, server, clients]
-    if: always()
+    name: Aggregate all sessions
+    needs: [prep, server, workers]
+    if: ${{ always() && needs.prep.result == 'success' }}
     runs-on: ubuntu-latest
     env:
       PLAN: ${{ needs.prep.outputs.plan }}
-      NETCODE_LIST: ${{ join(fromJSON(needs.prep.outputs.netcode_list), ' ') }}
     steps:
-      - name: Checkout (for aggregation scripts)
-        uses: actions/checkout@v7
-
-      - name: Download all results
+      - uses: actions/checkout@v7
+      - name: Download measured results
         uses: actions/download-artifact@v8
         with:
-          pattern: bench-result-${{ inputs.tag }}-*
+          pattern: bench-result-fleet-*
           path: all
           merge-multiple: true
-
-      - name: Render summaries
+      - name: Render per-session datapoints
         run: |
-          # Artifacts with a single upload path lose their parent folder, so a netcode's files can
-          # sit at all/<netcode>/ or all/results/<netcode>/; gather them by name into one folder each.
-          for n in $NETCODE_LIST; do
-            DIR="agg/$n"
-            mkdir -p "$DIR"
-            find all -type f \( -path "*/$n/server.json" -o -path "*/$n/client-*.json" \) -exec cp -n {} "$DIR/" \;
-            if [ ! -f "$DIR/server.json" ]; then
-              echo "::warning::No server result for $n"
+          jq -c '.cases[]' <<< "$PLAN" | while IFS= read -r entry; do
+            NETCODE=$(jq -r .netcode <<< "$entry")
+            TAG=$(jq -r .tag <<< "$entry")
+            TOTAL=$(jq -r .total <<< "$entry")
+            DIR="all/results/$TAG/$NETCODE"
+            if [ ! -s "$DIR/server.json" ]; then
+              echo "::warning::Missing server result for $TAG/$NETCODE"
               continue
             fi
-            echo "$n: $(ls "$DIR" | wc -l) result files"
-            TOTAL=$(echo "$PLAN" | jq -r --arg n "$n" '.[$n].total')
-            bash .github/scripts/bench-aggregate.sh \
-              "$DIR" \
-              "$n" \
-              "$TOTAL" \
-              "${{ inputs.tag }}" \
-              "${{ inputs.bench_seconds }}" \
-              "${{ inputs.bench_objects }}" \
-              scaling
+            bash .github/scripts/bench-aggregate.sh "$DIR" "$NETCODE" "$TOTAL" "$TAG" \
+              "$BENCH_SECONDS" "$BENCH_OBJECTS" scaling
           done
-
       - name: Upload scaling datapoints
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: bench-scaling-${{ inputs.tag }}
+          name: bench-scaling-fleet
           path: scaling/
           if-no-files-found: ignore
           retention-days: 14

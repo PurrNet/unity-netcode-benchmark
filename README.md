@@ -56,18 +56,20 @@ single-process measured clients (the remaining connections run as load generator
 Dispatch **Netcode Scaling Benchmark** (`.github/workflows/scaling.yml`). Defaults run all five
 netcodes in three sessions, `10@20,100@20,100@60` (connections@tickHz), with 10-second windows
 (Idle and Static use 5, since they only check the floor).
-Inside a session the five netcodes run back to back on the same server machine and the same
-client machines; sessions run one after another on the dedicated server, about 40 minutes each.
+The entire suite uses one prepared server/client fleet, sized for the largest session. Sessions
+and netcodes run one after another; every case starts fresh player processes on those same machines.
+Smaller sessions leave the extra loadgen runners idle. `max_parallel` must remain `1`.
 Useful inputs: `netcodes`, `sessions`, `bench_seconds`, `bench_objects`, `profiling`
 (development builds add a CPU-by-profiler-marker table), `fusion_max_clients`. `server_runner`,
 `runner` and `loadgen_runner` pick the machines; the defaults below are the published setup.
 
-Quick reference run while iterating on one netcode: `netcodes: purrnet`, `sessions: 10,100`,
-`bench_seconds: 5` (about 8 minutes).
+Quick reference run while iterating on one netcode: select that `netcodes` entry, `sessions: 10,100`,
+`bench_seconds: 5`. Use the full suite and normal windows for published comparisons.
 
 Each run renders the job summary, uploads raw per-process JSON as the `benchmark-results`
-artifact, and commits `docs/` (interactive report, `latest.json`, `latest.md`). GitHub Pages
-serves `docs/` as the live report.
+artifact. When all planned datapoints exist and the workflow succeeds, it commits `docs/`
+(interactive report, `latest.json`, `latest.md`). A failed fleet or missing completion acknowledgement
+does not replace the published report. GitHub Pages serves `docs/` as the live report.
 
 How to read the results: the report opens with one row per netcode.
 Bandwidth and CPU are a multiple of the best netcode in each load test, averaged over the seven
@@ -77,12 +79,16 @@ average; Idle and Static are left out of the averages because they sit at the no
 to what a linear sender would score (10× and 3×), so below that line a netcode amortises. The
 per-test bar charts and the session table underneath carry every metric.
 
-How a session works: one server runner and the client runners meet over a Tailscale tailnet and
-stay up for the whole session. The server announces which netcode is next on a small HTTP endpoint,
+How the suite works: one server runner and the client runners meet over a Tailscale tailnet and
+stay up for all sessions. The server announces each case on a small HTTP endpoint,
 every runner launches that netcode's player, and every process is the same harness driven by
 `Shared/com.purrnet.netbench` (`-role server|client`), which waits for all clients, runs the Idle
 window and the seven tests, writes JSON and quits. Clients detect the active test from the spawned
-objects themselves, so no cross-netcode signalling is needed inside a netcode. Locally:
+objects themselves, so no cross-netcode signalling is needed inside a netcode. Every runner must
+finish preparation before the first case starts. Between cases, the coordinator waits for every
+worker to acknowledge that its player processes have exited (including loadgens); it does not
+shorten any measurement window to advance. Workers use a held HTTP request, not periodic phase
+polling while players run. Results and logs upload after the suite, not between sessions. Locally:
 
 ```bash
 ./NetBench -batchmode -nographics -role server -count 2 -port 7777 -benchObjects 100 -benchSeconds 10 -tickRate 20 -results server.json
@@ -91,6 +97,28 @@ objects themselves, so no cross-netcode signalling is needed inside a netcode. L
 
 Fusion uses `-session <name> -region eu` instead of `-serverHost/-port`. Bandwidth and CPU
 counters need Linux; frame stats work everywhere.
+
+### CI overhead and build reuse
+
+Each `player-<netcode>` artifact contains only runtime files plus `build-provenance.json`.
+Unity's `NetBench_BackUpThisFolder_ButDontShipItWithYourGame` folder (generated source, symbols
+and other build diagnostics) is retained separately as `build-diagnostics-<netcode>`, not downloaded
+by the measurement fleet. Packaging does not change player bytes, build flags or networking settings.
+
+Finished players are cached with an exact key covering the selected project's Assets, Packages
+and ProjectSettings (including Unity version), the shared harness, build workflow, packaging script,
+Linux IL2CPP target and release/development mode. There is no fallback key for finished binaries.
+Cache hits verify the recorded SHA-256 inventory and retain the original source revision in the
+provenance file. Cache misses build normally using the existing incremental Library cache.
+
+These changes target overhead observed in [run 33908349862](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/33908349862):
+repeated player downloads, a slow artifact download holding up the fleet, and fixed final sleeps.
+The latter are replaced by bounded completion acknowledgements. Workload timing, warmup,
+delivery grace, cooldowns, connection budgets and overload behaviour are unchanged. Actual time
+savings still need to be measured on a new CI run; they are not inferred from local correctness tests.
+
+Local orchestration checks: `python .github/scripts/test-bench-fleet.py` (fake players, no CPU
+comparison); the Linux run additionally checks cleanup of orphaned child processes.
 
 ## Changes from the defaults
 
