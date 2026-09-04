@@ -61,12 +61,16 @@ def fmt_x(v):
     return (f"{v:.0f}" if v >= 100 else f"{v:.1f}" if v >= 10 else f"{v:.2f}") + "×"
 
 
+def goals_in_use(netcodes, by, sc):
+    return [(g, tol) for g, tol in GOALS if any((n, sc) in by and metric(by[(n, sc)], g, t) is not None for n in netcodes for t in SCORE_TESTS)]
+
+
 def scorecard(netcodes, by, sc):
-    """rows: netcode -> dict(bw, cpu, gc, p99, wins)."""
+    """rows: netcode -> dict(bw, cpu, alloc, gc, p99, wins)."""
     rel = {g: {n: [] for n in netcodes} for g, _ in GOALS}
     wins = {n: 0 for n in netcodes}
     for t in SCORE_TESTS:
-        for g, tol in GOALS:
+        for g, tol in goals_in_use(netcodes, by, sc):
             vals = [(n, metric(by[(n, sc)], g, t)) for n in netcodes if (n, sc) in by]
             vals = [(n, v) for n, v in vals if v is not None]
             if not vals:
@@ -115,11 +119,18 @@ def scaling_axes(scenarios):
     return axes
 
 
-def mark_best(cells, lower=True):
-    """cells: list of (value, text). Returns list of (text, is_best)."""
+def mark_best(cells, lower=True, rel=0.02, abs_tol=None):
+    """cells: list of (value, text). Returns list of (text, is_best); values within the tolerance of
+    the best share the mark, and nothing is marked when every value ties."""
     present = [v for v, _ in cells if v is not None]
-    best = (min(present) if lower else max(present)) if len(present) > 1 else None
-    return [(text, v is not None and v == best) for v, text in cells]
+    if len(present) < 2:
+        return [(text, False) for _, text in cells]
+    best = min(present) if lower else max(present)
+    eps = abs_tol if abs_tol is not None else abs(best) * rel
+    flags = [v is not None and abs(v - best) <= eps for v, _ in cells]
+    if sum(flags) == len(present):
+        flags = [False] * len(cells)
+    return [(text, f) for (_, text), f in zip(cells, flags)]
 
 
 def svg_tables(blocks, theme):
@@ -231,14 +242,18 @@ def main():
     # Block 1: scorecard at the reference session.
     rows = scorecard(netcodes, by, ref)
     t1 = f"At a glance, {ref[0]} connections @ {ref[1]} Hz"
-    cols1 = ["Bandwidth", "Server CPU", "GC alloc", "Collections", "Frame p99", "Wins"]
     bw = mark_best([(rows[n]["bw"], fmt_x(rows[n]["bw"])) for n in netcodes])
     cpu = mark_best([(rows[n]["cpu"], fmt_x(rows[n]["cpu"])) for n in netcodes])
     alloc = mark_best([(rows[n]["alloc"], fmt_x(rows[n]["alloc"])) for n in netcodes])
-    gc = mark_best([(rows[n]["gc"], "–" if rows[n]["gc"] is None else str(rows[n]["gc"])) for n in netcodes])
-    p99 = mark_best([(rows[n]["p99"], "–" if rows[n]["p99"] is None else f"{rows[n]['p99']:.2f} ms") for n in netcodes])
-    wins = mark_best([(rows[n]["wins"], "–" if rows[n]["wins"] is None else f"{rows[n]['wins']} / {len(SCORE_TESTS) * len(GOALS)}") for n in netcodes], lower=False)
-    rows1 = [(NAMES[n], colors[n], [bw[i], cpu[i], alloc[i], gc[i], p99[i], wins[i]]) for i, n in enumerate(netcodes)]
+    gc = mark_best([(rows[n]["gc"], "–" if rows[n]["gc"] is None else str(rows[n]["gc"])) for n in netcodes], abs_tol=0)
+    p99 = mark_best([(rows[n]["p99"], "–" if rows[n]["p99"] is None else f"{rows[n]['p99']:.1f} ms") for n in netcodes], abs_tol=0.2)
+    n_goals = len(goals_in_use(netcodes, by, ref))
+    wins = mark_best([(rows[n]["wins"], "–" if rows[n]["wins"] is None else f"{rows[n]['wins']} / {len(SCORE_TESTS) * n_goals}") for n in netcodes], lower=False, abs_tol=0)
+    # Columns the dataset does not have (older runs lack allocation) are left out rather than shown as dashes.
+    columns = [("Bandwidth", "bw", bw), ("Server CPU", "cpu", cpu), ("GC alloc", "alloc", alloc), ("Collections", "gc", gc), ("Frame p99", "p99", p99), ("Wins", "wins", wins)]
+    columns = [c for c in columns if any(rows[n][c[1]] is not None for n in netcodes)]
+    cols1 = [c[0] for c in columns]
+    rows1 = [(NAMES[n], colors[n], [c[2][i] for c in columns]) for i, n in enumerate(netcodes)]
     note1 = "× best netcode, geometric mean over the load tests; lower is better"
 
     # Block 2: how it scales.

@@ -204,7 +204,7 @@ TEMPLATE = r"""<meta charset="utf-8">
 
   <section>
     <h2>Run notes</h2>
-    <p>Every netcode runs the same scenario: the server spawns N objects and replicates them to every client. On-wire bytes are read from the network interface (UDP/IP headers, ACKs and resends included). CPU is the whole server process, all threads, as % of one core with the frame loop capped at 60 fps; nothing is subtracted, so the Idle row is what holding N connections costs on its own. Fusion is relay-based (Photon Cloud): its RTT includes the relay hop and its traffic is measured on the public interface, but the server still sends one stream per client, so its downstream is comparable. Every session runs all netcodes on the same server machine and the same client machines, so numbers are comparable across netcodes within a session.</p>
+    <p>Every netcode runs the same scenario: the server spawns N objects and replicates them to every client. On-wire bytes are read from the network interface (UDP/IP headers, ACKs and resends included). CPU is the whole server process, all threads, as % of one core with the frame loop capped at 60 fps; nothing is subtracted, so the Idle row is what holding N connections costs on its own. Fusion is relay-based (Photon Cloud): its traffic is measured on the public interface, but the server still sends one stream per client, so its downstream is comparable. Round trips are only shown as the difference to each netcode's own Idle round trip, since the absolute value is the route from the client runners to the server (and Fusion's relay), not the netcode. Every session runs all netcodes on the same server machine and the same client machines, so numbers are comparable across netcodes within a session.</p>
     <ul id="warnings" class="warnings" hidden></ul>
   </section>
 
@@ -227,21 +227,22 @@ const TEST_DESC = {
 // Tests that carry real load; Idle and Static sit at the noise floor and would only add noise to averages.
 const SCORE_TESTS = ["MoveY", "MoveWander", "SyncVars", "SendRPC", "ClientInput", "SpawnChurn"];
 const kb = v => v == null ? null : v / 1024;
+// tol: values this close to the best count as tied ({rel: fraction of the best} or {abs: units}).
 const METRICS = [
-  { id: "srvDown", label: "Server downstream", unit: "KB/s", lower: true, hint: "bytes the server puts on the wire to all clients", get: (r, t) => kb(r.server[t] && r.server[t].txBytesPerSec) },
-  { id: "cpu", label: "Server CPU", unit: "%", lower: true, hint: "whole process CPU as % of one core, nothing subtracted", get: (r, t) => r.server[t] ? r.server[t].cpuPercent : null },
-  { id: "cliDown", label: "Per-client downstream", unit: "KB/s", lower: true, hint: "average received by one measured client", get: (r, t) => kb(r.clients[t] && r.clients[t].rxBytesPerSec) },
-  { id: "srvUp", label: "Server upstream", unit: "KB/s", lower: true, hint: "bytes the server receives from all clients", get: (r, t) => kb(r.server[t] && r.server[t].rxBytesPerSec) },
-  { id: "cliUp", label: "Per-client upstream", unit: "KB/s", lower: true, hint: "average sent by one measured client", get: (r, t) => kb(r.clients[t] && r.clients[t].txBytesPerSec) },
-  { id: "p95", label: "Frame p95", unit: "ms", lower: true, hint: "server main-thread frame time, 95th percentile (16.7 ms = on budget)", get: (r, t) => r.server[t] ? r.server[t].p95FrameMs : null },
-  { id: "p99", label: "Frame p99", unit: "ms", lower: true, hint: "server main-thread frame time, 99th percentile", get: (r, t) => r.server[t] ? r.server[t].p99FrameMs : null },
-  { id: "pkts", label: "Packets out", unit: "/s", lower: true, hint: "server datagrams sent per second", get: (r, t) => r.server[t] ? r.server[t].txPacketsPerSec : null },
-  { id: "alloc", label: "GC alloc", unit: "KB/s", lower: true, hint: "managed bytes the server allocates per second, all threads; the garbage the collections are made of", get: (r, t) => r.server[t] && r.server[t].gcAllocBytesPerSec >= 0 ? r.server[t].gcAllocBytesPerSec / 1024 : null },
-  { id: "gc", label: "GC collections", unit: "", lower: true, hint: "server GC collections during the window (each test starts on a freshly collected heap)", get: (r, t) => r.server[t] ? r.server[t].gcCollections : null },
-  { id: "rss", label: "Peak RSS", unit: "MB", lower: true, hint: "server peak resident memory", get: (r, t) => r.server[t] ? r.server[t].peakRssBytes / 1048576 : null },
-  { id: "rtt50", label: "RTT p50", unit: "ms", lower: true, hint: "client-side, netcode-reported round trip (Fusion includes the relay hop)", get: (r, t) => r.clients[t] ? r.clients[t].rttP50Ms : null },
-  { id: "rtt95", label: "RTT p95", unit: "ms", lower: true, hint: "client-side, netcode-reported round trip", get: (r, t) => r.clients[t] ? r.clients[t].rttP95Ms : null },
-  { id: "inputs", label: "Inputs received", unit: "/s", lower: false, hint: "ClientInput only: server RPCs received per second (expected tick × connections)", get: (r, t) => r.server[t] ? r.server[t].inputsPerSec : null }
+  { id: "srvDown", label: "Server downstream", unit: "KB/s", lower: true, tol: { rel: 0.01 }, hint: "bytes the server puts on the wire to all clients", get: (r, t) => kb(r.server[t] && r.server[t].txBytesPerSec) },
+  { id: "cpu", label: "Server CPU", unit: "%", lower: true, tol: { abs: 0.5 }, hint: "whole process CPU as % of one core, nothing subtracted", get: (r, t) => r.server[t] ? r.server[t].cpuPercent : null },
+  { id: "cliDown", label: "Per-client downstream", unit: "KB/s", lower: true, tol: { rel: 0.01 }, hint: "average received by one measured client", get: (r, t) => kb(r.clients[t] && r.clients[t].rxBytesPerSec) },
+  { id: "srvUp", label: "Server upstream", unit: "KB/s", lower: true, tol: { rel: 0.01 }, hint: "bytes the server receives from all clients", get: (r, t) => kb(r.server[t] && r.server[t].rxBytesPerSec) },
+  { id: "cliUp", label: "Per-client upstream", unit: "KB/s", lower: true, tol: { rel: 0.01 }, hint: "average sent by one measured client", get: (r, t) => kb(r.clients[t] && r.clients[t].txBytesPerSec) },
+  { id: "p99", label: "Frame p99", unit: "ms", lower: true, tol: { abs: 0.2 }, hint: "server main-thread frame time, 99th percentile; the loop is capped at 60 fps, so 16.7 ms is on budget and anything above means the server could not keep up", get: (r, t) => r.server[t] ? r.server[t].p99FrameMs : null },
+  { id: "pkts", label: "Packets out", unit: "/s", lower: true, tol: { rel: 0.01 }, hint: "server datagrams sent per second", get: (r, t) => r.server[t] ? r.server[t].txPacketsPerSec : null },
+  { id: "alloc", label: "GC alloc", unit: "KB/s", lower: true, tol: { rel: 0.02 }, hint: "managed bytes the server allocates per second, all threads; the garbage the collections are made of", get: (r, t) => r.server[t] && r.server[t].gcAllocBytesPerSec >= 0 ? r.server[t].gcAllocBytesPerSec / 1024 : null },
+  { id: "gc", label: "GC collections", unit: "", lower: true, tol: { abs: 0 }, hint: "server GC collections during the window (each test starts on a freshly collected heap)", get: (r, t) => r.server[t] ? r.server[t].gcCollections : null },
+  { id: "rss", label: "Peak RSS", unit: "MB", lower: true, tol: { rel: 0.02 }, hint: "server peak resident memory", get: (r, t) => r.server[t] ? r.server[t].peakRssBytes / 1048576 : null },
+  // Absolute round trips are mostly the path (US runners to the EU server, the tailnet, Fusion's relay);
+  // the same clients' Idle round trip contains all of that, so the difference is what the netcode adds.
+  { id: "rttAdd", label: "RTT added", unit: "ms", lower: true, tol: { abs: 1 }, hint: "client round trip (p50) under this test minus the same clients' Idle round trip; the network path cancels out and what remains is queuing the netcode adds under load", get: (r, t) => t !== "Idle" && r.clients[t] && r.clients.Idle && r.clients[t].rttP50Ms > 0 && r.clients.Idle.rttP50Ms > 0 ? r.clients[t].rttP50Ms - r.clients.Idle.rttP50Ms : null },
+  { id: "inputs", label: "Inputs received", unit: "/s", lower: false, tol: { rel: 0.01 }, hint: "ClientInput only: server RPCs received per second (expected tick × connections)", get: (r, t) => r.server[t] ? r.server[t].inputsPerSec : null }
 ];
 
 const runs = DATA.runs;
@@ -257,7 +258,10 @@ const run = (n, sc) => byKey[n + "@" + sc.key];
 const scLabel = sc => sc.size + " connections · " + sc.tick + " Hz";
 // Reference session: the largest connection count at the lowest tick rate that has it.
 const reference = scenarios.filter(s => s.size === sizes[sizes.length - 1]).sort((a, b) => a.tick - b.tick)[0];
-const state = { scenario: reference, metric: "srvDown", normalize: false, log: false, test: "MoveWander" };
+// Only offer metrics the dataset actually has (older runs lack allocation; runs without client artifacts lack RTT).
+const hasAny = m => runs.some(r => TESTS.some(t => { const v = m.get(r, t); return v != null && !Number.isNaN(v); }));
+const AVAILABLE = METRICS.filter(hasAny);
+const state = { scenario: reference, metric: AVAILABLE.some(m => m.id === "srvDown") ? "srvDown" : (AVAILABLE[0] || METRICS[0]).id, normalize: false, log: false, test: "MoveWander" };
 const charts = {};
 
 function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
@@ -282,6 +286,16 @@ function fmt(v, unit) {
 }
 function fmtX(v) { return v == null ? "–" : (v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2)) + "×"; }
 function geomean(xs) { const v = xs.filter(x => x != null && x > 0); return v.length ? Math.exp(v.reduce((a, x) => a + Math.log(x), 0) / v.length) : null; }
+// Indices of the values that share the best, within tol ({rel} or {abs}); empty when fewer than two
+// values exist or when every value ties, since a highlight then says nothing.
+function bestSet(vals, lower = true, tol = { rel: 0.01 }) {
+  const present = vals.map((v, i) => [v, i]).filter(([v]) => v != null && !Number.isNaN(v));
+  if (present.length < 2) return new Set();
+  const best = lower ? Math.min(...present.map(([v]) => v)) : Math.max(...present.map(([v]) => v));
+  const eps = tol.abs != null ? tol.abs : Math.abs(best) * tol.rel;
+  const set = new Set(present.filter(([v]) => Math.abs(v - best) <= eps).map(([, i]) => i));
+  return set.size === present.length ? new Set() : set;
+}
 const chip = n => `<span class="sw" style="background:var(--s-${n})"></span>${NAMES[n]}`;
 
 function buildHeader() {
@@ -309,11 +323,12 @@ const GOALS = [
   { id: "cpu", label: "Server CPU", tol: 0.5 },
   { id: "alloc", label: "GC alloc", tol: 0 }
 ];
+const goalsInUse = GOALS.filter(g => AVAILABLE.some(m => m.id === g.id));
 function score(sc) {
   // rel[goal][netcode] = per-test ratios of value / best value in that test; wins = tests won.
   const rel = {}, wins = {};
   GOALS.forEach(g => { rel[g.id] = {}; wins[g.id] = {}; netcodes.forEach(n => { rel[g.id][n] = []; wins[g.id][n] = 0; }); });
-  SCORE_TESTS.forEach(t => GOALS.forEach(g => {
+  SCORE_TESTS.forEach(t => goalsInUse.forEach(g => {
     const vals = netcodes.map(n => ({ n, v: rawM(g.id, n, sc, t) })).filter(x => x.v != null);
     if (!vals.length) return;
     const best = Math.min(...vals.map(x => x.v));
@@ -338,23 +353,26 @@ function buildScorecard() {
       gc: have.length ? have.reduce((a, t) => a + r.server[t].gcCollections, 0) : null,
       p99: have.length ? Math.max(...have.map(t => r.server[t].p99FrameMs)) : null,
       rss: have.length ? Math.max(...have.map(t => r.server[t].peakRssBytes / 1048576)) : null,
-      wins: GOALS.reduce((a, g) => a + wins[g.id][n], 0),
+      wins: goalsInUse.reduce((a, g) => a + wins[g.id][n], 0),
       conns: r ? r.connections : null
     };
   });
-  const best = key => { const v = rows.map(r => r[key]).filter(x => x != null); return v.length > 1 ? Math.min(...v) : null; };
-  const bestWins = Math.max(...rows.map(r => r.wins));
-  const cell = (r, key, f, lowerBest = true) => r[key] == null ? `<td class="na">–</td>` : `<td class="${(lowerBest ? r[key] === best(key) : r[key] === bestWins) ? "best" : ""}">${f(r[key])}</td>`;
-  const cols = ["Netcode", "Bandwidth", "Server CPU", "GC alloc", "Collections", "Frame p99", "Peak RSS", "Wins"];
+  const TOL = { bw: { rel: 0.02 }, cpu: { rel: 0.02 }, alloc: { rel: 0.02 }, gc: { abs: 0 }, p99: { abs: 0.2 }, rss: { rel: 0.02 }, wins: { abs: 0 } };
+  const bests = {};
+  Object.keys(TOL).forEach(k => { bests[k] = bestSet(rows.map(r => r[k]), k !== "wins", TOL[k]); });
+  const cell = (r, i, key, f) => r[key] == null ? `<td class="na">–</td>` : `<td class="${bests[key].has(i) ? "best" : ""}">${f(r[key])}</td>`;
+  const COLS = [
+    ["Bandwidth", "bw", fmtX], ["Server CPU", "cpu", fmtX], ["GC alloc", "alloc", fmtX], ["Collections", "gc", v => String(v)],
+    ["Frame p99", "p99", v => v.toFixed(1) + " ms"], ["Peak RSS", "rss", v => v.toFixed(0) + " MB"], ["Wins", "wins", v => v + " / " + (SCORE_TESTS.length * goalsInUse.length)]
+  ].filter(([, key]) => rows.some(r => r[key] != null));
   document.getElementById("scorecard").innerHTML =
-    "<thead><tr>" + cols.map(c => `<th>${c}</th>`).join("") + "</tr></thead><tbody>" +
-    rows.map(r => `<tr><td class="name">${chip(r.n)}${r.conns != null && r.conns !== sc.size ? `<span class="sub">${r.conns} clients</span>` : ""}</td>` +
-      cell(r, "bw", fmtX) + cell(r, "cpu", fmtX) + cell(r, "alloc", fmtX) + cell(r, "gc", v => String(v)) + cell(r, "p99", v => v.toFixed(2) + " ms") + cell(r, "rss", v => v.toFixed(0) + " MB") +
-      cell(r, "wins", v => v + " / " + (SCORE_TESTS.length * GOALS.length), false) + "</tr>").join("") + "</tbody>";
+    "<thead><tr><th>Netcode</th>" + COLS.map(([label]) => `<th>${label}</th>`).join("") + "</tr></thead><tbody>" +
+    rows.map((r, i) => `<tr><td class="name">${chip(r.n)}${r.conns != null && r.conns !== sc.size ? `<span class="sub">${r.conns} clients</span>` : ""}</td>` +
+      COLS.map(([, key, f]) => cell(r, i, key, f)).join("") + "</tr>").join("") + "</tbody>";
   document.getElementById("score-hint").textContent =
     scLabel(sc) + ". Bandwidth (server downstream) and server CPU are the geometric mean over the " + SCORE_TESTS.length +
     " load tests of this netcode's value divided by the best netcode's value in that test: 1.00× is the best in every test, 2× is twice the best on average. " +
-    "GC alloc is the same ratio for managed bytes allocated per second. Collections is the sum over those tests; frame p99 and peak RSS are the worst of them. Wins counts tests where the netcode had the lowest bandwidth, CPU (within 0.5 points) or allocation; ties share the win.";
+    "GC alloc is the same ratio for managed bytes allocated per second. Collections is the sum over those tests; frame p99 and peak RSS are the worst of them (the loop is capped at 60 fps, so 16.7 ms means every test stayed on budget). Wins counts tests where the netcode had the lowest bandwidth, CPU (within 0.5 points) or allocation; ties share the win. Nothing is marked best when the column is a tie.";
 }
 
 // ---- How it scales: multiplier between the smallest and largest connection count (at the base tick)
@@ -377,10 +395,10 @@ function buildScaling() {
   const goals = [{ id: "srvDown", label: "Bandwidth" }, { id: "cpu", label: "Server CPU" }];
   const cols = axes.flatMap(a => goals.map(g => ({ a, g })));
   const rows = netcodes.map(n => ({ n, cells: cols.map(c => multiplier(n, c.a.from, c.a.to, c.g.id)) }));
-  const bestPer = cols.map((_, i) => { const v = rows.map(r => r.cells[i]).filter(x => x != null); return v.length > 1 ? Math.min(...v) : null; });
+  const bestPer = cols.map((_, i) => bestSet(rows.map(r => r.cells[i]), true, { rel: 0.02 }));
   document.getElementById("scaling").innerHTML =
     "<thead><tr><th>Netcode</th>" + cols.map(c => `<th>${c.g.label}<br>${c.a.label}</th>`).join("") + "</tr></thead><tbody>" +
-    rows.map(r => `<tr><td class="name">${chip(r.n)}</td>` + r.cells.map((v, i) => v == null ? `<td class="na">–</td>` : `<td class="${v === bestPer[i] ? "best" : ""}">${fmtX(v)}</td>`).join("") + "</tr>").join("") + "</tbody>";
+    rows.map((r, ri) => `<tr><td class="name">${chip(r.n)}</td>` + r.cells.map((v, i) => v == null ? `<td class="na">–</td>` : `<td class="${bestPer[i].has(ri) ? "best" : ""}">${fmtX(v)}</td>`).join("") + "</tr>").join("") + "</tbody>";
   const lin = axes.map(a => a.label + " (" + a.note + "): a netcode whose cost is linear in that axis lands at " + fmtX((a.to.size / a.from.size) * (a.to.tick / a.from.tick))).join("; ");
   document.getElementById("scaling-hint").textContent = "Geometric mean over the load tests of the ratio between the two sessions. " + lin + ". Below that the netcode amortises; above it the per-unit cost grows.";
 }
@@ -397,7 +415,7 @@ function buildControls() {
     refresh();
   });
   const seg = document.getElementById("metrics");
-  seg.innerHTML = METRICS.map(m => `<button type="button" data-id="${m.id}" aria-pressed="${m.id === state.metric}">${m.label}</button>`).join("");
+  seg.innerHTML = AVAILABLE.map(m => `<button type="button" data-id="${m.id}" aria-pressed="${m.id === state.metric}">${m.label}</button>`).join("");
   seg.addEventListener("click", e => {
     const b = e.target.closest("button"); if (!b) return;
     state.metric = b.dataset.id;
@@ -474,18 +492,17 @@ function buildTable() {
   const m = metric();
   const t = state.test;
   document.getElementById("table-title").textContent = t + " — " + m.label + (state.normalize ? " relative to PurrNet" : (m.unit ? " (" + m.unit + ")" : ""));
-  document.getElementById("table-hint").textContent = TEST_DESC[t] + ". " + m.hint + ". Best value per row is marked; every session is a row.";
+  document.getElementById("table-hint").textContent = TEST_DESC[t] + ". " + m.hint + ". The best value per row is marked, shared when tied, not at all when the whole row ties.";
   let html = "<thead><tr><th>Session</th>" + netcodes.map(n => `<th>${NAMES[n]}</th>`).join("") + "</tr></thead><tbody>";
   scenarios.forEach(sc => {
     const vals = netcodes.map(n => value(n, sc, t));
-    const present = vals.filter(v => v != null);
-    const best = present.length > 1 ? (m.lower ? Math.min(...present) : Math.max(...present)) : null;
+    const best = bestSet(vals, m.lower, state.normalize ? { rel: 0.02 } : m.tol);
     html += `<tr><td>${scLabel(sc)}</td>` + netcodes.map((n, i) => {
       const v = vals[i];
       if (v == null) return `<td class="na">–</td>`;
       const r = run(n, sc);
       const note = r && r.connections !== sc.size ? `<span class="rel" title="actual connections">${r.connections}c</span>` : "";
-      return `<td class="${v === best ? "best" : ""}">${fmt(v, m.unit)}${note}</td>`;
+      return `<td class="${best.has(i) ? "best" : ""}">${fmt(v, m.unit)}${note}</td>`;
     }).join("") + "</tr>";
   });
   html += "</tbody>";
