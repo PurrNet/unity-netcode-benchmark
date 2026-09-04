@@ -461,6 +461,9 @@ namespace PurrNet.NetBench
 
             EnforceFrameCap();
             ReadTickRate();
+            // Sampled at the start: clients finish their (shorter) last window and quit before the
+            // server's ends, so a count taken at the end reads 0 for the final test.
+            int connections = _isServer ? _adapter.ConnectedClientCount : 1;
             load.Begin(_iface);
             markers.Begin(_adapter.ProfilerMarkerPrefixes);
             long inputs0 = BenchRegistry.ServerInputsReceived;
@@ -521,7 +524,7 @@ namespace PurrNet.NetBench
                 name = TestNames[test],
                 objects = BenchRegistry.Count(slot),
                 windowSeconds = stats.wallSeconds,
-                connections = _isServer ? _adapter.ConnectedClientCount : 1,
+                connections = connections,
                 truncated = truncated,
                 cpuPercent = stats.cpuPercent,
                 avgFrameMs = stats.avgFrameMs,

@@ -273,6 +273,7 @@ jobs:
         name: Prepare players
         run: |
           sudo apt-get update -qq && sudo apt-get install -y xvfb >/dev/null
+          rm -rf results logs phase
           for n in $NETCODE_LIST; do
             chmod +x "$PWD/players/player-$n/NetBench"
             mkdir -p "results/$n" "logs/$n"
@@ -280,6 +281,17 @@ jobs:
           echo "CPU: $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2- | xargs) x$(nproc)"
 
       - name: Connect Tailscale
+        id: tailscale
+        continue-on-error: true
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          hostname: ${{ env.SERVER_HOST }}
+
+      - name: Connect Tailscale (retry)
+        if: steps.tailscale.outcome == 'failure'
         uses: tailscale/github-action@v3
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
@@ -306,6 +318,10 @@ jobs:
             fi
             sleep 2
           done
+          if [ $((READY * 10)) -ge $((EXPECTED * 9)) ]; then
+            echo "::warning::Only $READY/$EXPECTED benchmark runners joined the tailnet; running with the clients that are here"
+            exit 0
+          fi
           echo "::error::Only $READY/$EXPECTED benchmark runners joined the tailnet"
           tailscale status || true
           exit 1
@@ -356,7 +372,8 @@ jobs:
                   sleep 5
                 done
               done
-              NET_ARGS=(-session "nb-${GITHUB_RUN_ID}-${TAG}" -region "$PHOTON_REGION" -netIface eth0 -photonAppId "$PHOTON_APP_ID")
+              PUB_IFACE=$(ip route get 1.1.1.1 2>/dev/null | sed -n 's/.* dev \([^ ]*\).*/\1/p' | head -n1)
+              NET_ARGS=(-session "nb-${GITHUB_RUN_ID}-${TAG}" -region "$PHOTON_REGION" -netIface "${PUB_IFACE:-eth0}" -photonAppId "$PHOTON_APP_ID")
             else
               for i in $(seq 1 30); do
                 ss -lun 2>/dev/null | grep -qE "[:.]${BENCH_PORT}\b" || break
@@ -434,6 +451,17 @@ jobs:
       - *prepare_players
 
       - name: Connect Tailscale
+        id: tailscale
+        continue-on-error: true
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          hostname: nb-cli-${{ github.run_id }}-${{ inputs.tag }}-${{ matrix.idx }}
+
+      - name: Connect Tailscale (retry)
+        if: steps.tailscale.outcome == 'failure'
         uses: tailscale/github-action@v3
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
@@ -527,7 +555,8 @@ jobs:
 
             BIN="$PWD/players/player-$n/NetBench"
             if [ "$n" = "fusion" ]; then
-              NET_ARGS=(-session "nb-${GITHUB_RUN_ID}-${TAG}" -region "$PHOTON_REGION" -netIface eth0 -photonAppId "$PHOTON_APP_ID")
+              PUB_IFACE=$(ip route get 1.1.1.1 2>/dev/null | sed -n 's/.* dev \([^ ]*\).*/\1/p' | head -n1)
+              NET_ARGS=(-session "nb-${GITHUB_RUN_ID}-${TAG}" -region "$PHOTON_REGION" -netIface "${PUB_IFACE:-eth0}" -photonAppId "$PHOTON_APP_ID")
             else
               NET_ARGS=(-serverHost "$SERVER_IP" -port "$BENCH_PORT" -netIface tailscale0)
             fi
@@ -588,6 +617,17 @@ jobs:
       - *prepare_players
 
       - name: Connect Tailscale
+        id: tailscale
+        continue-on-error: true
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          hostname: nb-lg-${{ github.run_id }}-${{ inputs.tag }}-${{ matrix.idx }}
+
+      - name: Connect Tailscale (retry)
+        if: steps.tailscale.outcome == 'failure'
         uses: tailscale/github-action@v3
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
@@ -632,7 +672,8 @@ jobs:
 
             BIN="$PWD/players/player-$n/NetBench"
             if [ "$n" = "fusion" ]; then
-              NET_ARGS=(-session "nb-${GITHUB_RUN_ID}-${TAG}" -region "$PHOTON_REGION" -netIface eth0 -photonAppId "$PHOTON_APP_ID")
+              PUB_IFACE=$(ip route get 1.1.1.1 2>/dev/null | sed -n 's/.* dev \([^ ]*\).*/\1/p' | head -n1)
+              NET_ARGS=(-session "nb-${GITHUB_RUN_ID}-${TAG}" -region "$PHOTON_REGION" -netIface "${PUB_IFACE:-eth0}" -photonAppId "$PHOTON_APP_ID")
             else
               NET_ARGS=(-serverHost "$SERVER_IP" -port "$BENCH_PORT" -netIface tailscale0)
             fi
