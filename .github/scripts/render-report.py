@@ -146,6 +146,7 @@ TEMPLATE = r"""<meta charset="utf-8">
   td.name { font-family: "Instrument Sans", system-ui, sans-serif; font-weight: 500; }
   td.name .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: -1px; }
   td .sub { color: var(--muted); font-size: 11px; margin-left: 6px; font-weight: 400; }
+  td .sub.stall { color: var(--warn); }
 
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
   .card { background: var(--surface); border: 1px solid var(--ring); border-radius: 8px; padding: 12px 12px 8px; display: grid; gap: 6px; cursor: pointer; text-align: left; font: inherit; color: inherit; }
@@ -177,7 +178,7 @@ TEMPLATE = r"""<meta charset="utf-8">
   </section>
 
   <section id="scaling-section" hidden>
-    <h2>How it scales <span class="hint">&#xb7; cost multiplier when the load grows; closer to 1&#xd7; means better amortisation</span></h2>
+    <h2>What one more costs <span class="hint">&#xb7; marginal server cost of a connection and of a tick per second; lower is better</span></h2>
     <div class="tablewrap"><table id="scaling"></table></div>
     <p id="scaling-hint"></p>
   </section>
@@ -328,12 +329,23 @@ const GOALS = [
   { id: "alloc", label: "GC alloc", tol: 0 }
 ];
 const goalsInUse = GOALS.filter(g => AVAILABLE.some(m => m.id === g.id));
+// A server that did not keep up in a test: frame p99 past twice the 60 fps budget, a sixth of its
+// frames dropped, clients lost, or memory run away to four times its own Idle footprint. Its
+// bandwidth and CPU then describe a stall, not the netcode, so the test is left out of scoring.
+function stalled(n, sc, t) {
+  const r = run(n, sc); const w = r && r.server[t]; if (!w) return false;
+  const idleRss = r.server.Idle ? r.server.Idle.peakRssBytes : 0;
+  return w.p99FrameMs > 33.3 || (w.avgFps > 0 && w.avgFps < 54) ||
+    (r.meta.expectedClients > 0 && w.connections < 0.9 * r.meta.expectedClients) ||
+    (idleRss > 0 && w.peakRssBytes > 4 * idleRss);
+}
+function stalledAnywhere(n, sc) { return SCORE_TESTS.some(t => stalled(n, sc, t)); }
 function score(sc) {
   // rel[goal][netcode] = per-test ratios of value / best value in that test; wins = tests won.
   const rel = {}, wins = {};
   GOALS.forEach(g => { rel[g.id] = {}; wins[g.id] = {}; netcodes.forEach(n => { rel[g.id][n] = []; wins[g.id][n] = 0; }); });
   SCORE_TESTS.forEach(t => goalsInUse.forEach(g => {
-    const vals = netcodes.map(n => ({ n, v: rawM(g.id, n, sc, t) })).filter(x => x.v != null);
+    const vals = netcodes.map(n => ({ n, v: stalled(n, sc, t) ? null : rawM(g.id, n, sc, t) })).filter(x => x.v != null);
     if (!vals.length) return;
     const best = Math.min(...vals.map(x => x.v));
     vals.forEach(x => {
@@ -351,6 +363,7 @@ function buildScorecard() {
     const have = r ? SCORE_TESTS.filter(t => r.server[t]) : [];
     return {
       n,
+      stalls: r ? SCORE_TESTS.filter(t => stalled(n, sc, t)).length : 0,
       bw: geomean(rel.srvDown[n]),
       cpu: geomean(rel.cpu[n]),
       alloc: geomean(rel.alloc[n]),
@@ -372,40 +385,48 @@ function buildScorecard() {
   ].filter(([, key]) => rows.some(r => r[key] != null));
   document.getElementById("scorecard").innerHTML =
     "<thead><tr><th>Netcode</th>" + COLS.map(([label]) => `<th>${label}</th>`).join("") + "</tr></thead><tbody>" +
-    rows.map((r, i) => `<tr><td class="name">${chip(r.n)}${r.conns != null && r.conns !== sc.size ? `<span class="sub">${r.conns} clients</span>` : ""}</td>` +
+    rows.map((r, i) => `<tr><td class="name">${chip(r.n)}${r.conns != null && r.conns !== sc.size ? `<span class="sub">${r.conns} clients</span>` : ""}${r.stalls ? `<span class="sub stall">stalled in ${r.stalls} of ${SCORE_TESTS.length} tests</span>` : ""}</td>` +
       COLS.map(([, key, f]) => cell(r, i, key, f)).join("") + "</tr>").join("") + "</tbody>";
   document.getElementById("score-hint").textContent =
     scLabel(sc) + ". Bandwidth (server downstream) and server CPU are the geometric mean over the " + SCORE_TESTS.length +
     " load tests of this netcode's value divided by the best netcode's value in that test: 1.00× is the best in every test, 2× is twice the best on average. " +
-    "GC alloc is the same ratio for managed bytes allocated per second. Collections is the sum over those tests; frame p99 and peak RSS are the worst of them (the loop is capped at 60 fps, so 16.7 ms means every test stayed on budget). Wins counts tests where the netcode had the lowest bandwidth, CPU (within 0.5 points) or allocation; ties share the win. Nothing is marked best when the column is a tie.";
+    "GC alloc is the same ratio for managed bytes allocated per second. Collections is the sum over those tests; frame p99 and peak RSS are the worst of them (the loop is capped at 60 fps, so 16.7 ms means every test stayed on budget). Wins counts tests where the netcode had the lowest bandwidth, CPU (within 0.5 points) or allocation; ties share the win. Nothing is marked best when the column is a tie. A test counts as stalled when the server's frame p99 passed twice the budget, it dropped more than a sixth of its frames, it lost clients, or its memory ran to four times its Idle footprint: it wins nothing and stays out of the averages, since a server that stopped serving also stops spending.";
 }
 
-// ---- How it scales: multiplier between the smallest and largest connection count (at the base tick)
-//      and between the lowest and highest tick rate (at the largest connection count).
-function multiplier(n, from, to, mid) {
-  const ratios = SCORE_TESTS.map(t => { const a = rawM(mid, n, from, t), b = rawM(mid, n, to, t); return (a > 0 && b != null) ? b / a : null; });
-  return geomean(ratios);
+// ---- What one more costs: (cost at the larger session - cost at the smaller) / (units added), averaged
+//      over the load tests. Unlike a multiplier this does not flatter a netcode with an expensive floor.
+function marginal(n, from, to, mid, units) {
+  // A server that fell over in either session has no measurable marginal cost.
+  if (stalledAnywhere(n, from) || stalledAnywhere(n, to)) return null;
+  const deltas = SCORE_TESTS.map(t => {
+    if (stalled(n, from, t) || stalled(n, to, t)) return null;
+    const a = rawM(mid, n, from, t), b = rawM(mid, n, to, t);
+    return (a != null && b != null) ? (b - a) / units : null;
+  }).filter(v => v != null);
+  return deltas.length ? deltas.reduce((x, y) => x + y, 0) / deltas.length : null;
 }
+function fmtCost(v, unit) { return v == null ? "–" : (Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : Math.abs(v) >= 1 ? v.toFixed(2) : v.toFixed(3)) + " " + unit; }
 function buildScaling() {
   const axes = [];
   const baseTick = ticks[0];
   const bySize = scenarios.filter(s => s.tick === baseTick);
-  if (bySize.length > 1) axes.push({ from: bySize[0], to: bySize[bySize.length - 1], label: bySize[0].size + " → " + bySize[bySize.length - 1].size + " connections", note: "at " + baseTick + " Hz" });
+  if (bySize.length > 1) axes.push({ from: bySize[0], to: bySize[bySize.length - 1], label: "per connection", units: bySize[bySize.length - 1].size - bySize[0].size, note: bySize[0].size + " → " + bySize[bySize.length - 1].size + " connections at " + baseTick + " Hz" });
   const bigSize = sizes[sizes.length - 1];
   const byTick = scenarios.filter(s => s.size === bigSize);
-  if (byTick.length > 1) axes.push({ from: byTick[0], to: byTick[byTick.length - 1], label: byTick[0].tick + " → " + byTick[byTick.length - 1].tick + " Hz", note: "at " + bigSize + " connections" });
+  if (byTick.length > 1) axes.push({ from: byTick[0], to: byTick[byTick.length - 1], label: "per Hz", units: byTick[byTick.length - 1].tick - byTick[0].tick, note: byTick[0].tick + " → " + byTick[byTick.length - 1].tick + " Hz at " + bigSize + " connections" });
   const section = document.getElementById("scaling-section");
   if (!axes.length) { section.hidden = true; return; }
   section.hidden = false;
-  const goals = [{ id: "srvDown", label: "Bandwidth" }, { id: "cpu", label: "Server CPU" }];
+  const goals = [{ id: "srvDown", label: "Bandwidth", unit: "KB/s" }, { id: "cpu", label: "Server CPU", unit: "pts" }];
   const cols = axes.flatMap(a => goals.map(g => ({ a, g })));
-  const rows = netcodes.map(n => ({ n, cells: cols.map(c => multiplier(n, c.a.from, c.a.to, c.g.id)) }));
-  const bestPer = cols.map((_, i) => bestSet(rows.map(r => r.cells[i]), true, { rel: 0.02 }, fmtX));
+  const rows = netcodes.map(n => ({ n, cells: cols.map(c => marginal(n, c.a.from, c.a.to, c.g.id, c.a.units)) }));
+  // Marginal costs divide two noisy readings, so a wider tolerance than the raw metrics get.
+  const bestPer = cols.map((c, i) => bestSet(rows.map(r => r.cells[i]), true, { rel: 0.05 }, v => fmtCost(v, c.g.unit)));
   document.getElementById("scaling").innerHTML =
     "<thead><tr><th>Netcode</th>" + cols.map(c => `<th>${c.g.label}<br>${c.a.label}</th>`).join("") + "</tr></thead><tbody>" +
-    rows.map((r, ri) => `<tr><td class="name">${chip(r.n)}</td>` + r.cells.map((v, i) => v == null ? `<td class="na">–</td>` : `<td class="${bestPer[i].has(ri) ? "best" : ""}">${fmtX(v)}</td>`).join("") + "</tr>").join("") + "</tbody>";
-  const lin = axes.map(a => a.label + " (" + a.note + "): a netcode whose cost is linear in that axis lands at " + fmtX((a.to.size / a.from.size) * (a.to.tick / a.from.tick))).join("; ");
-  document.getElementById("scaling-hint").textContent = "Geometric mean over the load tests of the ratio between the two sessions. " + lin + ". Below that the netcode amortises; above it the per-unit cost grows.";
+    rows.map((r, ri) => `<tr><td class="name">${chip(r.n)}</td>` + r.cells.map((v, i) => v == null ? `<td class="na">–</td>` : `<td class="${bestPer[i].has(ri) ? "best" : ""}">${fmtCost(v, cols[i].g.unit)}</td>`).join("") + "</tr>").join("") + "</tbody>";
+  document.getElementById("scaling-hint").textContent = "Difference between the two sessions divided by what was added, averaged over the load tests: " + axes.map(a => a.label + " from " + a.note).join("; ") +
+    ". Bandwidth in KB/s, CPU in percentage points of one core. A dash means the server stalled somewhere in one of the two sessions, so its cost could not be measured.";
 }
 
 // ---- Per-test bar charts for the selected metric and session.

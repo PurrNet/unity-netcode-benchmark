@@ -41,9 +41,31 @@ def esc(s):
     return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+STALL_MS = 33.3
+
+
+def stalled(r, t):
+    """The server did not keep up in this test: frame p99 past twice the 60 fps budget, a sixth of its
+    frames dropped, clients lost, or memory run away to four times its own Idle footprint."""
+    s = r.get("server", {}).get(t) if r else None
+    if not s:
+        return False
+    idle = r.get("server", {}).get("Idle") or {}
+    expected = (r.get("meta") or {}).get("expectedClients") or 0
+    idle_rss = idle.get("peakRssBytes") or 0
+    fps = s.get("avgFps") or 0
+    return ((s.get("p99FrameMs") or 0) > STALL_MS or (0 < fps < 54)
+            or (expected > 0 and (s.get("connections") or 0) < 0.9 * expected)
+            or (idle_rss > 0 and (s.get("peakRssBytes") or 0) > 4 * idle_rss))
+
+
+def stalled_anywhere(r):
+    return any(stalled(r, t) for t in SCORE_TESTS)
+
+
 def metric(r, mid, t):
     s = r.get("server", {}).get(t)
-    if not s:
+    if not s or stalled(r, t):
         return None
     alloc = s.get("gcAllocBytesPerSec")
     return {"srvDown": s.get("txBytesPerSec"), "cpu": s.get("cpuPercent"), "gc": s.get("gcCollections"),
@@ -85,6 +107,7 @@ def scorecard(netcodes, by, sc):
     for n in netcodes:
         r = by.get((n, sc))
         have = [t for t in SCORE_TESTS if r and r.get("server", {}).get(t)]
+        stalls = [t for t in SCORE_TESTS if stalled(r, t)]
         rows[n] = {
             "bw": geomean(rel["srvDown"][n]),
             "cpu": geomean(rel["cpu"][n]),
@@ -92,30 +115,43 @@ def scorecard(netcodes, by, sc):
             "gc": sum(r["server"][t].get("gcCollections", 0) for t in have) if have else None,
             "p99": max(r["server"][t].get("p99FrameMs", 0) for t in have) if have else None,
             "wins": wins[n] if r else None,
+            "stalls": len(stalls),
         }
     return rows
 
 
-def multiplier(by, n, frm, to, mid):
-    ratios = []
+def marginal(by, n, frm, to, mid, units):
+    """(cost at the larger session - cost at the smaller) / units added, averaged over the load tests.
+    A server that fell over in either session has no measurable marginal cost."""
+    if stalled_anywhere(by.get((n, frm))) or stalled_anywhere(by.get((n, to))):
+        return None
+    deltas = []
     for t in SCORE_TESTS:
         a = metric(by[(n, frm)], mid, t) if (n, frm) in by else None
         b = metric(by[(n, to)], mid, t) if (n, to) in by else None
-        if a and b is not None and a > 0:
-            ratios.append(b / a)
-    return geomean(ratios)
+        if a is not None and b is not None:
+            deltas.append((b - a) / units)
+    return sum(deltas) / len(deltas) if deltas else None
+
+
+def fmt_cost(v, unit):
+    if v is None:
+        return "–"
+    a = abs(v)
+    return (f"{v:.0f}" if a >= 100 else f"{v:.1f}" if a >= 10 else f"{v:.2f}" if a >= 1 else f"{v:.3f}") + f" {unit}"
 
 
 def scaling_axes(scenarios):
+    """(from, to, column label, units added, note)"""
     sizes = sorted({s for s, _ in scenarios})
     ticks = sorted({t for _, t in scenarios})
     axes = []
     by_size = sorted(s for s in scenarios if s[1] == ticks[0])
     if len(by_size) > 1:
-        axes.append((by_size[0], by_size[-1], f"{by_size[0][0]} → {by_size[-1][0]} conn"))
+        axes.append((by_size[0], by_size[-1], "per conn", by_size[-1][0] - by_size[0][0], f"{by_size[0][0]} → {by_size[-1][0]} connections at {ticks[0]} Hz"))
     by_tick = sorted((s for s in scenarios if s[0] == sizes[-1]), key=lambda s: s[1])
     if len(by_tick) > 1:
-        axes.append((by_tick[0], by_tick[-1], f"{by_tick[0][1]} → {by_tick[-1][1]} Hz"))
+        axes.append((by_tick[0], by_tick[-1], "per Hz", by_tick[-1][1] - by_tick[0][1], f"{by_tick[0][1]} → {by_tick[-1][1]} Hz at {sizes[-1]} connections"))
     return axes
 
 
@@ -254,22 +290,24 @@ def main():
     columns = [("Bandwidth", "bw", bw), ("Server CPU", "cpu", cpu), ("GC alloc", "alloc", alloc), ("Collections", "gc", gc), ("Frame p99", "p99", p99), ("Wins", "wins", wins)]
     columns = [c for c in columns if any(rows[n][c[1]] is not None for n in netcodes)]
     cols1 = [c[0] for c in columns]
-    rows1 = [(NAMES[n], colors[n], [c[2][i] for c in columns]) for i, n in enumerate(netcodes)]
+    rows1 = [(NAMES[n] + (f" (stalled {rows[n]['stalls']}/{len(SCORE_TESTS)})" if rows[n]["stalls"] else ""), colors[n], [c[2][i] for c in columns]) for i, n in enumerate(netcodes)]
     note1 = "× best netcode, geometric mean over the load tests; lower is better"
 
     # Block 2: how it scales.
     axes = scaling_axes(scenarios)
     blocks = [(t1, note1, cols1, rows1)]
     if axes:
-        cols2 = [f"{g}\n{label}" for _, _, label in axes for g in ("Bandwidth", "Server CPU")]
+        cols2 = [f"{g}\n{label}" for _, _, label, _, _ in axes for g in ("Bandwidth", "Server CPU")]
         cells2 = []
-        for frm, to, _ in axes:
-            for mid in ("srvDown", "cpu"):
-                cells2.append(mark_best([(multiplier(by, n, frm, to, mid), fmt_x(multiplier(by, n, frm, to, mid))) for n in netcodes]))
+        for frm, to, _, units, _ in axes:
+            for mid, unit in (("srvDown", "KB/s"), ("cpu", "pts")):
+                vals = [marginal(by, n, frm, to, mid, units) for n in netcodes]
+                if mid == "srvDown":
+                    vals = [v / 1024 if v is not None else None for v in vals]
+                cells2.append(mark_best([(v, fmt_cost(v, unit)) for v in vals], rel=0.05))
         rows2 = [(NAMES[n], colors[n], [c[i] for c in cells2]) for i, n in enumerate(netcodes)]
-        linear = ", ".join(f"linear = {fmt_x((to[0] / frm[0]) * (to[1] / frm[1]))} for {label}" for frm, to, label in axes)
-        note2 = f"cost multiplier; {linear}"
-        blocks.append(("How it scales", note2, cols2, rows2))
+        note2 = "marginal server cost; " + "; ".join(note for _, _, _, _, note in axes)
+        blocks.append(("What one more costs", note2, cols2, rows2))
 
     if args.svg_out:
         out_dir = Path(args.svg_out)
@@ -292,7 +330,7 @@ def main():
     else:
         for title, note, cols, rows_ in blocks:
             lines += md_table(title, note, cols, rows_)
-    lines.append(f"Bandwidth is server downstream on-wire, CPU is the whole server process and GC alloc is managed bytes allocated per second; each is shown as a multiple of the best netcode in each of the {len(SCORE_TESTS)} load tests, averaged (geometric mean), so 1.00× is best everywhere. Collections is the count over those tests, each starting on a freshly collected heap. Wins counts tests won on bandwidth, CPU or allocation.")
+    lines.append(f"Bandwidth is server downstream on-wire, CPU is the whole server process and GC alloc is managed bytes allocated per second; each is shown as a multiple of the best netcode in each of the {len(SCORE_TESTS)} load tests, averaged (geometric mean), so 1.00× is best everywhere. Collections is the count over those tests, each starting on a freshly collected heap. Wins counts tests won on bandwidth, CPU or allocation. A test is a stall when the server's frame p99 passed twice the 60 fps budget, it dropped more than a sixth of its frames, it lost clients, or its memory ran to four times its Idle footprint: it wins nothing and is left out of the averages.")
     links = []
     if args.report_url:
         links.append(f"[interactive report]({args.report_url})")
