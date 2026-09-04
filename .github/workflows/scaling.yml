@@ -6,8 +6,8 @@ name: Netcode Scaling Benchmark
 # count are comparable across netcodes. Finally renders the cross-netcode tables and report.
 #
 # Runner budget per session: 1 server + measured_clients + ceil((size - measured) / loadgen_procs)
-# loadgen runners, e.g. size 100 = 1 + 10 + 4 = 15 runners. Every runner joins the tailnet as an
-# ephemeral device, so max_parallel x 15 must stay under the Tailscale device limit.
+# loadgen runners, e.g. size 100 = 1 + 10 + 8 = 19 runners. Every runner joins the tailnet as an
+# ephemeral device, so max_parallel x 19 must stay under the Tailscale device limit.
 #
 # Fusion's client count is capped by fusion_max_clients (Photon CCU plan). If Photon refuses a
 # connection the server proceeds with the clients it has after -connectTimeout, and the summary
@@ -69,6 +69,13 @@ on:
         description: "Benchmark sessions (connection counts) in flight at once. Every runner is a tailnet device: keep max_parallel x runners-per-session under your Tailscale device limit (100 on the Personal plan). bench-server runs one session at a time, so leave at 1 unless server_runner points elsewhere"
         required: false
         default: "1"
+
+# The dedicated bench-server takes one session at a time: a second dispatch waits for the running
+# one to finish instead of starting alongside it. GitHub keeps one waiting run per group, so a third
+# dispatch replaces the waiting one.
+concurrency:
+  group: netcode-scaling-bench
+  cancel-in-progress: false
 
 jobs:
   prep:
