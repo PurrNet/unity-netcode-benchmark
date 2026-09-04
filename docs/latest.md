@@ -1,31 +1,21 @@
-_Last run 2026-09-04: PurrNet 1.23.0-beta.26 · FishNet 4.7.3 · Mirror 96.0.1 · NGO 2.13.2 · Fusion 2.1.2 Stable 2279 · Unity 6000.5.4f1 · 100 objects per test · 20 s windows · sessions 10c @ 20 Hz / 100c @ 20 Hz / 100c @ 60 Hz._
+_Last run 2026-09-04: PurrNet 1.23.0-beta.26 · FishNet 4.7.3 · Mirror 96.0.1 · NGO 2.13.2 · Fusion 2.1.2 Stable 2279 · Unity 6000.5.4f1 · 100 objects per test · 20 s windows · sessions 10c @ 20 Hz / 100c @ 60 Hz._
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="latest-dark.svg">
-  <img alt="At a glance, 100 connections @ 20 Hz; how it scales. Best value per column highlighted in green." src="latest-light.svg">
+  <img alt="At a glance, 100 connections @ 60 Hz; how it scales. Best value per column highlighted in green." src="latest-light.svg">
 </picture>
 
 <details><summary>Same tables as text</summary>
 
-**At a glance, 100 connections @ 20 Hz** (× best netcode, geometric mean over the load tests; lower is better)
+**At a glance, 100 connections @ 60 Hz** (× best netcode, geometric mean over the load tests; lower is better)
 
 | Netcode | Server CPU | Collections | Frame p99 | Wins |
 |---|---:|---:|---:|---:|
-| PurrNet | 1.12× | **6** | 16.7 ms | 5 / 12 |
-| FishNet | **1.06×** | 75 | 16.7 ms | **6 / 12** |
-| Mirror | 1.27× | 59 | 16.7 ms | 3 / 12 |
-| NGO | 2.21× | 18 | 16.7 ms | 2 / 12 |
-| Fusion | 2.54× | 8 | 16.7 ms | **6 / 12** |
-
-**How it scales** (cost multiplier; linear = 10.0× for 10 → 100 conn, linear = 3.00× for 20 → 60 Hz)
-
-| Netcode | Bandwidth 10 → 100 conn | Server CPU 10 → 100 conn | Bandwidth 20 → 60 Hz | Server CPU 20 → 60 Hz |
-|---|---:|---:|---:|---:|
-| PurrNet | 1.00× | 1.00× | 14.1× | 5.25× |
-| FishNet | 1.00× | 1.00× | 19.2× | 6.45× |
-| Mirror | 1.00× | 1.00× | 12.9× | 7.48× |
-| NGO | 1.00× | 1.00× | **0.93×** | **4.00×** |
-| Fusion | – | 1.00× | – | 14.2× |
+| PurrNet | **1.96×** | **5** | **16.7 ms** | 3 / 12 |
+| FishNet | 2.27× | 317 | 17.6 ms | 1 / 12 |
+| Mirror | 3.14× | 171 | **16.7 ms** | 0 / 12 |
+| NGO | 2.93× | 132 | 11309.8 ms | 2 / 12 |
+| Fusion | 11.9× | 102 | 1000.4 ms | **6 / 12** |
 
 </details>
 

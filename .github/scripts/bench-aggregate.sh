@@ -96,6 +96,16 @@ if [ ${#CLIENT_FILES[@]} -gt 0 ]; then
   echo "" >> "$SUMMARY"
 fi
 
+# A server result whose expected client count is not this session's total was not produced by this
+# session (a self-hosted runner can leave an earlier session's files in the workspace); no datapoint.
+if [ -f "$SERVER_FILE" ]; then
+  EXPECTED=$(jq -r '.expectedClients // 0' "$SERVER_FILE")
+  if [ "$EXPECTED" != "$TOTAL" ]; then
+    echo "::error::$NETCODE ($TAG): server result expects $EXPECTED clients but this session runs $TOTAL; not writing a datapoint"
+    exit 0
+  fi
+fi
+
 # Datapoint for the cross-netcode scaling table. Inputs go through files (--slurpfile), not
 # arguments: with 25+ clients the concatenated JSON exceeds the exec argument limit.
 TMP_DIR=$(mktemp -d)

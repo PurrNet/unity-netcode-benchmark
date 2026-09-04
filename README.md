@@ -110,6 +110,11 @@ counters need Linux; frame stats work everywhere.
   with a different `server_runner`.
 - **Frame cap.** Mirror (headless server) and FishNet override the frame rate on start; the
   harness re-applies 60 fps at every measurement window.
+- **NGO send queue.** Unity Transport's `Max Packet Queue Size` is raised from its default of 128
+  to 4096 in the NGO NetworkManager prefab. At the default the server overflows the queue from
+  50 connections up, drops the excess and logs one error per connection per tick, which at 100
+  connections and 60 Hz saturates a core with logging alone. Unity's own guidance for large
+  player counts is to raise it; every other setting is the package default.
 - **FishNet packet size.** Tugboat hard-codes 1350-byte packets and LiteNetLib sets don't-fragment;
   over the 1280-byte tailnet that silently drops every full packet, so the vendored constant is
   lowered to 1200 (Mirror's KCP default). All FishNet-side changes are listed in

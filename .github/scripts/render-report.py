@@ -171,7 +171,7 @@ TEMPLATE = r"""<meta charset="utf-8">
 
   <section>
     <h2>At a glance <span class="hint">&#xb7; one row per netcode, lower is better everywhere</span></h2>
-    <div class="row"><span class="lbl">Session</span><div class="seg" id="scenarios" role="group" aria-label="Session"></div></div>
+    <div class="row"><span class="lbl">Session</span><div class="seg scenarios" role="group" aria-label="Session"></div></div>
     <div class="tablewrap"><table id="scorecard"></table></div>
     <p id="score-hint"></p>
   </section>
@@ -185,6 +185,7 @@ TEMPLATE = r"""<meta charset="utf-8">
   <section>
     <h2>Per test <span class="hint" id="charts-hint"></span></h2>
     <div class="controls" role="region" aria-label="Chart controls">
+      <div class="row"><span class="lbl">Session</span><div class="seg scenarios" role="group" aria-label="Session"></div></div>
       <div class="row"><span class="lbl">Metric</span><div class="seg" id="metrics" role="group" aria-label="Metric"></div></div>
       <div class="row">
         <span class="lbl">View</span>
@@ -405,14 +406,17 @@ function buildScaling() {
 
 // ---- Per-test bar charts for the selected metric and session.
 function buildControls() {
-  const scs = document.getElementById("scenarios");
-  scs.innerHTML = scenarios.map(s => `<button type="button" data-key="${s.key}" aria-pressed="${s.key === state.scenario.key}">${scLabel(s)}</button>`).join("");
-  scs.addEventListener("click", e => {
-    const b = e.target.closest("button"); if (!b) return;
-    state.scenario = scenarios.find(s => s.key === b.dataset.key);
-    scs.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b));
-    buildScorecard();
-    refresh();
+  // The session drives the scorecard, the charts and the table, so the selector appears above each.
+  const groups = [...document.querySelectorAll(".scenarios")];
+  groups.forEach(g => {
+    g.innerHTML = scenarios.map(s => `<button type="button" data-key="${s.key}" aria-pressed="${s.key === state.scenario.key}">${scLabel(s)}</button>`).join("");
+    g.addEventListener("click", e => {
+      const b = e.target.closest("button"); if (!b) return;
+      state.scenario = scenarios.find(s => s.key === b.dataset.key);
+      groups.forEach(x => x.querySelectorAll("button").forEach(y => y.setAttribute("aria-pressed", y.dataset.key === state.scenario.key)));
+      buildScorecard();
+      refresh();
+    });
   });
   const seg = document.getElementById("metrics");
   seg.innerHTML = AVAILABLE.map(m => `<button type="button" data-id="${m.id}" aria-pressed="${m.id === state.metric}">${m.label}</button>`).join("");
@@ -478,12 +482,17 @@ function refresh() {
   document.getElementById("metric-hint").textContent = m.hint + (m.lower ? " · lower is better" : " · higher is better");
   document.getElementById("charts-hint").textContent = "· " + scLabel(state.scenario) + " · click a chart to open its table";
   const colors = netcodes.map(n => css("--s-" + n));
+  let empty = 0;
   TESTS.forEach(t => {
     const ch = charts[t];
+    const data = netcodes.map(n => value(n, state.scenario, t));
+    if (data.every(v => v == null)) empty++;
     ch.options = baseOptions(t);
-    ch.data.datasets = [{ data: netcodes.map(n => value(n, state.scenario, t)), backgroundColor: colors, borderColor: colors, borderWidth: 0, borderRadius: 3, barPercentage: 0.7, categoryPercentage: 0.8 }];
+    ch.data.datasets = [{ data, backgroundColor: colors, borderColor: colors, borderWidth: 0, borderRadius: 3, barPercentage: 0.7, categoryPercentage: 0.8 }];
     ch.update("none");
   });
+  if (empty === TESTS.length)
+    document.getElementById("charts-hint").textContent += " · no " + m.label.toLowerCase() + " data in this session (its client results are missing); pick another session or metric";
   buildTable();
 }
 
