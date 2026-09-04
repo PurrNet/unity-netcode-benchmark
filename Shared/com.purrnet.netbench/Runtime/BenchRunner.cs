@@ -588,6 +588,8 @@ namespace PurrNet.NetBench
             }
 
             _run.tests.Add(result);
+            // Rewrite the file now: a server that crashes in a later test still leaves this one on disk.
+            WriteResults(quiet: true);
 
             Debug.Log($"[NetBench] {result.name}: objects={result.objects} conns={result.connections} window={result.windowSeconds:F1}s " +
                       $"cpu={result.cpuPercent:F1}% frame={result.avgFrameMs:F2}ms p95={result.p95FrameMs:F2}ms " +
@@ -611,7 +613,7 @@ namespace PurrNet.NetBench
             }
         }
 
-        private void WriteResults()
+        private void WriteResults(bool quiet = false)
         {
             if (string.IsNullOrEmpty(_resultsPath) || _run == null)
                 return;
@@ -623,7 +625,8 @@ namespace PurrNet.NetBench
                     Directory.CreateDirectory(dir);
 
                 File.WriteAllText(_resultsPath, JsonUtility.ToJson(_run, true));
-                Debug.Log($"[NetBench] Results written to {_resultsPath}");
+                if (!quiet)
+                    Debug.Log($"[NetBench] Results written to {_resultsPath}");
             }
             catch (Exception e)
             {
@@ -638,6 +641,8 @@ namespace PurrNet.NetBench
 
             _finished = true;
             ResetMode();
+            if (_run != null)
+                _run.completed = true;
             WriteResults();
 
             try

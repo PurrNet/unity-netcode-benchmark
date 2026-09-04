@@ -86,6 +86,8 @@ namespace PurrNet.NetBench
         public double benchSeconds;
         public double warmupSeconds;
         public string error;
+        /// <summary>False while the run is in progress; the file is rewritten after every test so a crash keeps what finished.</summary>
+        public bool completed;
         public List<TestResult> tests = new List<TestResult>();
     }
 }

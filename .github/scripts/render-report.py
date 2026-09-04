@@ -206,7 +206,7 @@ TEMPLATE = r"""<meta charset="utf-8">
 
   <section>
     <h2>Run notes</h2>
-    <p>Every netcode runs the same scenario: the server spawns N objects and replicates them to every client. On-wire bytes are read from the network interface (UDP/IP headers, ACKs and resends included). CPU is the whole server process, all threads, as % of one core with the frame loop capped at 60 fps; nothing is subtracted, so the Idle row is what holding N connections costs on its own. Fusion is relay-based (Photon Cloud): its traffic is measured on the public interface, but the server still sends one stream per client, so its downstream is comparable. Round trips are only shown as the difference to each netcode's own Idle round trip, since the absolute value is the route from the client runners to the server (and Fusion's relay), not the netcode. Every session runs all netcodes on the same server machine and the same client machines, so numbers are comparable across netcodes within a session.</p>
+    <p>Every netcode runs the same scenario: the server spawns N objects and replicates them to every client. On-wire bytes are read from the network interface (UDP/IP headers, ACKs and resends included). CPU is the whole server process, all threads, as % of one core with the frame loop capped at 60 fps; nothing is subtracted, so the Idle row is what holding N connections costs on its own. Fusion is relay-based (Photon Cloud): its traffic is measured on the public interface, but the server still sends one stream per client, so its downstream is comparable. Round trips are only shown as the difference to each netcode's own Idle round trip, since the absolute value is the route from the client runners to the server (and Fusion's relay), not the netcode. Every session runs all netcodes on the same server machine and the same client machines, so numbers are comparable across netcodes within a session. Every netcode runs with its package defaults except three changes that were needed for it to work at all here, each listed with its default in the README: FishNet's Tugboat packet size lowered from 1350 to 1200 for the 1280-byte tailnet, NGO's Unity Transport packet queue raised from 128 to 4096, and NGO's NetworkTransforms set to unreliable deltas, which is how the other four deliver transforms out of the box.</p>
     <ul id="warnings" class="warnings" hidden></ul>
   </section>
 
@@ -336,7 +336,9 @@ const goalsInUse = GOALS.filter(g => AVAILABLE.some(m => m.id === g.id));
 // frames dropped, clients lost, or memory run away to four times its own Idle footprint. Its
 // bandwidth and CPU then describe a stall, not the netcode, so the test is left out of scoring.
 function stalled(n, sc, t) {
-  const r = run(n, sc); const w = r && r.server[t]; if (!w) return false;
+  const r = run(n, sc); if (!r) return false;
+  if (r.meta.serverError) return true;
+  const w = r.server[t]; if (!w) return false;
   const idleRss = r.server.Idle ? r.server.Idle.peakRssBytes : 0;
   return w.p99FrameMs > 33.3 || (w.avgFps > 0 && w.avgFps < 54) ||
     (r.meta.expectedClients > 0 && w.connections < 0.9 * r.meta.expectedClients) ||
@@ -370,6 +372,7 @@ function buildScorecard() {
     return {
       n,
       stalls: r ? SCORE_TESTS.filter(t => stalled(n, sc, t)).length : 0,
+      err: r && r.meta.serverError ? r.meta.serverError : null,
       bw: avg("srvDown"),
       cpu: avg("cpu"),
       alloc: avg("alloc"),
@@ -391,7 +394,7 @@ function buildScorecard() {
   ].filter(([, key]) => rows.some(r => r[key] != null));
   document.getElementById("scorecard").innerHTML =
     "<thead><tr><th>Netcode</th>" + COLS.map(([label]) => `<th>${label}</th>`).join("") + "</tr></thead><tbody>" +
-    rows.map((r, i) => `<tr><td class="name">${chip(r.n)}${r.conns != null && r.conns !== sc.size ? `<span class="sub">${r.conns} clients</span>` : ""}${r.stalls ? `<span class="sub stall">stalled in ${r.stalls} of ${SCORE_TESTS.length} tests</span>` : ""}</td>` +
+    rows.map((r, i) => `<tr><td class="name">${chip(r.n)}${r.conns != null && r.conns !== sc.size ? `<span class="sub">${r.conns} clients</span>` : ""}${r.err ? `<span class="sub stall">${r.err}</span>` : r.stalls ? `<span class="sub stall">stalled in ${r.stalls} of ${SCORE_TESTS.length} tests</span>` : ""}</td>` +
       COLS.map(([, key, f]) => cell(r, i, key, f)).join("") + "</tr>").join("") + "</tbody>";
   document.getElementById("score-hint").textContent =
     scLabel(sc) + ". Averages over the " + SCORE_TESTS.length + " load tests: bandwidth is what the server puts on the wire to all clients, CPU is the whole server process as a share of one core, GC alloc is managed bytes allocated per second. " +

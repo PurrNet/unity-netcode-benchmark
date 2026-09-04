@@ -156,9 +156,12 @@ chown "$RUNNER_USER:$RUNNER_USER" "$RUNNER_DIR/.env"
 SVC=$(cat "$RUNNER_DIR/.service")
 mkdir -p "/etc/systemd/system/$SVC.d"
 # The runner and everything it spawns inherit CPUs 0-1; the workflow moves the player to BENCH_CPUS with taskset.
+# MemoryMax: a server that runs away (NGO reached 50 GB at 60 Hz) is killed by the cgroup before it
+# starves the runner agent, tailscaled and sshd on a 64 GB box.
 cat > "/etc/systemd/system/$SVC.d/cpus.conf" <<CONF
 [Service]
 CPUAffinity=$HOUSEKEEPING
+MemoryMax=48G
 CONF
 systemctl daemon-reload
 (cd "$RUNNER_DIR" && ./svc.sh start >/dev/null)

@@ -138,7 +138,10 @@ jq -n \
         cpuModel: $server.cpuModel, cpuCount: $server.cpuCount, devBuild: $server.devBuild,
         tickRate: $server.tickRate, requestedTickRate: ($server.requestedTickRate // 0), unityVersion: $server.unityVersion,
         connectedAtStart: $server.connectedAtStart, expectedClients: $server.expectedClients,
-        serverError: (if ($server.error // "") == "" then null else $server.error end), measuredClients: ($clients | length)
+        serverError: (if ($server.error // "") != "" then $server.error
+                      elif ($server.completed // true) == false then "did not complete: the server died after \($server.tests | length) tests"
+                      else null end),
+        measuredClients: ($clients | length)
       },
       server: $st,
       clients: ( [ $clients[].tests[].name ] | unique

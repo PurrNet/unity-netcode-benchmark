@@ -100,7 +100,7 @@ MonoBehaviour:
   ScaleMaxInterpolationTime: 0.1
   AuthorityMode: 0
   TickSyncChildren: 0
-  UseUnreliableDeltas: 0
+  UseUnreliableDeltas: 1
   SyncPositionX: 1
   SyncPositionY: 1
   SyncPositionZ: 1

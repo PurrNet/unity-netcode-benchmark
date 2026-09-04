@@ -50,6 +50,8 @@ def stalled(r, t):
     s = r.get("server", {}).get(t) if r else None
     if not s:
         return False
+    if (r.get("meta") or {}).get("serverError"):
+        return True
     idle = r.get("server", {}).get("Idle") or {}
     expected = (r.get("meta") or {}).get("expectedClients") or 0
     idle_rss = idle.get("peakRssBytes") or 0
@@ -307,7 +309,12 @@ def main():
     columns = [("Bandwidth", "bw", bw), ("Server CPU", "cpu", cpu), ("GC alloc", "alloc", alloc), ("Collections", "gc", gc), ("Frame p99", "p99", p99), ("Wins", "wins", wins)]
     columns = [c for c in columns if any(rows[n][c[1]] is not None for n in netcodes)]
     cols1 = [c[0] for c in columns]
-    rows1 = [(NAMES[n] + (f" (stalled {rows[n]['stalls']}/{len(SCORE_TESTS)})" if rows[n]["stalls"] else ""), colors[n], [c[2][i] for c in columns]) for i, n in enumerate(netcodes)]
+    def label(n):
+        r = by.get((n, ref))
+        if r and (r.get("meta") or {}).get("serverError"):
+            return NAMES[n] + " (did not complete)"
+        return NAMES[n] + (f" (stalled {rows[n]['stalls']}/{len(SCORE_TESTS)})" if rows[n]["stalls"] else "")
+    rows1 = [(label(n), colors[n], [c[2][i] for c in columns]) for i, n in enumerate(netcodes)]
     note1 = "averages over the load tests; lower is better"
 
     # Block 2: how it scales.

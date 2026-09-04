@@ -92,6 +92,21 @@ objects themselves, so no cross-netcode signalling is needed inside a netcode. L
 Fusion uses `-session <name> -region eu` instead of `-serverHost/-port`. Bandwidth and CPU
 counters need Linux; frame stats work everywhere.
 
+## Changes from the defaults
+
+The intent is to run every netcode exactly as it comes out of the box: package defaults, the same
+scenes, prefabs and tick rate. The three changes below are the ones that were needed for a netcode
+to work at all in this setup. Each is listed with its default so the reader can judge it.
+
+| Netcode | What | Default | Here | Why it was needed |
+|---|---|---|---|---|
+| FishNet | Tugboat's packet size constant `MAXIMUM_UDP_MTU` (a source edit in the vendored transport; there is no inspector field for it) | 1350 | 1200 | LiteNetLib sets don't-fragment and Tugboat hands it a fixed 1350-byte MTU, so on the 1280-byte tailnet every full packet was silently dropped and MoveWander and SendRPC sent almost nothing. 1200 is Mirror's KCP default. Details in [fishnet/BENCHMARK_CHANGES.md](fishnet/BENCHMARK_CHANGES.md). |
+| NGO | Unity Transport → `Max Packet Queue Size` (inspector field on the NetworkManager prefab) | 128 | 4096 | At 128 the server overflows the queue from 50 connections up, drops packets and logs one error per connection per tick; at 100 connections and 60 Hz the logging alone saturates a core. Unity recommends raising it for large player counts. |
+| NGO | NetworkTransform → `Use Unreliable Deltas` (inspector field on the three movement prefabs) | off | on | Delivers transform deltas unreliably, which is what the other four do for transforms out of the box (Mirror's default NetworkTransform is the unreliable one, FishNet and PurrNet send transform deltas unreliably, Fusion's snapshots are unreliable). With the reliable default the server queues without bound behind Unity Transport's reliable window at 60 Hz and dies. |
+
+Nothing else is changed. RPCs are reliable in every netcode, and NGO's NetworkVariables are
+reliable by design. PurrNet, Mirror and Fusion run untouched.
+
 ## Caveats
 
 - **Fusion is relay-based.** Server and clients talk to Photon Cloud, so its RTT includes the
@@ -110,13 +125,7 @@ counters need Linux; frame stats work everywhere.
   with a different `server_runner`.
 - **Frame cap.** Mirror (headless server) and FishNet override the frame rate on start; the
   harness re-applies 60 fps at every measurement window.
-- **NGO send queue.** Unity Transport's `Max Packet Queue Size` is raised from its default of 128
-  to 4096 in the NGO NetworkManager prefab. At the default the server overflows the queue from
-  50 connections up, drops the excess and logs one error per connection per tick, which at 100
-  connections and 60 Hz saturates a core with logging alone. Unity's own guidance for large
-  player counts is to raise it; every other setting is the package default.
-- **FishNet packet size.** Tugboat hard-codes 1350-byte packets and LiteNetLib sets don't-fragment;
-  over the 1280-byte tailnet that silently drops every full packet, so the vendored constant is
-  lowered to 1200 (Mirror's KCP default). All FishNet-side changes are listed in
-  [fishnet/BENCHMARK_CHANGES.md](fishnet/BENCHMARK_CHANGES.md).
+- **Did not complete.** A netcode whose server dies mid-session shows as "did not complete" in
+  the report rather than being scored on the tests it survived; one whose server could not hold
+  the frame budget in a test is marked stalled there and wins nothing.
 - Release builds by default; `profiling` builds add profiler overhead.

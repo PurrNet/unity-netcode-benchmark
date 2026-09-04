@@ -405,9 +405,15 @@ jobs:
               -logFile "$PWD/logs/$n/server.log" || STATUS=$?
             kill "$TAIL_PID" 2>/dev/null || true
             if [ "$STATUS" -ne 0 ]; then
-              echo "::error::$n server exited with status $STATUS"
+              # The player rewrites its results after every test, so a server that died mid-session
+              # still leaves a datapoint that says how far it got; only a missing file fails the job.
+              if [ -s "results/$n/server.json" ]; then
+                echo "::warning::$n server exited with status $STATUS after $(jq '.tests | length' "results/$n/server.json") tests; its datapoint is marked as not completed"
+              else
+                echo "::error::$n server exited with status $STATUS and left no results"
+                FAILED="$FAILED $n"
+              fi
               tail -n 100 "logs/$n/server.log" || true
-              FAILED="$FAILED $n"
             fi
             echo "::endgroup::"
           done
@@ -416,7 +422,7 @@ jobs:
           # Give clients that are between netcodes a moment to read the final phase.
           sleep 20
           if [ -n "$FAILED" ]; then
-            echo "::error::Server failed for:$FAILED"
+            echo "::error::Server left no results for:$FAILED"
             exit 1
           fi
 
