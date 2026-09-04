@@ -60,6 +60,10 @@ on:
         description: "Objects spawned per test (moving objects / RPC emitters)"
         required: true
         default: "100"
+      tick_rate:
+        description: "Network tick rate in Hz, applied to every netcode (0 = each project's configured rate)"
+        required: false
+        default: "20"
       tag:
         description: "Run discriminator (artifact names, tailnet hostnames)"
         required: false
@@ -118,6 +122,10 @@ on:
       bench_objects:
         type: string
         required: true
+      tick_rate:
+        type: string
+        required: false
+        default: "20"
       tag:
         type: string
         required: true
@@ -374,7 +382,7 @@ jobs:
               ${BENCH_CPUS:+taskset -c "$BENCH_CPUS"} \
               "$BIN" -batchmode -nographics \
               -role server -count "$TOTAL" \
-              -benchSeconds ${{ inputs.bench_seconds }} -benchObjects ${{ inputs.bench_objects }} \
+              -benchSeconds ${{ inputs.bench_seconds }} -benchObjects ${{ inputs.bench_objects }} -tickRate ${{ inputs.tick_rate }} \
               "${NET_ARGS[@]}" -connectTimeout 180 -maxRunSeconds 780 \
               -results "$PWD/results/$n/server.json" \
               -logFile "$PWD/logs/$n/server.log" || STATUS=$?
@@ -533,7 +541,7 @@ jobs:
               xvfb-run -a --server-args="-screen 0 1024x768x24" \
               "$BIN" -batchmode -nographics \
               -role client \
-              -benchSeconds ${{ inputs.bench_seconds }} -benchObjects ${{ inputs.bench_objects }} \
+              -benchSeconds ${{ inputs.bench_seconds }} -benchObjects ${{ inputs.bench_objects }} -tickRate ${{ inputs.tick_rate }} \
               "${NET_ARGS[@]}" -connectTimeout 180 -maxRunSeconds 780 \
               -results "$PWD/results/$n/client-${{ matrix.idx }}.json" \
               -logFile "$PWD/$LOG" || STATUS=$?
@@ -640,7 +648,7 @@ jobs:
                 --server-args="-screen 0 1024x768x24" \
                 "$BIN" -batchmode -nographics \
                 -role client -loadgen \
-                -benchSeconds ${{ inputs.bench_seconds }} -benchObjects ${{ inputs.bench_objects }} \
+                -benchSeconds ${{ inputs.bench_seconds }} -benchObjects ${{ inputs.bench_objects }} -tickRate ${{ inputs.tick_rate }} \
                 "${NET_ARGS[@]}" -connectTimeout 180 -maxRunSeconds 780 \
                 -results "$PWD/results/$n/loadgen-${{ matrix.idx }}-$p.json" \
                 -logFile "$PWD/logs/$n/loadgen-${{ matrix.idx }}-$p.log" &

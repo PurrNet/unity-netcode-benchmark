@@ -1,9 +1,9 @@
 name: Netcode Scaling Benchmark
 
-# Builds every selected netcode once (in parallel), then runs one benchmark session per connection
-# count (sizes side by side, up to max_parallel). Inside a session every netcode runs back to back
-# on the same server machine and the same client machines, so CPU numbers within a connection
-# count are comparable across netcodes. Finally renders the cross-netcode tables and report.
+# Builds every selected netcode once (in parallel), then runs one benchmark session per entry in
+# `sessions` (connections@tickHz, e.g. 100@60; up to max_parallel side by side). Inside a session
+# every netcode runs back to back on the same server machine and the same client machines, so
+# numbers within a session are comparable across netcodes. Finally renders the report.
 #
 # Runner budget per session: 1 server + measured_clients + ceil((size - measured) / loadgen_procs)
 # loadgen runners, e.g. size 100 = 1 + 10 + 8 = 19 runners. Every runner joins the tailnet as an
@@ -20,10 +20,10 @@ on:
         description: "Comma-separated netcodes to run"
         required: true
         default: "purrnet,fishnet,mirror,ngo,fusion"
-      sizes:
-        description: "Comma-separated connection counts"
+      sessions:
+        description: "Comma-separated sessions as connections@tickHz (a bare number means 20 Hz)"
         required: true
-        default: "10,50,100"
+        default: "10@20,100@20,100@60"
       bench_seconds:
         description: "Steady-state measurement window per test, seconds"
         required: true
@@ -91,27 +91,35 @@ jobs:
         run: |
           set -eu
           NETCODES=$(echo "${{ inputs.netcodes }}" | tr ',' '\n' | sed 's/ //g' | grep -v '^$')
-          SIZES=$(echo "${{ inputs.sizes }}" | tr ',' '\n' | sed 's/ //g' | grep -v '^$')
+          SESSIONS=$(echo "${{ inputs.sessions }}" | tr ',' '\n' | sed 's/ //g' | grep -v '^$')
           for n in $NETCODES; do
             case "$n" in purrnet|fishnet|mirror|ngo|fusion) ;; *) echo "::error::Unknown netcode '$n'"; exit 1;; esac
           done
           echo "netcode_matrix=$(printf '%s\n' $NETCODES | jq -R . | jq -s -c .)" >> "$GITHUB_OUTPUT"
           echo "max_parallel=${{ inputs.max_parallel }}" >> "$GITHUB_OUTPUT"
 
-          # One session per connection count; the session itself runs the netcodes back to back
-          # and works out measured / loadgen runner counts per netcode (see benchmark.yml).
-          # Fusion sessions share one Photon CCU plan, so each session waits for the smaller
-          # sessions to finish Fusion before starting its own (fusion_after).
+          # One session per connections@tick entry; the session itself runs the netcodes back to
+          # back and works out measured / loadgen runner counts per netcode (see benchmark.yml).
+          # The tag (c100t60) names artifacts and tailnet hosts and tells the aggregator which
+          # row the datapoint belongs to. Fusion sessions share one Photon CCU plan, so each
+          # session waits for the earlier ones to finish Fusion before starting its own (fusion_after).
           ENTRIES=""
           AFTER=""
-          for s in $SIZES; do
-            ENTRIES="$ENTRIES{\"size\":\"$s\",\"tag\":\"c$s\",\"fusion_after\":\"${AFTER#,}\"},"
-            AFTER="$AFTER,c$s"
+          COUNT=0
+          for s in $SESSIONS; do
+            SIZE=${s%@*}
+            TICK=20
+            [ "$s" != "$SIZE" ] && TICK=${s#*@}
+            case "$SIZE$TICK" in *[!0-9]*) echo "::error::Bad session '$s' (want connections@tickHz)"; exit 1;; esac
+            TAG="c${SIZE}t${TICK}"
+            ENTRIES="$ENTRIES{\"size\":\"$SIZE\",\"tick\":\"$TICK\",\"tag\":\"$TAG\",\"fusion_after\":\"${AFTER#,}\"},"
+            AFTER="$AFTER,$TAG"
+            COUNT=$((COUNT + 1))
           done
           MATRIX="{\"include\":[${ENTRIES%,}]}"
           echo "$MATRIX" | jq .
           echo "size_matrix=$(echo "$MATRIX" | jq -c .)" >> "$GITHUB_OUTPUT"
-          echo "expected=$(( $(printf '%s\n' $NETCODES | wc -l) * $(printf '%s\n' $SIZES | wc -l) ))" >> "$GITHUB_OUTPUT"
+          echo "expected=$(( $(printf '%s\n' $NETCODES | wc -l) * COUNT ))" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build
@@ -128,7 +136,7 @@ jobs:
       runner: ${{ inputs.runner }}
 
   bench:
-    name: ${{ matrix.size }} connections
+    name: ${{ matrix.size }} connections @ ${{ matrix.tick }} Hz
     needs: [prep, build]
     if: ${{ !cancelled() && needs.prep.result == 'success' }}
     strategy:
@@ -145,6 +153,7 @@ jobs:
       fusion_max_clients: ${{ inputs.fusion_max_clients }}
       bench_seconds: ${{ inputs.bench_seconds }}
       bench_objects: ${{ inputs.bench_objects }}
+      tick_rate: ${{ matrix.tick }}
       tag: ${{ matrix.tag }}
       fusion_after: ${{ matrix.fusion_after }}
       build_players: false
@@ -174,16 +183,11 @@ jobs:
           path: all
           merge-multiple: true
 
-      - name: Render scaling curve
+      - name: Merge datapoints
         run: |
           bash .github/scripts/versions.sh > all/versions.json
           cat all/versions.json
-          bash .github/scripts/bench-scaling.sh \
-            all \
-            "${{ inputs.bench_seconds }}" \
-            "${{ inputs.bench_objects }}" \
-            all/versions.json \
-            results-out
+          bash .github/scripts/bench-scaling.sh all results-out
 
       - name: Render interactive report
         id: report
@@ -209,6 +213,8 @@ jobs:
           # The Markdown references docs/latest-*.svg; the commit step copies them there.
           sed -i 's#results-out/svg/#docs/#g' results-out/latest.md
           cat results-out/latest.md
+          # Same block as the job summary, minus the picture (its SVGs are not reachable from here).
+          sed '/<picture>/,/<\/picture>/d' results-out/latest.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload combined results
         if: always()

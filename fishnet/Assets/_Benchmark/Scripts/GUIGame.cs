@@ -62,6 +62,8 @@ namespace StinkySteak.FishnetBenchmark
 
         public void Configure(BenchConnectOptions options)
         {
+            if (options.tickRate > 0)
+                _networkManager.TimeManager.SetTickRate((ushort)options.tickRate);
             if (_networkManager.TransportManager.Transport is Tugboat tugboat)
             {
                 tugboat.SetMaximumClients(options.maxClients);

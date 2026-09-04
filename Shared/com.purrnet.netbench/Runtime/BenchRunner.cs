@@ -25,6 +25,7 @@ namespace PurrNet.NetBench
     ///   -role server|client   -count N (server: expected clients)   -serverHost H  -port P
     ///   -session S -region R -photonAppId ID (relay netcodes)       -tests 1,2,3,4,5,6,7,8
     ///   -benchSeconds S (20)  -warmupSeconds S (3)  -idleSeconds S (5)  -benchObjects N (100)
+    ///   -tickRate HZ (0 = the project's configured rate; applied to the netcode before it starts)
     ///   -connectTimeout S (120)  -maxRunSeconds S (900)  -fps N (60)  -netIface NAME (auto)
     ///   -results PATH  -loadgen (client is load only, not a measured sample)
     /// </summary>
@@ -135,7 +136,8 @@ namespace PurrNet.NetBench
                 maxClients = _expectedClients + 4,
                 session = CommandLine.Get("-session", "netbench"),
                 region = CommandLine.Get("-region", "us"),
-                photonAppId = CommandLine.Get("-photonAppId", "")
+                photonAppId = CommandLine.Get("-photonAppId", ""),
+                tickRate = CommandLine.GetInt("-tickRate", 0)
             };
         }
 
@@ -221,13 +223,14 @@ namespace PurrNet.NetBench
                 cpuCount = SystemInfo.processorCount,
                 targetFps = _fps,
                 expectedClients = _expectedClients,
+                requestedTickRate = _opts.tickRate,
                 benchObjects = _objects,
                 benchSeconds = _benchSeconds,
                 warmupSeconds = _warmupSeconds
             };
 
             Debug.Log($"[NetBench] netcode={_run.netcode} role={_run.role} loadgen={_loadgen} clients={_expectedClients} objects={_objects} " +
-                      $"window={_benchSeconds}s warmup={_warmupSeconds}s tests={string.Join(",", _tests)} iface={_iface} fps={_fps} " +
+                      $"window={_benchSeconds}s warmup={_warmupSeconds}s tests={string.Join(",", _tests)} iface={_iface} fps={_fps} tickRate={_opts.tickRate} " +
                       $"host={_opts.host}:{_opts.port} session={_opts.session} region={_opts.region} cpu={_run.cpuModel} x{_run.cpuCount}");
 
             if (!Try(() => _adapter.Configure(_opts), "Configure"))

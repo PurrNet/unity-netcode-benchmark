@@ -72,6 +72,8 @@ namespace PurrNet.NetBench
         public string cpuModel;
         public int cpuCount;
         public int tickRate;
+        /// <summary>Tick rate asked for on the command line (0 = project default); tickRate is what the netcode reported.</summary>
+        public int requestedTickRate;
         public int targetFps;
         public int expectedClients;
         public int connectedAtStart;

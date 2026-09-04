@@ -82,6 +82,8 @@ namespace StinkySteak.NGOBenchmark
 
         public void Configure(BenchConnectOptions options)
         {
+            if (options.tickRate > 0)
+                _networkManager.NetworkConfig.TickRate = (uint)options.tickRate;
             if (_networkManager.NetworkConfig.NetworkTransport is UnityTransport utp)
                 utp.SetConnectionData(options.host, options.port, "0.0.0.0");
         }

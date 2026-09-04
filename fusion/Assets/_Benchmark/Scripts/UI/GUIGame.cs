@@ -104,6 +104,17 @@ namespace StinkySteak.FusionBenchmark
         public void Configure(BenchConnectOptions options)
         {
             _opts = options;
+            if (options.tickRate > 0)
+            {
+                // StartGame without an explicit Config uses the global project config; every interval
+                // is 1 so client, server and send rates all equal the requested rate.
+                var selection = NetworkProjectConfig.Global.Simulation.TickRateSelection;
+                selection.Client = options.tickRate;
+                selection.ClientSendInterval = 1;
+                selection.ServerTickInterval = 1;
+                selection.ServerSendInterval = 1;
+                NetworkProjectConfig.Global.Simulation.TickRateSelection = selection;
+            }
         }
 
         public void StartBenchServer() => _ = StartBench(GameMode.Server);

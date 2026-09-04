@@ -1,8 +1,8 @@
 # Unity netcode benchmark
 
 The same five stress scenarios built for PurrNet, FishNet, Mirror, Netcode for GameObjects and
-Photon Fusion 2, run headless by GitHub Actions at 10 / 50 / 100 connections on identical
-hardware, with bandwidth, CPU, frame time and RTT compared side by side.
+Photon Fusion 2, run headless by GitHub Actions at 10 and 100 connections and at 20 and 60 Hz
+on a dedicated server, with bandwidth, CPU, frame time and RTT compared side by side.
 
 ## Latest results
 
@@ -59,8 +59,8 @@ All metrics (per-client bandwidth, frame times, RTT, GC, memory, every connectio
 | `ngo/` | Netcode for GameObjects | Unity Transport |
 | `fusion/` | Photon Fusion 2 | Photon Cloud relay, dedicated server mode |
 
-All projects use Unity `6000.5.4f1`, a 20 Hz tick, a 60 fps frame cap and the same scenes and
-prefabs (from [StinkySteak's benchmark](https://github.com/StinkySteak/unity-netcode-benchmark)).
+All projects use Unity `6000.5.4f1`, the same tick rate (set per session with `-tickRate`), a
+60 fps frame cap and the same scenes and prefabs (from [StinkySteak's benchmark](https://github.com/StinkySteak/unity-netcode-benchmark)).
 The server spawns `N` objects (100 by default) and replicates them to every client:
 
 | Test | Per object, every tick |
@@ -95,19 +95,27 @@ single-process measured clients (the remaining connections run as load generator
 ## Running it
 
 Dispatch **Netcode Scaling Benchmark** (`.github/workflows/scaling.yml`). Defaults run all five
-netcodes at 10 / 50 / 100 connections with 20-second windows. Each connection count is one
-session: the five netcodes run back to back on the same server machine and the same client
-machines, and sessions run one after another on the dedicated server, about 40 minutes per
-session. Useful inputs: `netcodes`, `sizes`, `bench_seconds`, `bench_objects`, `profiling`
+netcodes in three sessions, `10@20,100@20,100@60` (connections@tickHz), with 20-second windows.
+Inside a session the five netcodes run back to back on the same server machine and the same
+client machines; sessions run one after another on the dedicated server, about 40 minutes each.
+Useful inputs: `netcodes`, `sessions`, `bench_seconds`, `bench_objects`, `profiling`
 (development builds add a CPU-by-profiler-marker table), `fusion_max_clients`. `server_runner`,
 `runner` and `loadgen_runner` pick the machines; the defaults below are the published setup.
 
-Quick reference run while iterating on one netcode: `netcodes: purrnet`, `sizes: 10,100`,
+Quick reference run while iterating on one netcode: `netcodes: purrnet`, `sessions: 10,100`,
 `bench_seconds: 10` (about 12 minutes).
 
 Each run renders the job summary, uploads raw per-process JSON as the `benchmark-results`
 artifact, and commits `docs/index.html` (interactive report), `docs/latest.json` and the
 "Latest results" block above. Serve `docs/` with GitHub Pages to get a permanent report URL.
+
+How to read the results: the block above and the top of the report show one row per netcode.
+Bandwidth and CPU are a multiple of the best netcode in each load test, averaged over the seven
+load tests (geometric mean), so 1.00× means best everywhere and 2× means twice the best on
+average; Idle and Static are left out of the averages because they sit at the noise floor.
+"How it scales" gives the cost multiplier from 10 to 100 connections and from 20 to 60 Hz, next
+to what a linear sender would score (10× and 3×), so below that line a netcode amortises. The
+per-test bar charts and the session table underneath carry every metric.
 
 How a session works: one server runner and the client runners meet over a Tailscale tailnet and
 stay up for the whole session. The server announces which netcode is next on a small HTTP endpoint,
@@ -117,8 +125,8 @@ window and the eight tests, writes JSON and quits. Clients detect the active tes
 objects themselves, so no cross-netcode signalling is needed inside a netcode. Locally:
 
 ```bash
-./NetBench -batchmode -nographics -role server -count 2 -port 7777 -benchObjects 100 -benchSeconds 10 -results server.json
-./NetBench -batchmode -nographics -role client -serverHost 127.0.0.1 -port 7777 -benchObjects 100 -benchSeconds 10 -results client.json
+./NetBench -batchmode -nographics -role server -count 2 -port 7777 -benchObjects 100 -benchSeconds 10 -tickRate 20 -results server.json
+./NetBench -batchmode -nographics -role client -serverHost 127.0.0.1 -port 7777 -benchObjects 100 -benchSeconds 10 -tickRate 20 -results client.json
 ```
 
 Fusion uses `-session <name> -region eu` instead of `-serverHost/-port`. Bandwidth and CPU

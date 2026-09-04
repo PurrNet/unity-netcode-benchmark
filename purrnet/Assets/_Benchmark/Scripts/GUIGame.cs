@@ -61,6 +61,8 @@ namespace StinkySteak.MirrorBenchmark
 
         public void Configure(BenchConnectOptions options)
         {
+            if (options.tickRate > 0)
+                _networkManager.tickRate = options.tickRate;
             if (_networkManager.transport is UDPTransport udp)
             {
                 udp.address = options.host;

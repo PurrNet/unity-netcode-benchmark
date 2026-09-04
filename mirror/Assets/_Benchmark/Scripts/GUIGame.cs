@@ -79,6 +79,8 @@ namespace StinkySteak.MirrorBenchmark
 
         public void Configure(BenchConnectOptions options)
         {
+            if (options.tickRate > 0)
+                _networkManager.sendRate = options.tickRate;
             _networkManager.networkAddress = options.host;
             _networkManager.maxConnections = options.maxClients;
             if (_networkManager.transport is KcpTransport kcp)

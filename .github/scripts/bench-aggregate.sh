@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Renders one benchmark run (one netcode, one connection count) to the job summary and emits a
-# compact datapoint (dp-<netcode>-<connections>.json) for bench-scaling.sh.
+# Renders one benchmark run (one netcode, one session) to the job summary and emits a compact
+# datapoint (dp-<netcode>-<tag>.json) for bench-scaling.sh.
 #
 # Inputs are the per-process JSON files written by BenchRunner (Shared/com.purrnet.netbench):
 #   <results_dir>/server.json          server process
@@ -119,13 +119,14 @@ jq -n \
   | {
       netcode: $netcode,
       connections: $connections,
-      # Requested size from the tag (c100 -> 100) so capped runs (e.g. Fusion at 99) land in the
-      # same table row as the other netcodes; falls back to the actual connection count.
-      size: (([$tag | capture("^c(?<n>[0-9]+)$") | .n] | first // ($connections | tostring)) | tonumber),
+      # Requested size and tick from the tag (c100t60 -> 100 connections at 60 Hz) so capped runs
+      # (e.g. Fusion at 99) land in the same row as the other netcodes; fall back to the actual values.
+      size: (([$tag | capture("^c(?<n>[0-9]+)") | .n] | first // ($connections | tostring)) | tonumber),
+      tick: (([$tag | capture("t(?<t>[0-9]+)$") | .t] | first // ($server.tickRate | tostring)) | tonumber),
       tag: $tag,
       meta: {
         cpuModel: $server.cpuModel, cpuCount: $server.cpuCount, devBuild: $server.devBuild,
-        tickRate: $server.tickRate, unityVersion: $server.unityVersion,
+        tickRate: $server.tickRate, requestedTickRate: ($server.requestedTickRate // 0), unityVersion: $server.unityVersion,
         connectedAtStart: $server.connectedAtStart, expectedClients: $server.expectedClients,
         serverError: (if ($server.error // "") == "" then null else $server.error end), measuredClients: ($clients | length)
       },
@@ -145,6 +146,6 @@ jq -n \
                          }})
                  | from_entries )
     }
-' > "$OUT_DIR/dp-${NETCODE}-${TOTAL}.json"
+' > "$OUT_DIR/dp-${NETCODE}-${TAG}.json"
 
-echo "Datapoint written to $OUT_DIR/dp-${NETCODE}-${TOTAL}.json"
+echo "Datapoint written to $OUT_DIR/dp-${NETCODE}-${TAG}.json"

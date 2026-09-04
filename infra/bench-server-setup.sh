@@ -63,7 +63,7 @@ if [ "$BOOST_DONE" -eq 0 ] && command -v wrmsr >/dev/null; then
     wrmsr -p "$c" 0xc0010015 $(( 0x$v | (1 << 25) )) && BOOST_DONE=1
   done
 fi
-echo "smt=$(cat /sys/devices/system/cpu/smt/control 2>/dev/null || echo n/a) boost_disabled=$BOOST_DONE governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || echo n/a) online_cpus=$(nproc)"
+echo "smt=$(cat /sys/devices/system/cpu/smt/control 2>/dev/null || echo n/a) boost_disabled=$BOOST_DONE governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || echo n/a) online_cpus=$(nproc --all)"
 TUNE
 chmod +x /usr/local/sbin/bench-cpu-tune.sh
 

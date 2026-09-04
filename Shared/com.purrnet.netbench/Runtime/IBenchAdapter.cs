@@ -13,6 +13,8 @@ namespace PurrNet.NetBench
         public string region;
         /// <summary>Optional app id override for relay-based netcodes (empty = project default).</summary>
         public string photonAppId;
+        /// <summary>Network tick rate to run at in Hz, or 0 to keep the project's configured rate.</summary>
+        public int tickRate;
     }
 
     /// <summary>
