@@ -7,9 +7,7 @@ hardware, with bandwidth, CPU, frame time and RTT compared side by side.
 ## Latest results
 
 <!-- BENCH:START -->
-_Last run 2026-09-03: PurrNet 1.23.0-beta.24 · FishNet 4.7.3 · Mirror 96.0.1 · NGO 2.13.2 · Fusion 2.1.2 Stable 2279 · Unity 6000.5.4f1 · 100 objects per test · 20 s windows · connections 10 / 50 / 100._
-
-_Note: Fusion ran with 1/100 clients._
+_Last run 2026-09-04: PurrNet ? · FishNet 4.7.3 · Mirror 96.0.1 · NGO 2.13.2 · Fusion 2.1.2 Stable 2279 · Unity 6000.5.4f1 · 100 objects per test · 20 s windows · connections 10 / 50 / 100._
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/latest-dark.svg">
@@ -22,33 +20,33 @@ _Note: Fusion ran with 1/100 clients._
 
 | Test | PurrNet | FishNet | Mirror | NGO | Fusion |
 |---|---:|---:|---:|---:|---:|
-| Idle | 13.6 | 14.3 | 169 | **11.6** | 50.4 |
-| MoveY | 492 | 1,253 | 2,443 | 3,024 | **68.1** |
-| MoveAllAxis | 1,295 | 2,020 | 4,423 | 4,952 | **67.2** |
-| MoveWander | 1,694 | 2,840 | 5,182 | 6,619 | **77.7** |
-| SendRPC | 1,782 | 1,446 | 3,013 | 3,412 | **80.1** |
-| Static | 13.8 | 14.1 | 171 | **11.6** | 42.0 |
-| SpawnChurn | 745 | 644 | 852 | 944 | **43.7** |
-| ClientInput | 91.0 | 93.8 | 279 | 115 | **42.0** |
-| SyncVars | 2,612 | 3,661 | 4,983 | 4,281 | **67.1** |
+| Idle | 14.1 | 14.2 | 169 | **12.3** | 1,314 |
+| MoveY | **485** | 1,253 | 2,464 | 2,934 | 2,805 |
+| MoveAllAxis | **1,282** | 2,025 | 4,418 | 4,585 | 2,774 |
+| MoveWander | **1,704** | 2,839 | 5,187 | 6,199 | 3,679 |
+| SendRPC | 1,782 | **1,446** | 3,014 | 3,034 | 3,831 |
+| Static | 13.8 | 14.2 | 171 | **11.6** | 405 |
+| SpawnChurn | 743 | 645 | 851 | 944 | **388** |
+| ClientInput | **91.2** | 93.2 | 277 | 115 | 217 |
+| SyncVars | **2,496** | 3,475 | 4,774 | 3,885 | 3,223 |
 
 **Server CPU at 100 connections** (% of one core, lower is better)
 
 | Test | PurrNet | FishNet | Mirror | NGO | Fusion |
 |---|---:|---:|---:|---:|---:|
-| Idle | 3.0 | **3.0** | 6.4 | 3.4 | 3.4 |
-| MoveY | 11.4 | 7.0 | 10.5 | 42.6 | **1.5** |
-| MoveAllAxis | 16.5 | 5.1 | 9.4 | 55.4 | **2.4** |
-| MoveWander | 14.1 | 6.3 | 10.0 | 55.7 | **1.7** |
-| SendRPC | 5.4 | 9.3 | 17.7 | 56.6 | **2.6** |
-| Static | 1.7 | 5.0 | 8.5 | 5.0 | **1.3** |
-| SpawnChurn | 10.0 | 12.0 | 11.0 | 9.7 | **3.5** |
-| ClientInput | 3.6 | 9.0 | 7.9 | 5.9 | **2.5** |
-| SyncVars | 7.7 | 8.4 | 13.2 | 62.3 | **2.3** |
+| Idle | 2.0 | **1.4** | 5.6 | 1.4 | 6.6 |
+| MoveY | 9.9 | **3.8** | 5.7 | 31.7 | 12.2 |
+| MoveAllAxis | 11.1 | **3.4** | 5.4 | 32.4 | 13.0 |
+| MoveWander | 11.2 | **2.7** | 5.7 | 33.5 | 13.7 |
+| SendRPC | 7.1 | **5.4** | 7.3 | 32.2 | 12.9 |
+| Static | 1.7 | 1.4 | 3.8 | **1.1** | 8.1 |
+| SpawnChurn | 11.0 | 4.4 | 5.3 | **3.7** | 9.8 |
+| ClientInput | 2.4 | 2.8 | 5.1 | **1.8** | 9.4 |
+| SyncVars | **3.9** | 4.3 | 6.9 | 35.8 | 13.4 |
 
 </details>
 
-All metrics (per-client bandwidth, frame times, RTT, GC, memory, every connection count) are in the [interactive report](https://purrnet.github.io/unity-netcode-benchmark/), [workflow run](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/33815693476), [raw datapoints](docs/latest.json).
+All metrics (per-client bandwidth, frame times, RTT, GC, memory, every connection count) are in the [interactive report](https://purrnet.github.io/unity-netcode-benchmark/), [workflow run](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/33863558632), [raw datapoints](docs/latest.json).
 <!-- BENCH:END -->
 
 ## What runs
