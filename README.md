@@ -97,9 +97,10 @@ single-process measured clients (the remaining connections run as load generator
 Dispatch **Netcode Scaling Benchmark** (`.github/workflows/scaling.yml`). Defaults run all five
 netcodes at 10 / 50 / 100 connections with 20-second windows. Each connection count is one
 session: the five netcodes run back to back on the same server machine and the same client
-machines, sessions run side by side, about 40 minutes in total. Useful inputs: `netcodes`, `sizes`, `bench_seconds`,
-`bench_objects`, `profiling` (development builds add a CPU-by-profiler-marker table),
-`max_parallel`, `fusion_max_clients`.
+machines, and sessions run one after another on the dedicated server, about 40 minutes per
+session. Useful inputs: `netcodes`, `sizes`, `bench_seconds`, `bench_objects`, `profiling`
+(development builds add a CPU-by-profiler-marker table), `fusion_max_clients`. `server_runner`,
+`runner` and `loadgen_runner` pick the machines; the defaults below are the published setup.
 
 Quick reference run while iterating on one netcode: `netcodes: purrnet`, `sizes: 10,100`,
 `bench_seconds: 10` (about 12 minutes).
@@ -120,7 +121,7 @@ objects themselves, so no cross-netcode signalling is needed inside a netcode. L
 ./NetBench -batchmode -nographics -role client -serverHost 127.0.0.1 -port 7777 -benchObjects 100 -benchSeconds 10 -results client.json
 ```
 
-Fusion uses `-session <name> -region us` instead of `-serverHost/-port`. Bandwidth and CPU
+Fusion uses `-session <name> -region eu` instead of `-serverHost/-port`. Bandwidth and CPU
 counters need Linux; frame stats work everywhere.
 
 ## Caveats
@@ -129,12 +130,16 @@ counters need Linux; frame stats work everywhere.
   relay hop and its traffic is measured on the public interface. The server still sends one stream
   per client, so its downstream is comparable. `fusion_max_clients` caps its client count to the
   Photon CCU plan.
-- **Hardware.** Jobs run on Blacksmith's `blacksmith-4vcpu-ubuntu-2404` pool, which is a mix of
-  CPU models whose speed also varies over time. That is why all netcodes of one connection count
-  share one server machine: CPU is comparable across netcodes within a connection count, not
-  between connection counts and not between runs. Bandwidth, packets, GC and frame times do not
-  depend on the machine. Every runner is a tailnet device (100 on Tailscale's Personal plan), which
-  bounds `max_parallel`.
+- **Hardware.** The server runs on a dedicated Hetzner AX41 (Ryzen 5 3600, Helsinki) registered
+  as the self-hosted `bench-server` runner: SMT and turbo off, performance governor, interrupts
+  and the runner agent pinned to two cores and the server player to the other four
+  (`infra/bench-server-setup.sh`). Server CPU is therefore comparable across netcodes, connection
+  counts and runs. The box takes one session at a time, which is why `max_parallel` defaults
+  to 1. Clients and load generators run on GitHub-hosted `ubuntu-latest` runners in the US, so the
+  RTT column reads as US clients to an EU server for every netcode alike; the Idle row shows that
+  floor. Bandwidth, packets, GC and frame times do not depend on the machine. Every runner is a
+  tailnet device (100 on Tailscale's Personal plan), which bounds `max_parallel` if you raise it
+  with a different `server_runner`.
 - **Frame cap.** Mirror (headless server) and FishNet override the frame rate on start; the
   harness re-applies 60 fps at every measurement window.
 - **FishNet packet size.** Tugboat hard-codes 1350-byte packets and LiteNetLib sets don't-fragment;

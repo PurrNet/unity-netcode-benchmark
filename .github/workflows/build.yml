@@ -18,7 +18,7 @@ on:
       runner:
         type: string
         required: false
-        default: blacksmith-4vcpu-ubuntu-2404
+        default: ubuntu-latest
   workflow_dispatch:
     inputs:
       netcode:
@@ -33,7 +33,7 @@ on:
       runner:
         type: string
         required: false
-        default: blacksmith-4vcpu-ubuntu-2404
+        default: ubuntu-latest
 
 jobs:
   build:

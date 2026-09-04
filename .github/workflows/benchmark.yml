@@ -37,17 +37,17 @@ on:
         required: true
         default: "10"
       loadgen_procs:
-        description: "Client processes per loadgen runner (the rest of the connections)"
+        description: "Client processes per loadgen runner (3 per vCPU is the tested ratio; ubuntu-latest has 4)"
         required: true
-        default: "24"
+        default: "12"
       loadgen_runner:
         description: "runs-on label for loadgen runners (empty = same as runner)"
         required: false
-        default: "blacksmith-8vcpu-ubuntu-2404"
-      server_runner:
-        description: "runs-on label for the server job (empty = same as runner; bench-server = the dedicated Hetzner box, one session at a time)"
-        required: false
         default: ""
+      server_runner:
+        description: "runs-on label for the server job (bench-server = the dedicated Hetzner box, one session at a time; empty = same as runner)"
+        required: false
+        default: "bench-server"
       fusion_max_clients:
         description: "Client cap for Fusion (Photon CCU plan limit)"
         required: false
@@ -79,13 +79,13 @@ on:
         required: false
         default: false
       runner:
-        description: "runs-on label for benchmark jobs (blacksmith-4vcpu-ubuntu-2404 = fixed hardware; ubuntu-latest = GitHub-hosted)"
+        description: "runs-on label for client jobs (ubuntu-latest = GitHub-hosted, free for public repos; blacksmith-4vcpu-ubuntu-2404 = fixed hardware)"
         required: false
-        default: "blacksmith-4vcpu-ubuntu-2404"
+        default: "ubuntu-latest"
       region:
-        description: "Photon Cloud region (Fusion only)"
+        description: "Photon Cloud region (Fusion only; eu is closest to bench-server)"
         required: false
-        default: "us"
+        default: "eu"
   workflow_call:
     inputs:
       netcodes:
@@ -136,7 +136,7 @@ on:
       runner:
         type: string
         required: false
-        default: "blacksmith-4vcpu-ubuntu-2404"
+        default: "ubuntu-latest"
       region:
         type: string
         required: false
@@ -155,7 +155,7 @@ env:
 jobs:
   prep:
     name: Plan session
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     outputs:
       netcode_list: ${{ steps.gen.outputs.netcode_list }}
       plan: ${{ steps.gen.outputs.plan }}
@@ -700,7 +700,7 @@ jobs:
     name: Aggregate results
     needs: [prep, server, clients]
     if: always()
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     env:
       PLAN: ${{ needs.prep.outputs.plan }}
       NETCODE_LIST: ${{ join(fromJSON(needs.prep.outputs.netcode_list), ' ') }}
