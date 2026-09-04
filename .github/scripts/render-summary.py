@@ -83,6 +83,23 @@ def fmt_x(v):
     return (f"{v:.0f}" if v >= 100 else f"{v:.1f}" if v >= 10 else f"{v:.2f}") + "×"
 
 
+def fmt_kbs(v):
+    """v in bytes/s."""
+    if v is None:
+        return "–"
+    kb = v / 1024
+    return f"{kb / 1024:.2f} MB/s" if kb >= 1024 else f"{kb:.0f} KB/s" if kb >= 100 else f"{kb:.1f} KB/s"
+
+
+def fmt_pct(v):
+    return "–" if v is None else f"{v:.1f}%"
+
+
+def mean(xs):
+    xs = [x for x in xs if x is not None]
+    return sum(xs) / len(xs) if xs else None
+
+
 def goals_in_use(netcodes, by, sc):
     return [(g, tol) for g, tol in GOALS if any((n, sc) in by and metric(by[(n, sc)], g, t) is not None for n in netcodes for t in SCORE_TESTS)]
 
@@ -109,9 +126,9 @@ def scorecard(netcodes, by, sc):
         have = [t for t in SCORE_TESTS if r and r.get("server", {}).get(t)]
         stalls = [t for t in SCORE_TESTS if stalled(r, t)]
         rows[n] = {
-            "bw": geomean(rel["srvDown"][n]),
-            "cpu": geomean(rel["cpu"][n]),
-            "alloc": geomean(rel["alloc"][n]),
+            "bw": mean(metric(r, "srvDown", t) for t in SCORE_TESTS) if r and not stalls else None,
+            "cpu": mean(metric(r, "cpu", t) for t in SCORE_TESTS) if r and not stalls else None,
+            "alloc": mean(metric(r, "alloc", t) for t in SCORE_TESTS) if r and not stalls else None,
             "gc": sum(r["server"][t].get("gcCollections", 0) for t in have) if have else None,
             "p99": max(r["server"][t].get("p99FrameMs", 0) for t in have) if have else None,
             "wins": wins[n] if r else None,
@@ -279,9 +296,9 @@ def main():
     # Block 1: scorecard at the reference session.
     rows = scorecard(netcodes, by, ref)
     t1 = f"At a glance, {ref[0]} connections @ {ref[1]} Hz"
-    bw = mark_best([(rows[n]["bw"], fmt_x(rows[n]["bw"])) for n in netcodes])
-    cpu = mark_best([(rows[n]["cpu"], fmt_x(rows[n]["cpu"])) for n in netcodes])
-    alloc = mark_best([(rows[n]["alloc"], fmt_x(rows[n]["alloc"])) for n in netcodes])
+    bw = mark_best([(rows[n]["bw"], fmt_kbs(rows[n]["bw"])) for n in netcodes])
+    cpu = mark_best([(rows[n]["cpu"], fmt_pct(rows[n]["cpu"])) for n in netcodes])
+    alloc = mark_best([(rows[n]["alloc"], fmt_kbs(rows[n]["alloc"])) for n in netcodes])
     gc = mark_best([(rows[n]["gc"], "–" if rows[n]["gc"] is None else str(rows[n]["gc"])) for n in netcodes], abs_tol=0)
     p99 = mark_best([(rows[n]["p99"], "–" if rows[n]["p99"] is None else f"{rows[n]['p99']:.1f} ms") for n in netcodes], abs_tol=0.2)
     n_goals = len(goals_in_use(netcodes, by, ref))
@@ -291,7 +308,7 @@ def main():
     columns = [c for c in columns if any(rows[n][c[1]] is not None for n in netcodes)]
     cols1 = [c[0] for c in columns]
     rows1 = [(NAMES[n] + (f" (stalled {rows[n]['stalls']}/{len(SCORE_TESTS)})" if rows[n]["stalls"] else ""), colors[n], [c[2][i] for c in columns]) for i, n in enumerate(netcodes)]
-    note1 = "× best netcode, geometric mean over the load tests; lower is better"
+    note1 = "averages over the load tests; lower is better"
 
     # Block 2: how it scales.
     axes = scaling_axes(scenarios)
@@ -330,7 +347,7 @@ def main():
     else:
         for title, note, cols, rows_ in blocks:
             lines += md_table(title, note, cols, rows_)
-    lines.append(f"Bandwidth is server downstream on-wire, CPU is the whole server process and GC alloc is managed bytes allocated per second; each is shown as a multiple of the best netcode in each of the {len(SCORE_TESTS)} load tests, averaged (geometric mean), so 1.00× is best everywhere. Collections is the count over those tests, each starting on a freshly collected heap. Wins counts tests won on bandwidth, CPU or allocation. A test is a stall when the server's frame p99 passed twice the 60 fps budget, it dropped more than a sixth of its frames, it lost clients, or its memory ran to four times its Idle footprint: it wins nothing and is left out of the averages.")
+    lines.append(f"Averages over the {len(SCORE_TESTS)} load tests: bandwidth is server downstream on-wire to all clients, CPU is the whole server process as a share of one core, GC alloc is managed bytes allocated per second. Collections is the count over those tests, each starting on a freshly collected heap. Wins counts tests won on bandwidth, CPU or allocation. A test is a stall when the server's frame p99 passed twice the 60 fps budget, it dropped more than a sixth of its frames, it lost clients, or its memory ran to four times its Idle footprint: it wins nothing and is left out of the averages.")
     links = []
     if args.report_url:
         links.append(f"[interactive report]({args.report_url})")

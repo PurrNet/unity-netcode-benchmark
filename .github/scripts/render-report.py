@@ -287,6 +287,9 @@ function fmt(v, unit) {
   return unit ? s + " " + unit : s;
 }
 function fmtX(v) { return v == null ? "–" : (v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2)) + "×"; }
+function fmtKb(v) { return v == null ? "–" : v >= 1024 ? (v / 1024).toFixed(2) + " MB/s" : v >= 100 ? v.toFixed(0) + " KB/s" : v.toFixed(1) + " KB/s"; }
+function fmtPct(v) { return v == null ? "–" : v.toFixed(1) + "%"; }
+function mean(xs) { const v = xs.filter(x => x != null); return v.length ? v.reduce((a, x) => a + x, 0) / v.length : null; }
 function geomean(xs) { const v = xs.filter(x => x != null && x > 0); return v.length ? Math.exp(v.reduce((a, x) => a + Math.log(x), 0) / v.length) : null; }
 // Indices of the values that share the best, within tol ({rel} or {abs}); empty when fewer than two
 // values exist or when every value ties, since a highlight then says nothing.
@@ -361,12 +364,15 @@ function buildScorecard() {
   const rows = netcodes.map(n => {
     const r = run(n, sc);
     const have = r ? SCORE_TESTS.filter(t => r.server[t]) : [];
+    // Plain averages over the load tests, in the metric's own unit. A netcode that stalled in any of
+    // them gets no average: one over the tests it survived would not compare with the others'.
+    const avg = mid => stalledAnywhere(n, sc) ? null : mean(SCORE_TESTS.map(t => rawM(mid, n, sc, t)));
     return {
       n,
       stalls: r ? SCORE_TESTS.filter(t => stalled(n, sc, t)).length : 0,
-      bw: geomean(rel.srvDown[n]),
-      cpu: geomean(rel.cpu[n]),
-      alloc: geomean(rel.alloc[n]),
+      bw: avg("srvDown"),
+      cpu: avg("cpu"),
+      alloc: avg("alloc"),
       gc: have.length ? have.reduce((a, t) => a + r.server[t].gcCollections, 0) : null,
       p99: have.length ? Math.max(...have.map(t => r.server[t].p99FrameMs)) : null,
       rss: have.length ? Math.max(...have.map(t => r.server[t].peakRssBytes / 1048576)) : null,
@@ -375,12 +381,12 @@ function buildScorecard() {
     };
   });
   const TOL = { bw: { rel: 0.02 }, cpu: { rel: 0.02 }, alloc: { rel: 0.02 }, gc: { abs: 0 }, p99: { abs: 0.2 }, rss: { rel: 0.02 }, wins: { abs: 0 } };
-  const FMT = { bw: fmtX, cpu: fmtX, alloc: fmtX, gc: String, p99: v => v.toFixed(1), rss: v => v.toFixed(0), wins: String };
+  const FMT = { bw: fmtKb, cpu: fmtPct, alloc: fmtKb, gc: String, p99: v => v.toFixed(1), rss: v => v.toFixed(0), wins: String };
   const bests = {};
   Object.keys(TOL).forEach(k => { bests[k] = bestSet(rows.map(r => r[k]), k !== "wins", TOL[k], FMT[k]); });
   const cell = (r, i, key, f) => r[key] == null ? `<td class="na">–</td>` : `<td class="${bests[key].has(i) ? "best" : ""}">${f(r[key])}</td>`;
   const COLS = [
-    ["Bandwidth", "bw", fmtX], ["Server CPU", "cpu", fmtX], ["GC alloc", "alloc", fmtX], ["Collections", "gc", v => String(v)],
+    ["Bandwidth", "bw", fmtKb], ["Server CPU", "cpu", fmtPct], ["GC alloc", "alloc", fmtKb], ["Collections", "gc", v => String(v)],
     ["Frame p99", "p99", v => v.toFixed(1) + " ms"], ["Peak RSS", "rss", v => v.toFixed(0) + " MB"], ["Wins", "wins", v => v + " / " + (SCORE_TESTS.length * goalsInUse.length)]
   ].filter(([, key]) => rows.some(r => r[key] != null));
   document.getElementById("scorecard").innerHTML =
@@ -388,9 +394,8 @@ function buildScorecard() {
     rows.map((r, i) => `<tr><td class="name">${chip(r.n)}${r.conns != null && r.conns !== sc.size ? `<span class="sub">${r.conns} clients</span>` : ""}${r.stalls ? `<span class="sub stall">stalled in ${r.stalls} of ${SCORE_TESTS.length} tests</span>` : ""}</td>` +
       COLS.map(([, key, f]) => cell(r, i, key, f)).join("") + "</tr>").join("") + "</tbody>";
   document.getElementById("score-hint").textContent =
-    scLabel(sc) + ". Bandwidth (server downstream) and server CPU are the geometric mean over the " + SCORE_TESTS.length +
-    " load tests of this netcode's value divided by the best netcode's value in that test: 1.00× is the best in every test, 2× is twice the best on average. " +
-    "GC alloc is the same ratio for managed bytes allocated per second. Collections is the sum over those tests; frame p99 and peak RSS are the worst of them (the loop is capped at 60 fps, so 16.7 ms means every test stayed on budget). Wins counts tests where the netcode had the lowest bandwidth, CPU (within 0.5 points) or allocation; ties share the win. Nothing is marked best when the column is a tie. A test counts as stalled when the server's frame p99 passed twice the budget, it dropped more than a sixth of its frames, it lost clients, or its memory ran to four times its Idle footprint: it wins nothing and stays out of the averages, since a server that stopped serving also stops spending.";
+    scLabel(sc) + ". Averages over the " + SCORE_TESTS.length + " load tests: bandwidth is what the server puts on the wire to all clients, CPU is the whole server process as a share of one core, GC alloc is managed bytes allocated per second. " +
+    "Collections is the sum over those tests; frame p99 and peak RSS are the worst of them (the loop is capped at 60 fps, so 16.7 ms means every test stayed on budget). Wins counts tests where the netcode had the lowest bandwidth, CPU (within 0.5 points) or allocation; ties share the win. Nothing is marked best when the column is a tie. A netcode that stalled in any test shows no averages, since one over the tests it survived would not compare. A test counts as stalled when the server's frame p99 passed twice the budget, it dropped more than a sixth of its frames, it lost clients, or its memory ran to four times its Idle footprint: it wins nothing and stays out of the averages, since a server that stopped serving also stops spending.";
 }
 
 // ---- What one more costs: (cost at the larger session - cost at the smaller) / (units added), averaged
