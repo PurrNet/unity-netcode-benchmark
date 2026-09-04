@@ -555,6 +555,7 @@ namespace PurrNet.NetBench
                 gcCollections = stats.gcCollections,
                 gcAllocBytes = stats.gcAllocBytes,
                 gcAllocBytesPerSec = stats.gcAllocBytes >= 0 ? stats.gcAllocBytes / wall : -1,
+                gcAllocEstimated = stats.gcAllocEstimated,
                 managedHeapBytes = stats.managedHeapBytes,
                 peakRssBytes = stats.peakRssBytes,
                 iface = _iface,

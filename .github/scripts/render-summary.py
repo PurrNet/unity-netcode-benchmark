@@ -127,7 +127,8 @@ def mark_best(cells, lower=True, rel=0.02, abs_tol=None):
         return [(text, False) for _, text in cells]
     best = min(present) if lower else max(present)
     eps = abs_tol if abs_tol is not None else abs(best) * rel
-    flags = [v is not None and abs(v - best) <= eps for v, _ in cells]
+    best_text = next(text for v, text in cells if v == best)
+    flags = [v is not None and (abs(v - best) <= eps or text == best_text) for v, text in cells]
     if sum(flags) == len(present):
         flags = [False] * len(cells)
     return [(text, f) for (_, text), f in zip(cells, flags)]

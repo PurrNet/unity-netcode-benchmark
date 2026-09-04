@@ -28,8 +28,10 @@ namespace PurrNet.NetBench
         public double avgFps;
         public int frameCount;
         public int gcCollections;
-        /// <summary>Managed bytes allocated during the window on every thread, or -1 when the counter is unavailable.</summary>
+        /// <summary>Managed bytes allocated during the window on every thread, or -1 when unavailable.</summary>
         public long gcAllocBytes;
+        /// <summary>True when gcAllocBytes came from heap growth between frames rather than the profiler counter.</summary>
+        public bool gcAllocEstimated;
         public long managedHeapBytes;
         public long peakRssBytes;
         public double wallSeconds;
@@ -48,6 +50,9 @@ namespace PurrNet.NetBench
         private int _startGcCollections;
         private ProfilerRecorder _gcAlloc;
         private long _gcAllocBytes;
+        private long _lastHeap;
+        private long _heapGrowth;
+        private long _growthFrames;
         private IfaceCounters _startIface;
         private string _iface;
         private readonly List<float> _frameMs = new List<float>();
@@ -62,6 +67,12 @@ namespace PurrNet.NetBench
             // collector ran, this says how much garbage was made, however the collections happen to fall.
             _gcAllocBytes = 0;
             _gcAlloc = ProfilerRecorder.StartNew(ProfilerCategory.Memory, "GC Allocated In Frame");
+            // The counter above only reports in development players; release builds fall back to the
+            // managed heap's growth between frames, with the running average standing in for frames
+            // where a collection shrank it. Heap growth covers every thread.
+            _lastHeap = GC.GetTotalMemory(false);
+            _heapGrowth = 0;
+            _growthFrames = 0;
             _startIface = ReadIface(iface);
             _frameMs.Clear();
         }
@@ -71,6 +82,19 @@ namespace PurrNet.NetBench
             _frameMs.Add(Time.unscaledDeltaTime * 1000f);
             if (_gcAlloc.Valid)
                 _gcAllocBytes += _gcAlloc.LastValue;
+
+            long heap = GC.GetTotalMemory(false);
+            long delta = heap - _lastHeap;
+            _lastHeap = heap;
+            if (delta >= 0)
+            {
+                _heapGrowth += delta;
+                _growthFrames++;
+            }
+            else if (_growthFrames > 0)
+            {
+                _heapGrowth += _heapGrowth / _growthFrames;
+            }
         }
 
         public LoadStats End()
@@ -86,7 +110,8 @@ namespace PurrNet.NetBench
                 peakRssBytes = ReadPeakResidentBytes(),
                 frameCount = _frameMs.Count,
                 gcCollections = GC.CollectionCount(0) - _startGcCollections,
-                gcAllocBytes = _gcAlloc.Valid ? _gcAllocBytes : -1,
+                gcAllocBytes = _gcAllocBytes > 0 ? _gcAllocBytes : _heapGrowth,
+                gcAllocEstimated = _gcAllocBytes <= 0,
                 managedHeapBytes = GC.GetTotalMemory(false),
                 wallSeconds = wall,
                 ifaceDelta = new IfaceCounters

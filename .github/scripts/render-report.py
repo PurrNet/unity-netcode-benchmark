@@ -237,7 +237,7 @@ const METRICS = [
   { id: "cliUp", label: "Per-client upstream", unit: "KB/s", lower: true, tol: { rel: 0.01 }, hint: "average sent by one measured client", get: (r, t) => kb(r.clients[t] && r.clients[t].txBytesPerSec) },
   { id: "p99", label: "Frame p99", unit: "ms", lower: true, tol: { abs: 0.2 }, hint: "server main-thread frame time, 99th percentile; the loop is capped at 60 fps, so 16.7 ms is on budget and anything above means the server could not keep up", get: (r, t) => r.server[t] ? r.server[t].p99FrameMs : null },
   { id: "pkts", label: "Packets out", unit: "/s", lower: true, tol: { rel: 0.01 }, hint: "server datagrams sent per second", get: (r, t) => r.server[t] ? r.server[t].txPacketsPerSec : null },
-  { id: "alloc", label: "GC alloc", unit: "KB/s", lower: true, tol: { rel: 0.02 }, hint: "managed bytes the server allocates per second, all threads; the garbage the collections are made of", get: (r, t) => r.server[t] && r.server[t].gcAllocBytesPerSec >= 0 ? r.server[t].gcAllocBytesPerSec / 1024 : null },
+  { id: "alloc", label: "GC alloc", unit: "KB/s", lower: true, tol: { rel: 0.02 }, hint: "managed bytes the server allocates per second, all threads, from heap growth between frames; the garbage the collections are made of", get: (r, t) => r.server[t] && r.server[t].gcAllocBytesPerSec >= 0 ? r.server[t].gcAllocBytesPerSec / 1024 : null },
   { id: "gc", label: "GC collections", unit: "", lower: true, tol: { abs: 0 }, hint: "server GC collections during the window (each test starts on a freshly collected heap)", get: (r, t) => r.server[t] ? r.server[t].gcCollections : null },
   { id: "rss", label: "Peak RSS", unit: "MB", lower: true, tol: { rel: 0.02 }, hint: "server peak resident memory", get: (r, t) => r.server[t] ? r.server[t].peakRssBytes / 1048576 : null },
   // Absolute round trips are mostly the path (US runners to the EU server, the tailnet, Fusion's relay);
@@ -289,12 +289,15 @@ function fmtX(v) { return v == null ? "–" : (v >= 100 ? v.toFixed(0) : v >= 10
 function geomean(xs) { const v = xs.filter(x => x != null && x > 0); return v.length ? Math.exp(v.reduce((a, x) => a + Math.log(x), 0) / v.length) : null; }
 // Indices of the values that share the best, within tol ({rel} or {abs}); empty when fewer than two
 // values exist or when every value ties, since a highlight then says nothing.
-function bestSet(vals, lower = true, tol = { rel: 0.01 }) {
+// A value that renders as the same text as the best is tied too: a mark between two "0.14 KB/s" cells
+// would only be reporting digits the reader cannot see.
+function bestSet(vals, lower = true, tol = { rel: 0.01 }, fmtFn = null) {
   const present = vals.map((v, i) => [v, i]).filter(([v]) => v != null && !Number.isNaN(v));
   if (present.length < 2) return new Set();
   const best = lower ? Math.min(...present.map(([v]) => v)) : Math.max(...present.map(([v]) => v));
   const eps = tol.abs != null ? tol.abs : Math.abs(best) * tol.rel;
-  const set = new Set(present.filter(([v]) => Math.abs(v - best) <= eps).map(([, i]) => i));
+  const bestText = fmtFn ? fmtFn(best) : null;
+  const set = new Set(present.filter(([v]) => Math.abs(v - best) <= eps || (fmtFn && fmtFn(v) === bestText)).map(([, i]) => i));
   return set.size === present.length ? new Set() : set;
 }
 const chip = n => `<span class="sw" style="background:var(--s-${n})"></span>${NAMES[n]}`;
@@ -359,8 +362,9 @@ function buildScorecard() {
     };
   });
   const TOL = { bw: { rel: 0.02 }, cpu: { rel: 0.02 }, alloc: { rel: 0.02 }, gc: { abs: 0 }, p99: { abs: 0.2 }, rss: { rel: 0.02 }, wins: { abs: 0 } };
+  const FMT = { bw: fmtX, cpu: fmtX, alloc: fmtX, gc: String, p99: v => v.toFixed(1), rss: v => v.toFixed(0), wins: String };
   const bests = {};
-  Object.keys(TOL).forEach(k => { bests[k] = bestSet(rows.map(r => r[k]), k !== "wins", TOL[k]); });
+  Object.keys(TOL).forEach(k => { bests[k] = bestSet(rows.map(r => r[k]), k !== "wins", TOL[k], FMT[k]); });
   const cell = (r, i, key, f) => r[key] == null ? `<td class="na">–</td>` : `<td class="${bests[key].has(i) ? "best" : ""}">${f(r[key])}</td>`;
   const COLS = [
     ["Bandwidth", "bw", fmtX], ["Server CPU", "cpu", fmtX], ["GC alloc", "alloc", fmtX], ["Collections", "gc", v => String(v)],
@@ -396,7 +400,7 @@ function buildScaling() {
   const goals = [{ id: "srvDown", label: "Bandwidth" }, { id: "cpu", label: "Server CPU" }];
   const cols = axes.flatMap(a => goals.map(g => ({ a, g })));
   const rows = netcodes.map(n => ({ n, cells: cols.map(c => multiplier(n, c.a.from, c.a.to, c.g.id)) }));
-  const bestPer = cols.map((_, i) => bestSet(rows.map(r => r.cells[i]), true, { rel: 0.02 }));
+  const bestPer = cols.map((_, i) => bestSet(rows.map(r => r.cells[i]), true, { rel: 0.02 }, fmtX));
   document.getElementById("scaling").innerHTML =
     "<thead><tr><th>Netcode</th>" + cols.map(c => `<th>${c.g.label}<br>${c.a.label}</th>`).join("") + "</tr></thead><tbody>" +
     rows.map((r, ri) => `<tr><td class="name">${chip(r.n)}</td>` + r.cells.map((v, i) => v == null ? `<td class="na">–</td>` : `<td class="${bestPer[i].has(ri) ? "best" : ""}">${fmtX(v)}</td>`).join("") + "</tr>").join("") + "</tbody>";
@@ -505,7 +509,7 @@ function buildTable() {
   let html = "<thead><tr><th>Session</th>" + netcodes.map(n => `<th>${NAMES[n]}</th>`).join("") + "</tr></thead><tbody>";
   scenarios.forEach(sc => {
     const vals = netcodes.map(n => value(n, sc, t));
-    const best = bestSet(vals, m.lower, state.normalize ? { rel: 0.02 } : m.tol);
+    const best = bestSet(vals, m.lower, state.normalize ? { rel: 0.02 } : m.tol, v => fmt(v, m.unit));
     html += `<tr><td>${scLabel(sc)}</td>` + netcodes.map((n, i) => {
       const v = vals[i];
       if (v == null) return `<td class="na">–</td>`;

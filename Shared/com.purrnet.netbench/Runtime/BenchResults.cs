@@ -35,6 +35,8 @@ namespace PurrNet.NetBench
         /// <summary>Managed bytes allocated during the window (all threads); -1 when the profiler counter is unavailable.</summary>
         public long gcAllocBytes;
         public double gcAllocBytesPerSec;
+        /// <summary>True when gcAllocBytes is heap growth between frames (release players) rather than the profiler counter.</summary>
+        public bool gcAllocEstimated;
         public long managedHeapBytes;
         public long peakRssBytes;
 
