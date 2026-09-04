@@ -57,6 +57,10 @@ on:
         description: "runs-on label for loadgen runners"
         required: false
         default: "blacksmith-8vcpu-ubuntu-2404"
+      server_runner:
+        description: "runs-on label for the server job (empty = same as runner; bench-server = the dedicated Hetzner box, which runs one session at a time, so set max_parallel to 1)"
+        required: false
+        default: ""
       fusion_max_clients:
         description: "Client cap for Fusion (Photon CCU plan limit; if the dedicated server counts as one CCU, set this to plan - 1)"
         required: false
@@ -140,6 +144,7 @@ jobs:
       profiling: ${{ inputs.profiling }}
       runner: ${{ inputs.runner }}
       loadgen_runner: ${{ inputs.loadgen_runner }}
+      server_runner: ${{ inputs.server_runner }}
       region: ${{ inputs.region }}
 
   combine:

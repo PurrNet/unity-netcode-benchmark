@@ -44,6 +44,10 @@ on:
         description: "runs-on label for loadgen runners (empty = same as runner)"
         required: false
         default: "blacksmith-8vcpu-ubuntu-2404"
+      server_runner:
+        description: "runs-on label for the server job (empty = same as runner; bench-server = the dedicated Hetzner box, one session at a time)"
+        required: false
+        default: ""
       fusion_max_clients:
         description: "Client cap for Fusion (Photon CCU plan limit)"
         required: false
@@ -97,6 +101,10 @@ on:
         type: string
         required: true
       loadgen_runner:
+        type: string
+        required: false
+        default: ""
+      server_runner:
         type: string
         required: false
         default: ""
@@ -156,6 +164,7 @@ jobs:
       measured_matrix: ${{ steps.gen.outputs.measured_matrix }}
       loadgen_matrix: ${{ steps.gen.outputs.loadgen_matrix }}
       loadgen_runner: ${{ steps.gen.outputs.loadgen_runner }}
+      server_runner: ${{ steps.gen.outputs.server_runner }}
     steps:
       - id: gen
         run: |
@@ -206,6 +215,9 @@ jobs:
           LG_RUNNER="${{ inputs.loadgen_runner }}"
           [ -z "$LG_RUNNER" ] && LG_RUNNER="${{ inputs.runner }}"
           echo "loadgen_runner=$LG_RUNNER" >> "$GITHUB_OUTPUT"
+          SRV_RUNNER="${{ inputs.server_runner }}"
+          [ -z "$SRV_RUNNER" ] && SRV_RUNNER="${{ inputs.runner }}"
+          echo "server_runner=$SRV_RUNNER" >> "$GITHUB_OUTPUT"
           if [ "$MAX_MEASURED" -gt 0 ]; then
             echo "measured_matrix=$(seq 1 "$MAX_MEASURED" | jq -R . | jq -s -c .)" >> "$GITHUB_OUTPUT"
           else
@@ -236,7 +248,7 @@ jobs:
     name: Server
     needs: [build, prep]
     if: ${{ !cancelled() && needs.prep.result == 'success' && needs.build.result != 'failure' }}
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ needs.prep.outputs.server_runner }}
     timeout-minutes: 150
     env:
       PLAN: ${{ needs.prep.outputs.plan }}
@@ -295,6 +307,7 @@ jobs:
           set -u
           # The phase file tells the client runners which netcode to launch; they poll it over the
           # tailnet and never start a player for netcode k before this server is about to listen for it.
+          [ -n "${BENCH_CPUS:-}" ] && echo "Server player pinned to CPUs $BENCH_CPUS"
           mkdir -p phase
           echo "wait" > phase/phase
           python3 -m http.server "$PHASE_PORT" --bind 0.0.0.0 --directory phase >/dev/null 2>&1 &
@@ -358,6 +371,7 @@ jobs:
             STATUS=0
             timeout --signal=TERM --kill-after=10s 15m \
               xvfb-run -a --server-args="-screen 0 1024x768x24" \
+              ${BENCH_CPUS:+taskset -c "$BENCH_CPUS"} \
               "$BIN" -batchmode -nographics \
               -role server -count "$TOTAL" \
               -benchSeconds ${{ inputs.bench_seconds }} -benchObjects ${{ inputs.bench_objects }} \
