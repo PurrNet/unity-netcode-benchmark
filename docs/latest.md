@@ -1,4 +1,4 @@
-_Last run 2026-09-04: PurrNet ? · FishNet 4.7.3 · Mirror 96.0.1 · NGO 2.13.2 · Fusion 2.1.2 Stable 2279 · Unity 6000.5.4f1 · 100 objects per test · 20 s windows · connections 10 / 50 / 100._
+_Last run 2026-09-04: PurrNet 1.23.0-beta.25 · FishNet 4.7.3 · Mirror 96.0.1 · NGO 2.13.2 · Fusion 2.1.2 Stable 2279 · Unity 6000.5.4f1 · 100 objects per test · 20 s windows · connections 10 / 50 / 100._
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/latest-dark.svg">
