@@ -11,43 +11,43 @@
 <line x1="8" y1="64" x2="586" y2="64" stroke="#d0d7de" stroke-width="1"/>
 <text x="8" y="82" fill="#1f2328">Idle</text>
 <text x="212" y="82" text-anchor="end" fill="#1f2328" font-weight="400">13.6</text>
-<text x="304" y="82" text-anchor="end" fill="#1f2328" font-weight="400">14.1</text>
-<text x="396" y="82" text-anchor="end" fill="#1f2328" font-weight="400">171</text>
+<text x="304" y="82" text-anchor="end" fill="#1f2328" font-weight="400">14.3</text>
+<text x="396" y="82" text-anchor="end" fill="#1f2328" font-weight="400">169</text>
 <rect x="410" y="67" width="80" height="21" rx="5" fill="#dafbe1"/>
 <text x="488" y="82" text-anchor="end" fill="#1a7f37" font-weight="600">11.6</text>
-<text x="580" y="82" text-anchor="end" fill="#1f2328" font-weight="400">224</text>
+<text x="580" y="82" text-anchor="end" fill="#1f2328" font-weight="400">50.4</text>
 <line x1="8" y1="91" x2="586" y2="91" stroke="#d0d7de" stroke-width="0.5"/>
 <text x="8" y="109" fill="#1f2328">MoveY</text>
-<rect x="134" y="94" width="80" height="21" rx="5" fill="#dafbe1"/>
-<text x="212" y="109" text-anchor="end" fill="#1a7f37" font-weight="600">490</text>
-<text x="304" y="109" text-anchor="end" fill="#1f2328" font-weight="400">1,248</text>
-<text x="396" y="109" text-anchor="end" fill="#1f2328" font-weight="400">2,428</text>
-<text x="488" y="109" text-anchor="end" fill="#1f2328" font-weight="400">3,110</text>
-<text x="580" y="109" text-anchor="end" fill="#1f2328" font-weight="400">2,863</text>
+<text x="212" y="109" text-anchor="end" fill="#1f2328" font-weight="400">492</text>
+<text x="304" y="109" text-anchor="end" fill="#1f2328" font-weight="400">1,253</text>
+<text x="396" y="109" text-anchor="end" fill="#1f2328" font-weight="400">2,443</text>
+<text x="488" y="109" text-anchor="end" fill="#1f2328" font-weight="400">3,024</text>
+<rect x="502" y="94" width="80" height="21" rx="5" fill="#dafbe1"/>
+<text x="580" y="109" text-anchor="end" fill="#1a7f37" font-weight="600">68.1</text>
 <line x1="8" y1="118" x2="586" y2="118" stroke="#d0d7de" stroke-width="0.5"/>
 <text x="8" y="136" fill="#1f2328">MoveAllAxis</text>
-<rect x="134" y="121" width="80" height="21" rx="5" fill="#dafbe1"/>
-<text x="212" y="136" text-anchor="end" fill="#1a7f37" font-weight="600">1,265</text>
-<text x="304" y="136" text-anchor="end" fill="#1f2328" font-weight="400">2,025</text>
-<text x="396" y="136" text-anchor="end" fill="#1f2328" font-weight="400">4,427</text>
-<text x="488" y="136" text-anchor="end" fill="#1f2328" font-weight="400">4,939</text>
-<text x="580" y="136" text-anchor="end" fill="#1f2328" font-weight="400">2,779</text>
+<text x="212" y="136" text-anchor="end" fill="#1f2328" font-weight="400">1,295</text>
+<text x="304" y="136" text-anchor="end" fill="#1f2328" font-weight="400">2,020</text>
+<text x="396" y="136" text-anchor="end" fill="#1f2328" font-weight="400">4,423</text>
+<text x="488" y="136" text-anchor="end" fill="#1f2328" font-weight="400">4,952</text>
+<rect x="502" y="121" width="80" height="21" rx="5" fill="#dafbe1"/>
+<text x="580" y="136" text-anchor="end" fill="#1a7f37" font-weight="600">67.2</text>
 <line x1="8" y1="145" x2="586" y2="145" stroke="#d0d7de" stroke-width="0.5"/>
 <text x="8" y="163" fill="#1f2328">MoveWander</text>
-<rect x="134" y="148" width="80" height="21" rx="5" fill="#dafbe1"/>
-<text x="212" y="163" text-anchor="end" fill="#1a7f37" font-weight="600">1,679</text>
-<text x="304" y="163" text-anchor="end" fill="#1f2328" font-weight="400">2,839</text>
-<text x="396" y="163" text-anchor="end" fill="#1f2328" font-weight="400">5,192</text>
-<text x="488" y="163" text-anchor="end" fill="#1f2328" font-weight="400">6,548</text>
-<text x="580" y="163" text-anchor="end" fill="#1f2328" font-weight="400">3,567</text>
+<text x="212" y="163" text-anchor="end" fill="#1f2328" font-weight="400">1,694</text>
+<text x="304" y="163" text-anchor="end" fill="#1f2328" font-weight="400">2,840</text>
+<text x="396" y="163" text-anchor="end" fill="#1f2328" font-weight="400">5,182</text>
+<text x="488" y="163" text-anchor="end" fill="#1f2328" font-weight="400">6,619</text>
+<rect x="502" y="148" width="80" height="21" rx="5" fill="#dafbe1"/>
+<text x="580" y="163" text-anchor="end" fill="#1a7f37" font-weight="600">77.7</text>
 <line x1="8" y1="172" x2="586" y2="172" stroke="#d0d7de" stroke-width="0.5"/>
 <text x="8" y="190" fill="#1f2328">SendRPC</text>
-<text x="212" y="190" text-anchor="end" fill="#1f2328" font-weight="400">1,783</text>
-<rect x="226" y="175" width="80" height="21" rx="5" fill="#dafbe1"/>
-<text x="304" y="190" text-anchor="end" fill="#1a7f37" font-weight="600">1,447</text>
-<text x="396" y="190" text-anchor="end" fill="#1f2328" font-weight="400">3,015</text>
-<text x="488" y="190" text-anchor="end" fill="#1f2328" font-weight="400">3,241</text>
-<text x="580" y="190" text-anchor="end" fill="#1f2328" font-weight="400">3,793</text>
+<text x="212" y="190" text-anchor="end" fill="#1f2328" font-weight="400">1,782</text>
+<text x="304" y="190" text-anchor="end" fill="#1f2328" font-weight="400">1,446</text>
+<text x="396" y="190" text-anchor="end" fill="#1f2328" font-weight="400">3,013</text>
+<text x="488" y="190" text-anchor="end" fill="#1f2328" font-weight="400">3,412</text>
+<rect x="502" y="175" width="80" height="21" rx="5" fill="#dafbe1"/>
+<text x="580" y="190" text-anchor="end" fill="#1a7f37" font-weight="600">80.1</text>
 <line x1="8" y1="199" x2="586" y2="199" stroke="#d0d7de" stroke-width="0.5"/>
 <text x="8" y="217" fill="#1f2328">Static</text>
 <text x="212" y="217" text-anchor="end" fill="#1f2328" font-weight="400">13.8</text>
@@ -55,31 +55,31 @@
 <text x="396" y="217" text-anchor="end" fill="#1f2328" font-weight="400">171</text>
 <rect x="410" y="202" width="80" height="21" rx="5" fill="#dafbe1"/>
 <text x="488" y="217" text-anchor="end" fill="#1a7f37" font-weight="600">11.6</text>
-<text x="580" y="217" text-anchor="end" fill="#1f2328" font-weight="400">410</text>
+<text x="580" y="217" text-anchor="end" fill="#1f2328" font-weight="400">42.0</text>
 <line x1="8" y1="226" x2="586" y2="226" stroke="#d0d7de" stroke-width="0.5"/>
 <text x="8" y="244" fill="#1f2328">SpawnChurn</text>
-<text x="212" y="244" text-anchor="end" fill="#1f2328" font-weight="400">804</text>
-<text x="304" y="244" text-anchor="end" fill="#1f2328" font-weight="400">646</text>
-<text x="396" y="244" text-anchor="end" fill="#1f2328" font-weight="400">795</text>
+<text x="212" y="244" text-anchor="end" fill="#1f2328" font-weight="400">745</text>
+<text x="304" y="244" text-anchor="end" fill="#1f2328" font-weight="400">644</text>
+<text x="396" y="244" text-anchor="end" fill="#1f2328" font-weight="400">852</text>
 <text x="488" y="244" text-anchor="end" fill="#1f2328" font-weight="400">944</text>
 <rect x="502" y="229" width="80" height="21" rx="5" fill="#dafbe1"/>
-<text x="580" y="244" text-anchor="end" fill="#1a7f37" font-weight="600">371</text>
+<text x="580" y="244" text-anchor="end" fill="#1a7f37" font-weight="600">43.7</text>
 <line x1="8" y1="253" x2="586" y2="253" stroke="#d0d7de" stroke-width="0.5"/>
 <text x="8" y="271" fill="#1f2328">ClientInput</text>
-<rect x="134" y="256" width="80" height="21" rx="5" fill="#dafbe1"/>
-<text x="212" y="271" text-anchor="end" fill="#1a7f37" font-weight="600">92.5</text>
+<text x="212" y="271" text-anchor="end" fill="#1f2328" font-weight="400">91.0</text>
 <text x="304" y="271" text-anchor="end" fill="#1f2328" font-weight="400">93.8</text>
-<text x="396" y="271" text-anchor="end" fill="#1f2328" font-weight="400">280</text>
+<text x="396" y="271" text-anchor="end" fill="#1f2328" font-weight="400">279</text>
 <text x="488" y="271" text-anchor="end" fill="#1f2328" font-weight="400">115</text>
-<text x="580" y="271" text-anchor="end" fill="#1f2328" font-weight="400">216</text>
+<rect x="502" y="256" width="80" height="21" rx="5" fill="#dafbe1"/>
+<text x="580" y="271" text-anchor="end" fill="#1a7f37" font-weight="600">42.0</text>
 <line x1="8" y1="280" x2="586" y2="280" stroke="#d0d7de" stroke-width="0.5"/>
 <text x="8" y="298" fill="#1f2328">SyncVars</text>
-<rect x="134" y="283" width="80" height="21" rx="5" fill="#dafbe1"/>
-<text x="212" y="298" text-anchor="end" fill="#1a7f37" font-weight="600">2,660</text>
-<text x="304" y="298" text-anchor="end" fill="#1f2328" font-weight="400">3,645</text>
-<text x="396" y="298" text-anchor="end" fill="#1f2328" font-weight="400">4,975</text>
-<text x="488" y="298" text-anchor="end" fill="#1f2328" font-weight="400">4,156</text>
-<text x="580" y="298" text-anchor="end" fill="#1f2328" font-weight="400">3,386</text>
+<text x="212" y="298" text-anchor="end" fill="#1f2328" font-weight="400">2,612</text>
+<text x="304" y="298" text-anchor="end" fill="#1f2328" font-weight="400">3,661</text>
+<text x="396" y="298" text-anchor="end" fill="#1f2328" font-weight="400">4,983</text>
+<text x="488" y="298" text-anchor="end" fill="#1f2328" font-weight="400">4,281</text>
+<rect x="502" y="283" width="80" height="21" rx="5" fill="#dafbe1"/>
+<text x="580" y="298" text-anchor="end" fill="#1a7f37" font-weight="600">67.1</text>
 <line x1="8" y1="307" x2="586" y2="307" stroke="#d0d7de" stroke-width="0.5"/>
 <text x="8" y="346" font-weight="600" fill="#1f2328">Server CPU at 100 connections</text>
 <text x="586" y="346" text-anchor="end" fill="#656d76" font-size="12">% of one core, lower is better</text>
@@ -91,75 +91,75 @@
 <text x="580" y="374" text-anchor="end" font-weight="600" fill="#e87ba4">Fusion</text>
 <line x1="8" y1="385" x2="586" y2="385" stroke="#d0d7de" stroke-width="1"/>
 <text x="8" y="403" fill="#1f2328">Idle</text>
-<text x="212" y="403" text-anchor="end" fill="#1f2328" font-weight="400">7.0</text>
+<text x="212" y="403" text-anchor="end" fill="#1f2328" font-weight="400">3.0</text>
 <rect x="226" y="388" width="80" height="21" rx="5" fill="#dafbe1"/>
-<text x="304" y="403" text-anchor="end" fill="#1a7f37" font-weight="600">3.6</text>
-<text x="396" y="403" text-anchor="end" fill="#1f2328" font-weight="400">7.2</text>
-<text x="488" y="403" text-anchor="end" fill="#1f2328" font-weight="400">6.0</text>
-<text x="580" y="403" text-anchor="end" fill="#1f2328" font-weight="400">8.2</text>
+<text x="304" y="403" text-anchor="end" fill="#1a7f37" font-weight="600">3.0</text>
+<text x="396" y="403" text-anchor="end" fill="#1f2328" font-weight="400">6.4</text>
+<text x="488" y="403" text-anchor="end" fill="#1f2328" font-weight="400">3.4</text>
+<text x="580" y="403" text-anchor="end" fill="#1f2328" font-weight="400">3.4</text>
 <line x1="8" y1="412" x2="586" y2="412" stroke="#d0d7de" stroke-width="0.5"/>
 <text x="8" y="430" fill="#1f2328">MoveY</text>
-<text x="212" y="430" text-anchor="end" fill="#1f2328" font-weight="400">24.5</text>
-<rect x="226" y="415" width="80" height="21" rx="5" fill="#dafbe1"/>
-<text x="304" y="430" text-anchor="end" fill="#1a7f37" font-weight="600">7.4</text>
-<text x="396" y="430" text-anchor="end" fill="#1f2328" font-weight="400">10.9</text>
-<text x="488" y="430" text-anchor="end" fill="#1f2328" font-weight="400">66.3</text>
-<text x="580" y="430" text-anchor="end" fill="#1f2328" font-weight="400">14.3</text>
+<text x="212" y="430" text-anchor="end" fill="#1f2328" font-weight="400">11.4</text>
+<text x="304" y="430" text-anchor="end" fill="#1f2328" font-weight="400">7.0</text>
+<text x="396" y="430" text-anchor="end" fill="#1f2328" font-weight="400">10.5</text>
+<text x="488" y="430" text-anchor="end" fill="#1f2328" font-weight="400">42.6</text>
+<rect x="502" y="415" width="80" height="21" rx="5" fill="#dafbe1"/>
+<text x="580" y="430" text-anchor="end" fill="#1a7f37" font-weight="600">1.5</text>
 <line x1="8" y1="439" x2="586" y2="439" stroke="#d0d7de" stroke-width="0.5"/>
 <text x="8" y="457" fill="#1f2328">MoveAllAxis</text>
-<text x="212" y="457" text-anchor="end" fill="#1f2328" font-weight="400">19.7</text>
-<rect x="226" y="442" width="80" height="21" rx="5" fill="#dafbe1"/>
-<text x="304" y="457" text-anchor="end" fill="#1a7f37" font-weight="600">4.7</text>
-<text x="396" y="457" text-anchor="end" fill="#1f2328" font-weight="400">12.8</text>
-<text x="488" y="457" text-anchor="end" fill="#1f2328" font-weight="400">49.6</text>
-<text x="580" y="457" text-anchor="end" fill="#1f2328" font-weight="400">13.8</text>
+<text x="212" y="457" text-anchor="end" fill="#1f2328" font-weight="400">16.5</text>
+<text x="304" y="457" text-anchor="end" fill="#1f2328" font-weight="400">5.1</text>
+<text x="396" y="457" text-anchor="end" fill="#1f2328" font-weight="400">9.4</text>
+<text x="488" y="457" text-anchor="end" fill="#1f2328" font-weight="400">55.4</text>
+<rect x="502" y="442" width="80" height="21" rx="5" fill="#dafbe1"/>
+<text x="580" y="457" text-anchor="end" fill="#1a7f37" font-weight="600">2.4</text>
 <line x1="8" y1="466" x2="586" y2="466" stroke="#d0d7de" stroke-width="0.5"/>
 <text x="8" y="484" fill="#1f2328">MoveWander</text>
-<text x="212" y="484" text-anchor="end" fill="#1f2328" font-weight="400">19.3</text>
-<rect x="226" y="469" width="80" height="21" rx="5" fill="#dafbe1"/>
-<text x="304" y="484" text-anchor="end" fill="#1a7f37" font-weight="600">4.3</text>
-<text x="396" y="484" text-anchor="end" fill="#1f2328" font-weight="400">15.5</text>
-<text x="488" y="484" text-anchor="end" fill="#1f2328" font-weight="400">57.5</text>
-<text x="580" y="484" text-anchor="end" fill="#1f2328" font-weight="400">15.1</text>
+<text x="212" y="484" text-anchor="end" fill="#1f2328" font-weight="400">14.1</text>
+<text x="304" y="484" text-anchor="end" fill="#1f2328" font-weight="400">6.3</text>
+<text x="396" y="484" text-anchor="end" fill="#1f2328" font-weight="400">10.0</text>
+<text x="488" y="484" text-anchor="end" fill="#1f2328" font-weight="400">55.7</text>
+<rect x="502" y="469" width="80" height="21" rx="5" fill="#dafbe1"/>
+<text x="580" y="484" text-anchor="end" fill="#1a7f37" font-weight="600">1.7</text>
 <line x1="8" y1="493" x2="586" y2="493" stroke="#d0d7de" stroke-width="0.5"/>
 <text x="8" y="511" fill="#1f2328">SendRPC</text>
-<text x="212" y="511" text-anchor="end" fill="#1f2328" font-weight="400">14.3</text>
-<rect x="226" y="496" width="80" height="21" rx="5" fill="#dafbe1"/>
-<text x="304" y="511" text-anchor="end" fill="#1a7f37" font-weight="600">11.7</text>
-<text x="396" y="511" text-anchor="end" fill="#1f2328" font-weight="400">20.0</text>
-<text x="488" y="511" text-anchor="end" fill="#1f2328" font-weight="400">59.3</text>
-<text x="580" y="511" text-anchor="end" fill="#1f2328" font-weight="400">13.1</text>
+<text x="212" y="511" text-anchor="end" fill="#1f2328" font-weight="400">5.4</text>
+<text x="304" y="511" text-anchor="end" fill="#1f2328" font-weight="400">9.3</text>
+<text x="396" y="511" text-anchor="end" fill="#1f2328" font-weight="400">17.7</text>
+<text x="488" y="511" text-anchor="end" fill="#1f2328" font-weight="400">56.6</text>
+<rect x="502" y="496" width="80" height="21" rx="5" fill="#dafbe1"/>
+<text x="580" y="511" text-anchor="end" fill="#1a7f37" font-weight="600">2.6</text>
 <line x1="8" y1="520" x2="586" y2="520" stroke="#d0d7de" stroke-width="0.5"/>
 <text x="8" y="538" fill="#1f2328">Static</text>
-<text x="212" y="538" text-anchor="end" fill="#1f2328" font-weight="400">6.5</text>
-<rect x="226" y="523" width="80" height="21" rx="5" fill="#dafbe1"/>
-<text x="304" y="538" text-anchor="end" fill="#1a7f37" font-weight="600">4.0</text>
-<text x="396" y="538" text-anchor="end" fill="#1f2328" font-weight="400">8.8</text>
-<text x="488" y="538" text-anchor="end" fill="#1f2328" font-weight="400">7.3</text>
-<text x="580" y="538" text-anchor="end" fill="#1f2328" font-weight="400">8.5</text>
+<text x="212" y="538" text-anchor="end" fill="#1f2328" font-weight="400">1.7</text>
+<text x="304" y="538" text-anchor="end" fill="#1f2328" font-weight="400">5.0</text>
+<text x="396" y="538" text-anchor="end" fill="#1f2328" font-weight="400">8.5</text>
+<text x="488" y="538" text-anchor="end" fill="#1f2328" font-weight="400">5.0</text>
+<rect x="502" y="523" width="80" height="21" rx="5" fill="#dafbe1"/>
+<text x="580" y="538" text-anchor="end" fill="#1a7f37" font-weight="600">1.3</text>
 <line x1="8" y1="547" x2="586" y2="547" stroke="#d0d7de" stroke-width="0.5"/>
 <text x="8" y="565" fill="#1f2328">SpawnChurn</text>
-<text x="212" y="565" text-anchor="end" fill="#1f2328" font-weight="400">21.7</text>
-<rect x="226" y="550" width="80" height="21" rx="5" fill="#dafbe1"/>
-<text x="304" y="565" text-anchor="end" fill="#1a7f37" font-weight="600">9.0</text>
-<text x="396" y="565" text-anchor="end" fill="#1f2328" font-weight="400">14.5</text>
+<text x="212" y="565" text-anchor="end" fill="#1f2328" font-weight="400">10.0</text>
+<text x="304" y="565" text-anchor="end" fill="#1f2328" font-weight="400">12.0</text>
+<text x="396" y="565" text-anchor="end" fill="#1f2328" font-weight="400">11.0</text>
 <text x="488" y="565" text-anchor="end" fill="#1f2328" font-weight="400">9.7</text>
-<text x="580" y="565" text-anchor="end" fill="#1f2328" font-weight="400">17.5</text>
+<rect x="502" y="550" width="80" height="21" rx="5" fill="#dafbe1"/>
+<text x="580" y="565" text-anchor="end" fill="#1a7f37" font-weight="600">3.5</text>
 <line x1="8" y1="574" x2="586" y2="574" stroke="#d0d7de" stroke-width="0.5"/>
 <text x="8" y="592" fill="#1f2328">ClientInput</text>
-<text x="212" y="592" text-anchor="end" fill="#1f2328" font-weight="400">8.1</text>
-<text x="304" y="592" text-anchor="end" fill="#1f2328" font-weight="400">5.7</text>
-<text x="396" y="592" text-anchor="end" fill="#1f2328" font-weight="400">10.7</text>
-<rect x="410" y="577" width="80" height="21" rx="5" fill="#dafbe1"/>
-<text x="488" y="592" text-anchor="end" fill="#1a7f37" font-weight="600">5.3</text>
-<text x="580" y="592" text-anchor="end" fill="#1f2328" font-weight="400">24.4</text>
+<text x="212" y="592" text-anchor="end" fill="#1f2328" font-weight="400">3.6</text>
+<text x="304" y="592" text-anchor="end" fill="#1f2328" font-weight="400">9.0</text>
+<text x="396" y="592" text-anchor="end" fill="#1f2328" font-weight="400">7.9</text>
+<text x="488" y="592" text-anchor="end" fill="#1f2328" font-weight="400">5.9</text>
+<rect x="502" y="577" width="80" height="21" rx="5" fill="#dafbe1"/>
+<text x="580" y="592" text-anchor="end" fill="#1a7f37" font-weight="600">2.5</text>
 <line x1="8" y1="601" x2="586" y2="601" stroke="#d0d7de" stroke-width="0.5"/>
 <text x="8" y="619" fill="#1f2328">SyncVars</text>
-<text x="212" y="619" text-anchor="end" fill="#1f2328" font-weight="400">12.2</text>
-<rect x="226" y="604" width="80" height="21" rx="5" fill="#dafbe1"/>
-<text x="304" y="619" text-anchor="end" fill="#1a7f37" font-weight="600">9.3</text>
-<text x="396" y="619" text-anchor="end" fill="#1f2328" font-weight="400">17.1</text>
-<text x="488" y="619" text-anchor="end" fill="#1f2328" font-weight="400">46.4</text>
-<text x="580" y="619" text-anchor="end" fill="#1f2328" font-weight="400">12.9</text>
+<text x="212" y="619" text-anchor="end" fill="#1f2328" font-weight="400">7.7</text>
+<text x="304" y="619" text-anchor="end" fill="#1f2328" font-weight="400">8.4</text>
+<text x="396" y="619" text-anchor="end" fill="#1f2328" font-weight="400">13.2</text>
+<text x="488" y="619" text-anchor="end" fill="#1f2328" font-weight="400">62.3</text>
+<rect x="502" y="604" width="80" height="21" rx="5" fill="#dafbe1"/>
+<text x="580" y="619" text-anchor="end" fill="#1a7f37" font-weight="600">2.3</text>
 <line x1="8" y1="628" x2="586" y2="628" stroke="#d0d7de" stroke-width="0.5"/>
 </svg>
