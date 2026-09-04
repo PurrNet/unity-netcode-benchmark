@@ -2,12 +2,14 @@
 
 The same five stress scenarios built for PurrNet, FishNet, Mirror, Netcode for GameObjects and
 Photon Fusion 2, run headless by GitHub Actions at 10 and 100 connections and at 20 and 60 Hz
-on a dedicated server, with bandwidth, CPU, frame time and RTT compared side by side.
+on a dedicated server, with bandwidth, CPU, frame time and memory compared side by side.
 
 ## Results
 
-Live report: **https://purrnet.github.io/unity-netcode-benchmark/** (scorecard, scaling table, every
-metric per test and session). Raw datapoints of the latest run are in `docs/latest.json`.
+Live report: **https://purrnet.github.io/unity-netcode-benchmark/** (scorecard, scaling table, comparison
+metrics per test and session). Raw datapoints of the latest run are in `docs/latest.json`.
+Single-test workload/delivery diagnostics are kept in the raw data and relevant run notes, not the chart selector.
+RTT measurements remain in the raw data only; they are not used for comparisons.
 
 ## What runs
 
@@ -46,7 +48,6 @@ framing and batching instead of integer encoding.
 | CPU % | process CPU time, all threads, as % of one core; whole process, nothing subtracted |
 | Frame avg / p95 / p99 | main-thread frame time; 16.7 ms means on budget at 60 fps |
 | GC alloc, collections, heap, peak RSS | the `GC Allocated In Frame` profiler counter summed over the window (all threads), `GC.CollectionCount`, `GC.GetTotalMemory`, `/proc/self/status`; every test starts on a freshly collected heap |
-| RTT added | each netcode's own round-trip estimate on the measured clients, under a test minus at Idle; the route (US runners to the EU server, the tailnet, Fusion's relay) is in both and cancels out |
 
 Server figures come from the one server process; client figures are averages over the
 single-process measured clients (the remaining connections run as load generators).
@@ -77,7 +78,7 @@ load tests (geometric mean), so 1.00× means best everywhere and 2× means twice
 average; Idle and Static are left out of the averages because they sit at the noise floor.
 "How it scales" gives the cost multiplier from 10 to 100 connections and from 20 to 60 Hz, next
 to what a linear sender would score (10× and 3×), so below that line a netcode amortises. The
-per-test bar charts and the session table underneath carry every metric.
+per-test bar charts and the session table underneath carry the comparison metrics.
 
 How the suite works: one server runner and the client runners meet over a Tailscale tailnet and
 stay up for all sessions. The server announces each case on a small HTTP endpoint,
@@ -183,8 +184,8 @@ send intervals are retained except for the documented FishNet SyncVar override.
   (`infra/bench-server-setup.sh`). Server CPU is therefore comparable across netcodes, connection
   counts and runs. The box takes one session at a time, which is why `max_parallel` defaults
   to 1. Clients and load generators run on GitHub-hosted `ubuntu-latest` runners in the US, so the
-  RTT column reads as US clients to an EU server for every netcode alike; the Idle row shows that
-  floor. Bandwidth, packets, GC and frame times do not depend on the machine. Every runner is a
+  raw RTT readings include that route and are not used for comparisons.
+  Bandwidth, packets, GC and frame times do not depend on the machine. Every runner is a
   tailnet device (100 on Tailscale's Personal plan), which bounds `max_parallel` if you raise it
   with a different `server_runner`.
 - **Frame cap.** Mirror (headless server) and FishNet override the frame rate on start; the

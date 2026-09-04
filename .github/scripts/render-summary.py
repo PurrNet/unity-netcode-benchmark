@@ -361,7 +361,7 @@ def main():
     if args.run_url:
         links.append(f"[workflow run]({args.run_url})")
     links.append("[raw datapoints](latest.json)")
-    lines.append("Every metric per test (bandwidth, CPU, frame times, RTT, GC, memory) and every session are in the " + ", ".join(links) + ".")
+    lines.append("Comparison metrics per test (bandwidth, CPU, frame times, GC, memory) and every session are in the " + ", ".join(links) + ".")
     print("\n".join(lines))
 
 

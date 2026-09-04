@@ -42,6 +42,59 @@ def sample(name):
 
 
 class DeliveryReportChecks(unittest.TestCase):
+    def test_chart_selector_excludes_single_test_diagnostics_and_rtt(self):
+        tests = ('Idle', 'MoveY', 'MoveWander', 'SyncVars', 'SendRPC', 'ClientInput', 'Static', 'SpawnChurn')
+        server = {t: dict(sample(t), gcAllocBytesPerSec=1024, rpcsSentPerSec=200,
+                          syncMutationsPerSec=200, inputsPerSec=20) for t in tests}
+        clients = {t: dict(n=1, rxBytesPerSec=1024, txBytesPerSec=512,
+                           rttP50Ms=10 if t == 'Idle' else 12, rpcsReceivedPerSec=200,
+                           syncObservationClients=1, syncObservedChangesPerSec=200,
+                           syncSilenceAvgMs=85, syncSilenceMaxMs=205,
+                           rpcDeliveryChecked=1, rpcDeliveryMatched=1,
+                           syncStateChecked=1, syncStateMatched=1) for t in tests}
+        data = dict(netcode='mirror', size=1, tick=20, connections=1, server=server, clients=clients,
+                    meta=dict(expectedClients=1, connectedAtStart=1, measuredClients=1, tickRate=20))
+        with tempfile.TemporaryDirectory(prefix='bench-chart-metrics-') as tmp:
+            root = Path(tmp)
+            source = root / 'results.json'
+            source.write_text(json.dumps(data), encoding='utf-8')
+            rendered = root / 'report.html'
+            subprocess.run([sys.executable, str(SCRIPTS / 'render-report.py'), str(source), str(rendered)],
+                           check=True, capture_output=True, text=True, encoding='utf-8', timeout=30)
+            # Check future rendered reports and the current checked-in report, without rewriting its data.
+            for path in (rendered, SCRIPTS.parent.parent / 'docs/index.html'):
+                with self.subTest(report=path.name):
+                    page = path.read_text(encoding='utf-8')
+                    js = re.search(r'<script>\s*(.*?)</script>', page, re.S).group(1)
+                    subprocess.run(['node', '--check'], input=js, text=True, encoding='utf-8',
+                                   check=True, capture_output=True, timeout=30)
+                    context = '''
+const assert = require('node:assert/strict');
+const elements = {};
+const document = {
+  querySelectorAll: () => [],
+  getElementById: id => elements[id] ||= {addEventListener() {}}
+};
+'''
+                    checks = '''
+const expected = ['srvDown', 'cpu', 'cliDown', 'srvUp', 'cliUp', 'p99', 'pkts', 'alloc', 'gc', 'rss'];
+assert.deepEqual(METRICS.map(m => m.id), expected);
+assert.deepEqual(AVAILABLE.map(m => m.id), expected);
+buildControls();
+assert.deepEqual([...elements.metrics.innerHTML.matchAll(/data-id="([^"]+)"/g)].map(m => m[1]), expected);
+assert.equal(state.metric, 'srvDown');
+// Removing chart options must not discard the diagnostics or hide delivery problems.
+assert.ok(DATA.runs.some(r => r.server.SendRPC?.rpcsSentPerSec > 0));
+assert.ok(DATA.runs.some(r => r.server.SyncVars?.syncMutationsPerSec > 0));
+assert.ok(DATA.runs.some(r => r.clients.SyncVars?.syncSilenceAvgMs > 0));
+assert.ok(DATA.runs.some(r => r.clients.Idle?.rttP50Ms > 0));
+buildNotes();
+assert.ok(elements.warnings.innerHTML.includes('RPC delivery'));
+assert.ok(elements.warnings.innerHTML.includes('field silence'));
+'''
+                    subprocess.run(['node'], input=context + js[:js.index('\nbuildHeader();')] + checks,
+                                   text=True, encoding='utf-8', check=True, capture_output=True, timeout=30)
+
     def test_no_artifacts_produces_empty_results_without_publishing_a_report(self):
         merge = workflow_script('scaling.yml', 'Merge datapoints')
         render = workflow_script('scaling.yml', 'Render interactive report')
@@ -175,9 +228,14 @@ class DeliveryReportChecks(unittest.TestCase):
                                check=True, env=env, capture_output=True, text=True, encoding='utf-8', timeout=30)
                 dp = root / 'dp-mirror-c1t20.json'
                 data = json.loads(dp.read_text(encoding='utf-8'))
+                summary = (root / 'summary.md').read_text(encoding='utf-8')
+                self.assertNotIn('RTT', summary)
+                self.assertNotIn('| Samples |', summary)
                 checked = 2 if case == 'mixed_clients' else int(case not in ('client_incomplete', 'server_incomplete', 'legacy', 'missing_client'))
                 matched = checked if case != 'mismatch' else 0
                 if case != 'missing_client':
+                    self.assertIn('| Test | Down per client | Up per client | Truncated |', summary)
+                    self.assertIn('rttP50Ms', data['clients']['SendRPC'])
                     self.assertEqual(data['clients']['SendRPC']['rpcDeliveryChecked'], checked)
                     self.assertEqual(data['clients']['SendRPC']['rpcDeliveryMatched'], matched)
                     self.assertEqual(data['clients']['SyncVars']['syncStateChecked'], checked)
