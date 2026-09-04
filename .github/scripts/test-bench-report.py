@@ -16,6 +16,18 @@ GIT_BASH = Path('C:/Program Files/Git/bin/bash.exe')
 BASH = str(GIT_BASH) if os.name == 'nt' and GIT_BASH.exists() else shutil.which('bash')
 
 
+def workflow_script(workflow, step):
+    lines = (SCRIPTS.parent / 'workflows' / workflow).read_text(encoding='utf-8').splitlines()
+    start = lines.index('      - name: ' + step)
+    start = lines.index('        run: |', start) + 1
+    script = []
+    for line in lines[start:]:
+        if line and not line.startswith('          '):
+            break
+        script.append(line[10:])
+    return '\n'.join(script)
+
+
 def sample(name):
     row = dict.fromkeys(('txBytesPerSec', 'rxBytesPerSec', 'txPacketsPerSec', 'inputsPerSec',
                          'cpuPercent', 'avgFrameMs', 'p95FrameMs', 'p99FrameMs', 'gcCollections',
@@ -30,15 +42,61 @@ def sample(name):
 
 
 class DeliveryReportChecks(unittest.TestCase):
+    def test_no_artifacts_produces_empty_results_without_publishing_a_report(self):
+        merge = workflow_script('scaling.yml', 'Merge datapoints')
+        render = workflow_script('scaling.yml', 'Render interactive report')
+        for expected, status in ((15, 'skipped'), (0, 'failure'), (0, 'success')):
+            with self.subTest(expected=expected, status=status), tempfile.TemporaryDirectory(prefix='bench-empty-report-') as tmp:
+                root = Path(tmp)
+                scripts = root / '.github/scripts'
+                scripts.mkdir(parents=True)
+                for name in ('bench-scaling.sh', 'versions.sh'):
+                    shutil.copy2(SCRIPTS / name, scripts / name)
+                # Minimal project metadata for the real versions.sh; no downloaded artifact directory.
+                for name, content in {
+                    'purrnet/Assets/PurrNet/package.json': '{"version":"test"}',
+                    'fishnet/Assets/FishNet/package.json': '{"version":"test"}',
+                    'mirror/Assets/Mirror/version.txt': 'test',
+                    'ngo/Packages/manifest.json': '{"dependencies":{"com.unity.netcode.gameobjects":"test"}}',
+                    'fusion/Assets/Photon/Fusion/build_info.txt': 'build: test',
+                    'purrnet/ProjectSettings/ProjectVersion.txt': 'm_EditorVersion: test',
+                }.items():
+                    path = root / name
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text(content, encoding='utf-8')
+                env = dict(os.environ, BENCH_RESULT=status, GITHUB_OUTPUT=(root / 'outputs').as_posix(),
+                           GITHUB_STEP_SUMMARY=(root / 'summary.md').as_posix())
+                self.assertFalse((root / 'all').exists())
+                result = subprocess.run([BASH, '-euo', 'pipefail', '-c', merge], cwd=root, env=env,
+                                        capture_output=True, text=True, encoding='utf-8', timeout=30)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(json.loads((root / 'results-out/scaling.json').read_text()), [])
+                self.assertTrue((root / 'all/versions.json').is_file())
+                replacements = {
+                    'github.server_url': 'https://github.com',
+                    'github.repository': 'example/benchmark',
+                    'github.run_id': '123',
+                    'github.repository_owner': 'example',
+                    'github.event.repository.name': 'benchmark',
+                    "needs.prep.outputs.expected || '0'": str(expected),
+                }
+                script = render
+                for expression, value in replacements.items():
+                    script = script.replace('${{ ' + expression + ' }}', value)
+                self.assertNotIn('${{', script)
+                result = subprocess.run([BASH, '-euo', 'pipefail', '-c', script], cwd=root, env=env,
+                                        capture_output=True, text=True, encoding='utf-8', timeout=30)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn('No datapoints; skipping report', result.stdout)
+                outputs = (root / 'outputs').read_text().splitlines()
+                self.assertIn('count=0', outputs)
+                self.assertIn('complete=false', outputs)
+                self.assertFalse((root / 'results-out/report.html').exists())
+                self.assertIn('No datapoints collected', (root / 'summary.md').read_text())
+
     def test_fleet_artifact_layout_uses_each_session_and_only_measured_clients(self):
         # Execute the actual workflow's aggregation shell, not a second implementation of it.
-        lines = (SCRIPTS.parent / 'workflows/benchmark.yml').read_text(encoding='utf-8').splitlines()
-        start = lines.index('      - name: Render per-session datapoints') + 2
-        script = []
-        for line in lines[start:]:
-            if line and not line.startswith('          '):
-                break
-            script.append(line[10:])
+        script = workflow_script('benchmark.yml', 'Render per-session datapoints')
         self.assertTrue(script)
         with tempfile.TemporaryDirectory(prefix='bench-fleet-report-') as tmp:
             root = Path(tmp)
@@ -64,7 +122,7 @@ class DeliveryReportChecks(unittest.TestCase):
                 (results / 'loadgen-1-1.json').write_text(json.dumps(client), encoding='utf-8')
             env = dict(os.environ, PLAN=json.dumps(dict(cases=cases)), BENCH_SECONDS='10', BENCH_OBJECTS='100',
                        GITHUB_STEP_SUMMARY=(root / 'summary.md').as_posix())
-            subprocess.run([BASH, '-euo', 'pipefail', '-c', '\n'.join(script)], cwd=root, env=env,
+            subprocess.run([BASH, '-euo', 'pipefail', '-c', script], cwd=root, env=env,
                            check=True, capture_output=True, text=True, encoding='utf-8', timeout=30)
             self.assertEqual(len(list((root / 'scaling').glob('dp-*.json'))), 2)
             for tick in (20, 60):

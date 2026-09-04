@@ -81,6 +81,42 @@ class Plans(unittest.TestCase):
 
 
 class Packages(unittest.TestCase):
+    @unittest.skipUnless(os.name == 'posix' and os.geteuid() != 0,
+                         'requires POSIX permissions and an unprivileged process')
+    def test_default_destination_works_when_build_directory_is_not_writable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            build = root / 'build'
+            source = build / 'StandaloneLinux64'
+            for name in ('NetBench', 'GameAssembly.so', 'UnityPlayer.so', 'NetBench_Data/globalgamemanagers',
+                         'NetBench_BackUpThisFolder_ButDontShipItWithYourGame/player.debug'):
+                path = source / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(name.encode())
+            (source / 'NetBench').chmod(0o755)
+            original = package.inventory(source)
+            # Reproduce the runner's inability to create a sibling under Docker's build directory.
+            build.chmod(0o555)
+            try:
+                with self.assertRaises(PermissionError):
+                    (build / 'player-package/runtime').mkdir(parents=True)
+                command = [sys.executable, str(SCRIPTS / 'package-player.py')]
+                result = subprocess.run(command + ['package', '--key', 'exact-key', '--revision', 'source-sha'],
+                                        cwd=root, capture_output=True, text=True, timeout=30)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                result = subprocess.run(command + ['verify', '--key', 'exact-key'],
+                                        cwd=root, capture_output=True, text=True, timeout=30)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                output = root / 'player-package'
+                self.assertTrue((output / 'runtime/NetBench').is_file())
+                self.assertEqual((output / 'runtime/NetBench').stat().st_mode, (source / 'NetBench').stat().st_mode)
+                self.assertTrue((output / 'diagnostics/NetBench_BackUpThisFolder_ButDontShipItWithYourGame/player.debug').is_file())
+                self.assertEqual(package.inventory(source), original)
+                self.assertEqual(build.stat().st_mode & 0o777, 0o555)
+                self.assertFalse((build / 'player-package').exists())
+            finally:
+                build.chmod(0o755)
+
     def test_runtime_unchanged_diagnostics_separate_and_cache_verified(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -57,7 +57,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('operation', choices=('package', 'verify'))
     parser.add_argument('--source', type=Path, default=Path('build/StandaloneLinux64'))
-    parser.add_argument('--destination', type=Path, default=Path('build/player-package'))
+    # Unity's Docker container can own build/, so stage in the runner-owned workspace instead.
+    parser.add_argument('--destination', type=Path, default=Path('player-package'))
     parser.add_argument('--key', required=True)
     parser.add_argument('--revision', default='')
     args = parser.parse_args()

@@ -45,11 +45,12 @@ jobs:
 
       # No restore prefix: a finished player is reusable only for identical build inputs.
       # ProjectSettings includes the Unity version; the workflow includes the builder/configuration.
+      # Keep staging outside build/: Unity's Docker container can leave that directory root-owned.
       - name: Restore finished player
         id: cache-player
         uses: actions/cache/restore@v6
         with:
-          path: build/player-package/
+          path: player-package/
           key: Player-v1-Linux-IL2CPP-${{ inputs.netcode }}-${{ inputs.profiling && 'dev' || 'rel' }}-${{ hashFiles(format('{0}/Assets/**', inputs.netcode), format('{0}/Packages/**', inputs.netcode), format('{0}/ProjectSettings/**', inputs.netcode), 'Shared/**', '.github/workflows/build.yml', '.github/scripts/package-player.py') }}
 
       # GitHub's cache (10 GB per repo). The Blacksmith drop-in used before this does not fall back
@@ -66,7 +67,7 @@ jobs:
 
       - name: Build StandaloneLinux64 player (IL2CPP)
         if: steps.cache-player.outputs.cache-hit != 'true'
-        uses: game-ci/unity-builder@v4
+        uses: game-ci/unity-builder@v5
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
@@ -76,9 +77,11 @@ jobs:
           projectPath: ${{ inputs.netcode }}
           targetPlatform: StandaloneLinux64
           buildName: NetBench
+          # v5 otherwise adds .x86_64; packaging and launch scripts expect the existing NetBench name.
+          linux64RemoveExecutableExtension: true
           buildsPath: build
           unityVersion: auto
-          # Custom method: game-ci v4 has no development-build toggle. Flags travel on the Unity
+          # Custom method: game-ci has no development-build toggle. Flags travel on the Unity
           # command line (customParameters) because the build container only forwards an env allowlist.
           buildMethod: PurrNet.NetBench.Editor.CIBuild.BuildLinuxPlayer
           customParameters: ${{ inputs.profiling && '-devBuild' || '' }}
@@ -105,14 +108,14 @@ jobs:
         if: steps.cache-player.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6
         with:
-          path: build/player-package/
+          path: player-package/
           key: ${{ steps.cache-player.outputs.cache-primary-key }}
 
       - name: Upload player artifact
         uses: actions/upload-artifact@v7
         with:
           name: player-${{ inputs.netcode }}
-          path: build/player-package/runtime/
+          path: player-package/runtime/
           if-no-files-found: error
           retention-days: 1
 
@@ -121,7 +124,7 @@ jobs:
         with:
           name: build-diagnostics-${{ inputs.netcode }}
           path: |
-            build/player-package/diagnostics/
-            build/player-package/runtime/build-provenance.json
+            player-package/diagnostics/
+            player-package/runtime/build-provenance.json
           if-no-files-found: error
           retention-days: 14

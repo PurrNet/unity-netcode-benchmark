@@ -154,6 +154,8 @@ jobs:
 
       - name: Merge datapoints
         run: |
+          # No matching artifacts (e.g. a failed build) means download-artifact may not create all/.
+          mkdir -p all
           bash .github/scripts/versions.sh > all/versions.json
           cat all/versions.json
           bash .github/scripts/bench-scaling.sh all results-out
@@ -167,7 +169,7 @@ jobs:
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           PAGES_URL="https://$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]').github.io/${{ github.event.repository.name }}/"
           COUNT=$(jq 'length' results-out/scaling.json 2>/dev/null || echo 0)
-          EXPECTED=${{ needs.prep.outputs.expected }}
+          EXPECTED=${{ needs.prep.outputs.expected || '0' }}
           COMPLETE=false
           [ "$COUNT" -eq "$EXPECTED" ] && [ "$COUNT" -gt 0 ] && [ "$BENCH_RESULT" = "success" ] && COMPLETE=true
           echo "Datapoints: $COUNT of $EXPECTED planned (complete=$COMPLETE)"
