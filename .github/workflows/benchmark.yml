@@ -256,7 +256,7 @@ jobs:
     steps:
       - &download_players
         name: Download players
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: player-*
           path: players
@@ -397,7 +397,7 @@ jobs:
 
       - name: Upload server results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bench-result-${{ inputs.tag }}-server
           path: |
@@ -552,7 +552,7 @@ jobs:
 
       - name: Upload client results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bench-result-${{ inputs.tag }}-client-${{ matrix.idx }}
           path: |
@@ -687,7 +687,7 @@ jobs:
 
       - name: Upload loadgen diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bench-log-${{ inputs.tag }}-loadgen-${{ matrix.idx }}
           path: |
@@ -706,10 +706,10 @@ jobs:
       NETCODE_LIST: ${{ join(fromJSON(needs.prep.outputs.netcode_list), ' ') }}
     steps:
       - name: Checkout (for aggregation scripts)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download all results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: bench-result-${{ inputs.tag }}-*
           path: all
@@ -741,7 +741,7 @@ jobs:
 
       - name: Upload scaling datapoints
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bench-scaling-${{ inputs.tag }}
           path: scaling/
