@@ -188,6 +188,7 @@ namespace PurrNet.NetBench
 
         private static void ResetMode()
         {
+            SyncObservation.End();
             BenchRegistry.WorkloadEnabled = true;
             BenchRegistry.MovementEnabled = true;
             BenchRegistry.Mode = BenchMode.Broadcast;
@@ -507,6 +508,8 @@ namespace PurrNet.NetBench
             ReadTickRate();
             // Record the minimum observed population, including losses during the window.
             int connections = _isServer ? _adapter.ConnectedClientCount : 1;
+            bool observeSync = !_isServer && test == TestSyncVars;
+            if (observeSync) SyncObservation.Begin();
             load.Begin(_iface);
             markers.Begin(_adapter.ProfilerMarkerPrefixes);
             long inputs0 = BenchRegistry.ServerInputsReceived;
@@ -572,6 +575,7 @@ namespace PurrNet.NetBench
             }
 
             var stats = load.End();
+            if (observeSync) SyncObservation.End();
             var cpuMarkers = markers.End();
             long inputs = BenchRegistry.ServerInputsReceived - inputs0;
             double wall = Math.Max(0.001, stats.wallSeconds);
@@ -604,6 +608,12 @@ namespace PurrNet.NetBench
                 rpcsSentPerSec = (BenchRegistry.RpcsSent - rpcsSent0) / wall,
                 rpcsReceivedPerSec = (BenchRegistry.RpcsReceived - rpcsReceived0) / wall,
                 syncMutationsPerSec = (BenchRegistry.SyncMutations - mutations0) / wall,
+                syncObservationAvailable = observeSync && SyncObservation.Samples > 0,
+                syncObservedChanges = observeSync ? SyncObservation.Changes : 0,
+                syncObservedChangesPerSec = observeSync ? SyncObservation.Changes / wall : 0,
+                syncFieldSamples = observeSync ? SyncObservation.Samples : 0,
+                syncSilenceAvgMs = observeSync && SyncObservation.Samples > 0 ? SyncObservation.SilenceSumMs / SyncObservation.Samples : 0,
+                syncSilenceMaxMs = observeSync ? SyncObservation.SilenceMaxMs : 0,
                 cpuMarkers = cpuMarkers
             };
 

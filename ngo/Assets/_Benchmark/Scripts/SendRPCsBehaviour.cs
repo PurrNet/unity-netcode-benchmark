@@ -20,10 +20,12 @@ public class SendRPCsBehaviour : NetworkBehaviour
 
     private int _seq;
     private double _inputAcc;
+    private SyncStateObserver _syncObserver;
 
     public override void OnNetworkSpawn()
     {
         BenchRegistry.Spawned(4);
+        _syncObserver = default;
         _seq = Random.Range(0, 4);
         if (!IsServer) return;
 
@@ -36,6 +38,14 @@ public class SendRPCsBehaviour : NetworkBehaviour
         BenchRegistry.Despawned(4);
         if (IsServer && NetworkManager != null && NetworkManager.NetworkTickSystem != null)
             NetworkManager.NetworkTickSystem.Tick -= OnTick;
+    }
+
+    // Identical client observation phase across all five netcodes; no extra network fields.
+    private void LateUpdate()
+    {
+        if (!IsSpawned || IsServer || !IsClient) return;
+        if (BenchRegistry.Mode != BenchMode.SyncVars) return;
+        _syncObserver.Observe(_syncA.Value, _syncB.Value, _syncC.Value, _syncD.Value, Time.unscaledTimeAsDouble);
     }
 
     private void Update()

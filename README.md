@@ -101,6 +101,7 @@ forcing identical batching, compression, precision or delivery behaviour.
 
 | Netcode | What | Default | Here | Why it was needed |
 |---|---|---|---|---|
+| FishNet | Send interval on the four benchmark SyncVars | 0.1 seconds per field | `UpdateSendRate(0f)` after initialization: changed state is eligible every network tick | This scenario requests tick-driven state replication. At 60 Hz each of the four fields changes 15 times/s; the default interval can coalesce those changes into roughly 10 sends/s per field. Removing the extra interval avoids comparing that lower update frequency as if it were equivalent service. Reliability, permissions and global SyncType defaults are unchanged. |
 | FishNet | Tugboat's packet size constant `MAXIMUM_UDP_MTU` (a source edit in the vendored transport; there is no inspector field for it) | 1350 | 1200 | LiteNetLib sets don't-fragment and Tugboat hands it a fixed 1350-byte MTU, so on the 1280-byte tailnet every full packet was silently dropped and MoveWander and SendRPC sent almost nothing. 1200 is Mirror's KCP default. Details in [fishnet/BENCHMARK_CHANGES.md](fishnet/BENCHMARK_CHANGES.md). |
 | NGO | Unity Transport → `Max Packet Queue Size` (inspector field on the NetworkManager prefab) | 128 | 4096 | At 128 the server overflows the queue from 50 connections up, drops packets and logs one error per connection per tick; at 100 connections and 60 Hz the logging alone saturates a core. Unity recommends raising it for large player counts. |
 | NGO | NetworkTransform → `Use Unreliable Deltas` (inspector field on the three movement prefabs) | off | on | Delivers transform deltas unreliably, which is what the other four do for transforms out of the box (Mirror's default NetworkTransform is the unreliable one, FishNet and PurrNet send transform deltas unreliably, Fusion's snapshots are unreliable). With the reliable default the server queues without bound behind Unity Transport's reliable window at 60 Hz and dies. |
@@ -127,9 +128,20 @@ delivery and exact final-state matches are reported separately from window rates
 diagnostic checks, not a guarantee of equal movement fidelity or update freshness; a state
 mismatch needs investigation before changing a netcode's precision or delivery defaults.
 
+All five projects also sample their client-visible SyncVar state in `LateUpdate`, including
+warmup, with counts collected only during the measurement window. The report shows observed
+field changes per second and average/maximum **field silence** (time since a field last changed
+locally). A `Vector3` counts as one field. The initial state is a baseline, not a received change.
+These allocation-free per-sample checks add no wire data, and their client CPU cost is included.
+They expose coalescing or stalled updates using the same observation rule for every netcode,
+including PurrNet. They are frame-sampled diagnostics, not packet counts, per-mutation delivery
+guarantees or server-to-client state age: updates within one frame may coalesce, and a steady
+delayed stream can have the same change rate and silence as a prompt one. No absolute freshness
+claim or new pass/fail scoring threshold is inferred from them.
+
 Beyond the exceptions above, networking settings remain unchanged. RPCs are reliable in every
 netcode, and NGO's NetworkVariables are reliable by design. Native coalescing, thresholds and
-send intervals are retained.
+send intervals are retained except for the documented FishNet SyncVar override.
 
 ## Caveats
 

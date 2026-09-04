@@ -49,11 +49,15 @@ foreach ($hz in $TickRates) {
                 Require ($s.rpcsSent -gt 0 -and $s.rpcsSent -eq $c.rpcsReceived) "$Netcode $hz Hz RPC mismatch: sent $($s.rpcsSent), received $($c.rpcsReceived)"
             } else {
                 Require ($s.finalStateObjects -eq 10 -and $c.finalStateObjects -eq 10 -and $s.finalStateHash -eq $c.finalStateHash) "$Netcode $hz Hz final state mismatch: server $($s.finalStateObjects)/$($s.finalStateHash), client $($c.finalStateObjects)/$($c.finalStateHash)"
+                Require ($c.syncObservationAvailable -and $c.syncFieldSamples -gt 0) "$Netcode $hz Hz client-visible state observation missing"
+                # Loopback regression tolerance only, not a published benchmark scoring threshold.
+                Require ([Math]::Abs($c.syncObservedChangesPerSec / (10 * $hz) - 1) -lt 0.1) "$Netcode $hz Hz client observed $($c.syncObservedChangesPerSec) changes/s, expected $(10 * $hz)/s"
+                Require ($c.syncSilenceAvgMs -ge 0 -and $c.syncSilenceMaxMs -ge $c.syncSilenceAvgMs) "$Netcode $hz Hz invalid field-silence statistics"
             }
         }
         $inputRate = ($server.tests | Where-Object name -eq 'ClientInput').inputsPerSec
         Require ([Math]::Abs($inputRate / $hz - 1) -lt 0.1) "$Netcode $hz Hz input rate $inputRate/s, expected $hz/s"
-        Write-Output "PASS: $Netcode $hz Hz, all scenarios, workload rates, RPC delivery, final SyncVars, final-window connection."
+        Write-Output "PASS: $Netcode $hz Hz, all scenarios, workload rates, RPC delivery, client-visible changes, final SyncVars, final-window connection."
     } finally {
         foreach ($process in $benchProcesses) {
             if (-not $process.HasExited) { $process.Kill(); $process.WaitForExit() }

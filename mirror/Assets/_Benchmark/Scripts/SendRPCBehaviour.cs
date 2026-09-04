@@ -21,6 +21,7 @@ public class SendRPCBehaviour : NetworkBehaviour
 
     private int _seq;
     private double _inputAcc;
+    private SyncStateObserver _syncObserver;
 
     public override void OnStartServer()
     {
@@ -35,11 +36,23 @@ public class SendRPCBehaviour : NetworkBehaviour
         BenchRegistry.RecordFinalState(_syncA, _syncB, _syncC, _syncD);
         BenchRegistry.Despawned(4);
     }
-    public override void OnStartClient() => BenchRegistry.Spawned(4);
+    public override void OnStartClient()
+    {
+        _syncObserver = default;
+        BenchRegistry.Spawned(4);
+    }
     public override void OnStopClient()
     {
         BenchRegistry.RecordFinalState(_syncA, _syncB, _syncC, _syncD);
         BenchRegistry.Despawned(4);
+    }
+
+    // Identical client observation phase across all five netcodes; no extra network fields.
+    private void LateUpdate()
+    {
+        if (!isClientOnly) return;
+        if (BenchRegistry.Mode != BenchMode.SyncVars) return;
+        _syncObserver.Observe(_syncA, _syncB, _syncC, _syncD, Time.unscaledTimeAsDouble);
     }
 
     private void Update()

@@ -16,7 +16,8 @@ namespace PurrNet.NetBench.Editor
                 CheckCadence();
                 CheckMovement();
                 CheckFinalState();
-                Debug.Log("[BenchRegressionChecks] PASS: cadence, hitch catch-up, movement timestep, final-state checks.");
+                CheckSyncObservation();
+                Debug.Log("[BenchRegressionChecks] PASS: cadence, hitch catch-up, movement timestep, final-state and client observation checks.");
                 EditorApplication.Exit(0);
             }
             catch (Exception e)
@@ -94,6 +95,33 @@ namespace PurrNet.NetBench.Editor
                 UnityEngine.Object.DestroyImmediate(a);
                 UnityEngine.Object.DestroyImmediate(b);
             }
+        }
+
+        private static void CheckSyncObservation()
+        {
+            SyncObservation.End();
+            var observer = new SyncStateObserver();
+            observer.Observe(0, 0, 0, Vector3.zero, 0);
+            observer.Observe(1, 0, 0, Vector3.zero, 0.1); // Warmup must not enter window counters.
+            SyncObservation.Begin();
+            observer.Observe(1, 2, 0, Vector3.zero, 0.2);
+            Require(SyncObservation.Changes == 1 && SyncObservation.Samples == 4, "Initial/warmup state counted as delivery.");
+            Require(Math.Abs(SyncObservation.SilenceSumMs - 500) < 0.001, "Last-change times did not carry over from warmup.");
+            observer.Observe(1, 2, 0, new Vector3(1, 2, 3), 0.25);
+            Require(SyncObservation.Changes == 2, "Vector3 must count as one changed field.");
+            observer.Observe(1, 2, 0, new Vector3(1, 2, 3), 0.5);
+            Require(SyncObservation.Changes == 2 && Math.Abs(SyncObservation.SilenceMaxMs - 500) < 0.001,
+                "A stalled field must accumulate silence without being counted as a change.");
+            SyncObservation.End();
+            observer.Observe(3, 4, 5, Vector3.one, 1);
+            Require(SyncObservation.Changes == 2 && SyncObservation.Samples == 12, "Delivery grace contaminated the measured window.");
+            SyncObservation.Begin();
+            observer = default;
+            observer.Observe(0, 0, 0, Vector3.zero, 2);
+            Require(SyncObservation.Changes == 0 && SyncObservation.Samples == 0, "New window retained samples or counted its baseline.");
+            observer.Observe(0, 0, 0, new Vector3(0.0000001f, 0, 0), 2.1);
+            Require(SyncObservation.Changes == 1, "Observer used approximate Vector3 equality.");
+            SyncObservation.End();
         }
 
         private static void CheckFinalState()

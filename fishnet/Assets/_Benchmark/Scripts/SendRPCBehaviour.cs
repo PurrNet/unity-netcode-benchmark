@@ -21,13 +21,22 @@ public class SendRPCBehaviour : NetworkBehaviour
 
     private int _seq;
     private double _inputAcc;
+    private SyncStateObserver _syncObserver;
 
     public override void OnStartNetwork()
     {
         BenchRegistry.Spawned(4);
+        _syncObserver = default;
         _seq = Random.Range(0, 4);
         if (!IsServer) return;
 
+        // Tick-driven benchmark: no extra per-field interval. Apply after initialization because
+        // this FishNet version treats all-zero constructor settings as "use the global default".
+        // Keep the native reliable channel and permissions unchanged.
+        _syncA.UpdateSendRate(0f);
+        _syncB.UpdateSendRate(0f);
+        _syncC.UpdateSendRate(0f);
+        _syncD.UpdateSendRate(0f);
         TimeManager.OnTick += OnTick;
     }
 
@@ -37,6 +46,14 @@ public class SendRPCBehaviour : NetworkBehaviour
         BenchRegistry.Despawned(4);
         if (TimeManager != null)
             TimeManager.OnTick -= OnTick;
+    }
+
+    // Identical client observation phase across all five netcodes; no extra network fields.
+    private void LateUpdate()
+    {
+        if (IsServerInitialized || !IsClientInitialized) return;
+        if (BenchRegistry.Mode != BenchMode.SyncVars) return;
+        _syncObserver.Observe(_syncA.Value, _syncB.Value, _syncC.Value, _syncD.Value, Time.unscaledTimeAsDouble);
     }
 
     private void Update()

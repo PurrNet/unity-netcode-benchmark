@@ -103,6 +103,14 @@ Profiler-marker prefixes used for the development-build CPU table: `FishNet`, `T
     at the session tick rate from `Update`, with elapsed-time catch-up; the server counts arrivals.
   - `SyncVars`: the server changes one of four `SyncVar<T>` fields (`float`, `float`, `float`,
     `Vector3`) per tick.
+    These four fields use `UpdateSendRate(0f)` in `OnStartNetwork` on the server, after SyncType
+    initialization, instead of the default 0.1-second interval. Changed state is then eligible
+    every network tick; channel, permissions and the global default are unchanged. In this
+    vendored version, `new SyncTypeSettings(0f)` compares as default and would inherit 0.1 seconds
+    again during initialization, so the override is applied afterwards.
+- Clients sample the four fields in `LateUpdate` through the same shared observer as the other
+  projects. The report distinguishes observed changes and local field silence from server
+  mutation counts and final-state convergence; silence is not one-way delivery latency.
 - **Why floats.** FishNet's writer varint-packs integers automatically (an `int` in
   [-10000, 10000] costs 2 to 3 bytes), while Mirror, NGO and Fusion write 4 bytes and PurrNet only
   packs when the field is declared `PackedInt`. The upstream PurrNet project had switched its RPC

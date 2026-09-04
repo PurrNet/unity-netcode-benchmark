@@ -23,10 +23,12 @@ public class SendRPCBehabiour : NetworkBehaviour
 
     private int _seq;
     private double _inputAcc;
+    private SyncStateObserver _syncObserver;
 
     public override void Spawned()
     {
         BenchRegistry.Spawned(4);
+        _syncObserver = default;
         _seq = Random.Range(0, 4);
 
         // apply on clients
@@ -45,6 +47,14 @@ public class SendRPCBehabiour : NetworkBehaviour
     {
         if (hasState) BenchRegistry.RecordFinalState(SyncA, SyncB, SyncC, SyncD);
         BenchRegistry.Despawned(4);
+    }
+
+    // Identical client observation phase across all five netcodes; no extra network fields.
+    private void LateUpdate()
+    {
+        if (Runner == null || !Runner.IsRunning || Runner.IsServer || !Object || !Object.IsValid) return;
+        if (BenchRegistry.Mode != BenchMode.SyncVars) return;
+        _syncObserver.Observe(SyncA, SyncB, SyncC, SyncD, Time.unscaledTimeAsDouble);
     }
 
     private void Update()

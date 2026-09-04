@@ -133,4 +133,69 @@ namespace PurrNet.NetBench
             return ticks;
         }
     }
+
+    /// <summary>Client-visible state sampled at the same Unity phase in every project. No wire data,
+    /// network-clock assumptions or per-sample allocations. Silence is not server-to-client latency.</summary>
+    public static class SyncObservation
+    {
+        public static bool Measuring { get; private set; }
+        public static long Changes { get; private set; }
+        public static long Samples { get; private set; }
+        public static double SilenceSumMs { get; private set; }
+        public static double SilenceMaxMs { get; private set; }
+
+        public static void Begin()
+        {
+            Changes = Samples = 0;
+            SilenceSumMs = SilenceMaxMs = 0;
+            Measuring = true;
+        }
+
+        public static void End() => Measuring = false;
+
+        internal static void Record(bool changed, double silenceSeconds)
+        {
+            if (!Measuring) return;
+            if (changed) Changes++;
+            Samples++;
+            double ms = Math.Max(0, silenceSeconds) * 1000;
+            SilenceSumMs += ms;
+            SilenceMaxMs = Math.Max(SilenceMaxMs, ms);
+        }
+    }
+
+    /// <summary>One per object, reset on spawn. Warmup observations seed the last-change times;
+    /// the first observation establishes a baseline and is never counted as a delivered change.</summary>
+    public struct SyncStateObserver
+    {
+        private bool _initialized;
+        private float _a, _b, _c;
+        private Vector3 _d;
+        private double _aChanged, _bChanged, _cChanged, _dChanged;
+
+        public void Observe(float a, float b, float c, Vector3 d, double now)
+        {
+            if (!_initialized)
+            {
+                _initialized = true;
+                _a = a; _b = b; _c = c; _d = d;
+                _aChanged = _bChanged = _cChanged = _dChanged = now;
+                return;
+            }
+
+            Sample(a != _a, now, ref _aChanged);
+            Sample(b != _b, now, ref _bChanged);
+            Sample(c != _c, now, ref _cChanged);
+            // A Vector3 is one synced field, not three changes. Use exact components, not Unity's
+            // approximate Vector3 equality, so every stack is observed with the same precision.
+            Sample(d.x != _d.x || d.y != _d.y || d.z != _d.z, now, ref _dChanged);
+            _a = a; _b = b; _c = c; _d = d;
+        }
+
+        private static void Sample(bool changed, double now, ref double lastChanged)
+        {
+            if (changed) lastChanged = now;
+            SyncObservation.Record(changed, now - lastChanged);
+        }
+    }
 }

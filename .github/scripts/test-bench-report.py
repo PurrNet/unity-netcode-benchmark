@@ -23,13 +23,15 @@ def sample(name):
                          'rttP99Ms', 'rttSamples'), 0)
     row.update(name=name, objects=10, connections=1, truncated=False, deliveryComplete=True,
                rpcsSent=600, rpcsReceived=600, rpcsReceivedPerSec=200,
+               syncObservationAvailable=name == 'SyncVars', syncObservedChangesPerSec=200,
+               syncSilenceAvgMs=85, syncSilenceMaxMs=205,
                finalStateObjects=10, finalStateHash='abcd000012345678')
     return row
 
 
 class DeliveryReportChecks(unittest.TestCase):
     def test_delivery_cases(self):
-        for case in ('match', 'mismatch', 'client_incomplete', 'server_incomplete', 'legacy', 'missing_client'):
+        for case in ('match', 'mismatch', 'client_incomplete', 'server_incomplete', 'legacy', 'missing_client', 'coalesced', 'no_observation', 'mixed_clients'):
             with self.subTest(case=case), tempfile.TemporaryDirectory(prefix='bench-report-') as tmp:
                 root = Path(tmp)
                 results = root / 'results'
@@ -41,25 +43,39 @@ class DeliveryReportChecks(unittest.TestCase):
                 if case == 'mismatch':
                     client['tests'][0]['rpcsReceived'] -= 1
                     client['tests'][1]['finalStateHash'] = 'different'
+                if case == 'coalesced':
+                    client['tests'][1]['syncObservedChangesPerSec'] = 120
+                    client['tests'][1]['syncSilenceMaxMs'] = 350
+                if case == 'no_observation':
+                    client['tests'][1]['syncObservationAvailable'] = False
                 if case in ('client_incomplete', 'server_incomplete'):
                     for row in (client if case == 'client_incomplete' else server)['tests']:
                         row['deliveryComplete'] = False
                 if case == 'legacy':
                     for row in server['tests'] + client['tests']:
                         for key in ('deliveryComplete', 'rpcsSent', 'rpcsReceived', 'rpcsReceivedPerSec',
-                                    'finalStateObjects', 'finalStateHash'):
+                                    'finalStateObjects', 'finalStateHash', 'syncObservationAvailable',
+                                    'syncObservedChangesPerSec', 'syncSilenceAvgMs', 'syncSilenceMaxMs'):
                             row.pop(key)
                 (results / 'server.json').write_text(json.dumps(server), encoding='utf-8')
                 if case != 'missing_client':
                     (results / 'client-0.json').write_text(json.dumps(client), encoding='utf-8')
+                if case == 'mixed_clients':
+                    missing_observation = copy.deepcopy(client)
+                    missing_observation['tests'][1]['syncObservationAvailable'] = False
+                    # Defaults from an unobserved client must not pull down the valid-client averages.
+                    missing_observation['tests'][1]['syncObservedChangesPerSec'] = 0
+                    missing_observation['tests'][1]['syncSilenceAvgMs'] = 0
+                    missing_observation['tests'][1]['syncSilenceMaxMs'] = 0
+                    (results / 'client-1.json').write_text(json.dumps(missing_observation), encoding='utf-8')
                 env = dict(os.environ, GITHUB_STEP_SUMMARY=(root / 'summary.md').as_posix())
                 subprocess.run([BASH, (SCRIPTS / 'bench-aggregate.sh').as_posix(), results.as_posix(),
                                 'mirror', '1', 'c1t20', '2', '10', root.as_posix()],
                                check=True, env=env, capture_output=True, text=True, encoding='utf-8', timeout=30)
                 dp = root / 'dp-mirror-c1t20.json'
                 data = json.loads(dp.read_text(encoding='utf-8'))
-                checked = int(case in ('match', 'mismatch'))
-                matched = int(case == 'match')
+                checked = 2 if case == 'mixed_clients' else int(case not in ('client_incomplete', 'server_incomplete', 'legacy', 'missing_client'))
+                matched = checked if case != 'mismatch' else 0
                 if case != 'missing_client':
                     self.assertEqual(data['clients']['SendRPC']['rpcDeliveryChecked'], checked)
                     self.assertEqual(data['clients']['SendRPC']['rpcDeliveryMatched'], matched)
@@ -67,6 +83,12 @@ class DeliveryReportChecks(unittest.TestCase):
                     self.assertEqual(data['clients']['SyncVars']['syncStateMatched'], matched)
                     if case == 'legacy':
                         self.assertIsNone(data['clients']['SendRPC']['rpcsReceivedPerSec'])
+                    observed = case not in ('legacy', 'no_observation')
+                    sync = data['clients']['SyncVars']
+                    self.assertEqual(sync['syncObservationClients'], int(observed))
+                    self.assertEqual(sync['syncObservedChangesPerSec'], (120 if case == 'coalesced' else 200) if observed else None)
+                    self.assertEqual(sync['syncSilenceAvgMs'], 85 if observed else None)
+                    self.assertEqual(sync['syncSilenceMaxMs'], (350 if case == 'coalesced' else 205) if observed else None)
                 html = root / 'report.html'
                 subprocess.run([sys.executable, str(SCRIPTS / 'render-report.py'), str(dp), str(html)],
                                check=True, capture_output=True, text=True, encoding='utf-8', timeout=30)
@@ -84,12 +106,18 @@ const el = {}, document = {getElementById: () => el};
                 output = subprocess.run(['node'], input=context + notes + '\nbuildNotes(); console.log(el.innerHTML);',
                                         text=True, encoding='utf-8', check=True, capture_output=True, timeout=30).stdout
                 if checked:
-                    self.assertIn(f'RPC delivery on {matched}/1 checked clients', output)
-                    self.assertIn(f'SyncVar state matched on {matched}/1 checked clients', output)
+                    self.assertIn(f'RPC delivery on {matched}/{checked} checked clients', output)
+                    self.assertIn(f'SyncVar state matched on {matched}/{checked} checked clients', output)
                 else:
                     self.assertNotIn('checked clients', output)
                 self.assertEqual('validation is incomplete' in output,
                                  case in ('client_incomplete', 'server_incomplete', 'missing_client'))
+                self.assertEqual('observation is missing or incomplete' in output,
+                                 case in ('missing_client', 'no_observation', 'mixed_clients'))
+                if case == 'coalesced':
+                    self.assertIn('client-visible SyncVar changes 120.0/s', output)
+                    self.assertIn('nominal 200/s', output)
+                    self.assertIn('field silence 350.0 ms', output)
 
 
 if __name__ == '__main__':

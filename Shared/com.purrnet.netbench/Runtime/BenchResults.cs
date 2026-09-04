@@ -59,6 +59,14 @@ namespace PurrNet.NetBench
         public double rpcsSentPerSec;
         public double rpcsReceivedPerSec;
         public double syncMutationsPerSec;
+        // Client-visible SyncVars sampled once per LateUpdate; Vector3 counts as one field.
+        // Silence is time since the last locally observed change, NOT time since server mutation.
+        public bool syncObservationAvailable;
+        public long syncObservedChanges;
+        public double syncObservedChangesPerSec;
+        public long syncFieldSamples;
+        public double syncSilenceAvgMs;
+        public double syncSilenceMaxMs;
         public long rpcsSent;
         public long rpcsReceived;
         public long syncMutations;
