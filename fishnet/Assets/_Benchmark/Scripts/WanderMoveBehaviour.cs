@@ -30,7 +30,8 @@ namespace StinkySteak.FishnetBenchmark
 
         private void OnTick()
         {
-            _wrapper.NetworkUpdate(transform);
+            if (!BenchRegistry.MovementEnabled) return;
+            _wrapper.NetworkUpdate(transform, (float)TimeManager.TickDelta);
         }
     }
 }

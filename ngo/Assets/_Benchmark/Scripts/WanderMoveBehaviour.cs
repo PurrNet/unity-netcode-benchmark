@@ -31,7 +31,8 @@ namespace StinkySteak.NGOBenchmark
         {
             if (!IsServer) return;
 
-            _wrapper.NetworkUpdate(transform);
+            if (!BenchRegistry.MovementEnabled) return;
+            _wrapper.NetworkUpdate(transform, 1f / NetworkManager.NetworkConfig.TickRate);
         }
     }
 }

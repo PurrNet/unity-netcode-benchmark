@@ -20,7 +20,7 @@ public class SendRPCBehaviour : NetworkBehaviour
     private readonly SyncVar<Vector3> _syncD = new SyncVar<Vector3>();
 
     private int _seq;
-    private float _inputAcc;
+    private double _inputAcc;
 
     public override void OnStartNetwork()
     {
@@ -33,6 +33,7 @@ public class SendRPCBehaviour : NetworkBehaviour
 
     public override void OnStopNetwork()
     {
+        BenchRegistry.RecordFinalState(_syncA.Value, _syncB.Value, _syncC.Value, _syncD.Value);
         BenchRegistry.Despawned(4);
         if (TimeManager != null)
             TimeManager.OnTick -= OnTick;
@@ -43,15 +44,17 @@ public class SendRPCBehaviour : NetworkBehaviour
         if (IsServerInitialized || !IsClientInitialized) return;
         if (BenchRegistry.Mode != BenchMode.ClientInput) return;
 
-        if (BenchRegistry.Due(ref _inputAcc, Time.deltaTime, 1f / BenchRegistry.ClientInputHz))
+        for (int ticks = BenchRegistry.AdvanceTicks(ref _inputAcc, Time.unscaledDeltaTime, BenchRegistry.TickInterval); ticks > 0; ticks--)
             ServerInput(Random.insideUnitSphere, Time.time);
     }
 
     private void OnTick()
     {
+        if (!BenchRegistry.WorkloadEnabled) return;
         switch (BenchRegistry.Mode)
         {
             case BenchMode.Broadcast:
+                BenchRegistry.RpcsSent++;
                 var v = Random.Range(-10000f, 10000f);
                 SomeData(v);
                 _text.SetText(v.ToString());
@@ -64,6 +67,7 @@ public class SendRPCBehaviour : NetworkBehaviour
 
     private void MutateSyncVar()
     {
+        BenchRegistry.SyncMutations++;
         switch (_seq++ & 3)
         {
             case 0: _syncA.Value = Random.Range(-10000f, 10000f); break;
@@ -76,6 +80,7 @@ public class SendRPCBehaviour : NetworkBehaviour
     [ObserversRpc]
     private void SomeData(float data)
     {
+        if (!IsServerInitialized) BenchRegistry.RpcsReceived++;
         _text.SetText(data.ToString());
     }
 

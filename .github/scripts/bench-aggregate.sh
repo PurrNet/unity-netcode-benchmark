@@ -155,6 +155,11 @@ jq -n \
                            rttP50Ms: ($rows | avg(.rttP50Ms)),
                            rttP95Ms: ($rows | avg(.rttP95Ms)),
                            rttP99Ms: ($rows | avg(.rttP99Ms)),
+                           rpcsReceivedPerSec: ($rows | map(select(has("rpcsReceivedPerSec"))) | avg(.rpcsReceivedPerSec)),
+                           rpcDeliveryChecked: ([ $rows[] | select($name == "SendRPC" and $st[$name].deliveryComplete == true and .deliveryComplete == true) ] | length),
+                           rpcDeliveryMatched: ([ $rows[] | select($name == "SendRPC" and $st[$name].deliveryComplete == true and .deliveryComplete == true and .rpcsReceived == $st[$name].rpcsSent) ] | length),
+                           syncStateChecked: ([ $rows[] | select($name == "SyncVars" and $st[$name].deliveryComplete == true and .deliveryComplete == true) ] | length),
+                           syncStateMatched: ([ $rows[] | select($name == "SyncVars" and $st[$name].deliveryComplete == true and .deliveryComplete == true and .finalStateObjects == $st[$name].finalStateObjects and .finalStateObjects > 0 and .finalStateHash == $st[$name].finalStateHash) ] | length),
                            truncated: ([ $rows[] | select(.truncated) ] | length)
                          }})
                  | from_entries )

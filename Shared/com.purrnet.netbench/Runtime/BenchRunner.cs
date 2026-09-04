@@ -45,7 +45,6 @@ namespace PurrNet.NetBench
         private const float CooldownSeconds = 2f;
         private const float ClientRetrySeconds = 15f;
         private const float RttSampleInterval = 0.1f;
-        private const float ChurnInterval = 0.05f;
 
         private static bool s_started;
 
@@ -140,6 +139,8 @@ namespace PurrNet.NetBench
                 photonAppId = CommandLine.Get("-photonAppId", ""),
                 tickRate = CommandLine.GetInt("-tickRate", 0)
             };
+            if (_opts.tickRate > 0)
+                BenchRegistry.TickRate = _opts.tickRate;
         }
 
         private static string ResolveIface(string requested)
@@ -178,6 +179,7 @@ namespace PurrNet.NetBench
 
         private static void ApplyMode(int test)
         {
+            BenchRegistry.WorkloadEnabled = true;
             BenchRegistry.MovementEnabled = test != TestStatic && test != TestSpawnChurn;
             BenchRegistry.Mode = test == TestClientInput ? BenchMode.ClientInput
                 : test == TestSyncVars ? BenchMode.SyncVars
@@ -186,6 +188,7 @@ namespace PurrNet.NetBench
 
         private static void ResetMode()
         {
+            BenchRegistry.WorkloadEnabled = true;
             BenchRegistry.MovementEnabled = true;
             BenchRegistry.Mode = BenchMode.Broadcast;
         }
@@ -301,9 +304,17 @@ namespace PurrNet.NetBench
                 yield return new WaitForSecondsRealtime(_warmupSeconds);
                 yield return Window(test, WindowSeconds(test));
 
-                // Let late-starting client windows finish before the objects vanish.
+                // Freeze the generated state and allow in-flight updates to settle outside measurement.
+                // Clients keep receiving until despawn, including after their final measurement window.
+                BenchRegistry.WorkloadEnabled = false;
+                BenchRegistry.MovementEnabled = false;
                 yield return new WaitForSecondsRealtime(SlackSeconds);
-                Try(() => _adapter.DespawnAll(), "DespawnAll");
+                if (!Try(() => _adapter.DespawnAll(), "DespawnAll"))
+                    yield break;
+                // Some adapters destroy asynchronously. Preserve Mode until their callbacks capture state.
+                while (BenchRegistry.Count(slot) > 0)
+                    yield return null;
+                CaptureDelivery(test);
                 ResetMode();
                 CollectGarbage();
                 yield return new WaitForSecondsRealtime(CooldownSeconds);
@@ -395,14 +406,12 @@ namespace PurrNet.NetBench
                 yield return Window(test, Mathf.Max(1f, WindowSeconds(test) - 1f));
                 remaining.Remove(test);
 
-                // Nothing left to observe after the last test; a relay client may never see the
-                // host's final despawn or its own disconnect, so do not wait for either.
-                if (remaining.Count == 0)
-                    break;
-
+                // Stay connected even after the last (shorter) client window: the server is still measuring.
+                // The existing overall run timeout handles a peer that never signals despawn/disconnect.
                 while (BenchRegistry.Count(slot) > 0 && _adapter.IsClientConnected)
                     yield return new WaitForSecondsRealtime(0.1f);
 
+                CaptureDelivery(test);
                 ResetMode();
             }
 
@@ -434,6 +443,8 @@ namespace PurrNet.NetBench
             try
             {
                 _run.tickRate = _adapter.TickRate;
+                if (_run.tickRate > 0)
+                    BenchRegistry.TickRate = _run.tickRate;
             }
             catch (Exception e)
             {
@@ -468,6 +479,21 @@ namespace PurrNet.NetBench
         /// <summary>Static only checks that untouched objects cost nothing, so it gets the short Idle window.</summary>
         private float WindowSeconds(int test) => test == TestStatic ? _idleSeconds : _benchSeconds;
 
+        private void CaptureDelivery(int test)
+        {
+            if (BenchRegistry.SlotOf(test) != 4 || _run.tests.Count == 0)
+                return;
+            var result = _run.tests[_run.tests.Count - 1];
+            if (result.test != test) return;
+            result.rpcsSent = BenchRegistry.RpcsSent;
+            result.rpcsReceived = BenchRegistry.RpcsReceived;
+            result.syncMutations = BenchRegistry.SyncMutations;
+            result.deliveryComplete = BenchRegistry.Count(4) == 0 && !result.truncated;
+            result.finalStateObjects = BenchRegistry.FinalStateObjects;
+            result.finalStateHash = test == TestSyncVars ? BenchRegistry.FinalStateHash : null;
+            WriteResults(quiet: true);
+        }
+
         private IEnumerator Window(int test, float seconds)
         {
             var load = new LoadSampler();
@@ -479,16 +505,18 @@ namespace PurrNet.NetBench
 
             EnforceFrameCap();
             ReadTickRate();
-            // Sampled at the start: clients finish their (shorter) last window and quit before the
-            // server's ends, so a count taken at the end reads 0 for the final test.
+            // Record the minimum observed population, including losses during the window.
             int connections = _isServer ? _adapter.ConnectedClientCount : 1;
             load.Begin(_iface);
             markers.Begin(_adapter.ProfilerMarkerPrefixes);
             long inputs0 = BenchRegistry.ServerInputsReceived;
+            long rpcsSent0 = BenchRegistry.RpcsSent;
+            long rpcsReceived0 = BenchRegistry.RpcsReceived;
+            long mutations0 = BenchRegistry.SyncMutations;
 
             double elapsed = 0;
             float nextRtt = 0;
-            float churnAcc = 0;
+            double churnAcc = 0;
             bool truncated = false;
 
             while (elapsed < seconds)
@@ -499,6 +527,14 @@ namespace PurrNet.NetBench
 
                 load.SampleFrame();
                 markers.Sample();
+                if (_isServer)
+                    connections = Math.Min(connections, _adapter.ConnectedClientCount);
+                else if (!_adapter.IsClientConnected)
+                {
+                    connections = 0;
+                    truncated = true;
+                    break;
+                }
 
                 if (!_isServer)
                 {
@@ -512,10 +548,14 @@ namespace PurrNet.NetBench
                     }
                 }
 
-                if (churn && BenchRegistry.Due(ref churnAcc, dt, ChurnInterval))
+                if (churn)
                 {
-                    _adapter.DespawnOldest(churnCount);
-                    _adapter.SpawnTest(slot, churnCount);
+                    int ticks = BenchRegistry.AdvanceTicks(ref churnAcc, dt, BenchRegistry.TickInterval);
+                    for (int i = 0; i < ticks; i++)
+                    {
+                        _adapter.DespawnOldest(churnCount);
+                        _adapter.SpawnTest(slot, churnCount);
+                    }
                 }
 
                 if (test != 0 && BenchRegistry.Count(slot) == 0)
@@ -561,6 +601,9 @@ namespace PurrNet.NetBench
                 iface = _iface,
                 inputsReceived = inputs,
                 inputsPerSec = inputs / wall,
+                rpcsSentPerSec = (BenchRegistry.RpcsSent - rpcsSent0) / wall,
+                rpcsReceivedPerSec = (BenchRegistry.RpcsReceived - rpcsReceived0) / wall,
+                syncMutationsPerSec = (BenchRegistry.SyncMutations - mutations0) / wall,
                 cpuMarkers = cpuMarkers
             };
 

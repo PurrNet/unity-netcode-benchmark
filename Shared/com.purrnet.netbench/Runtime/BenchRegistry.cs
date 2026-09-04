@@ -1,3 +1,6 @@
+using System;
+using UnityEngine;
+
 namespace PurrNet.NetBench
 {
     /// <summary>What the SendRPC-prefab behaviours do while spawned.</summary>
@@ -32,16 +35,59 @@ namespace PurrNet.NetBench
         /// <summary>False during Static / SpawnChurn so the movement scripts leave their transforms alone.</summary>
         public static bool MovementEnabled = true;
 
-        /// <summary>Client -> server messages per second per client in <see cref="BenchMode.ClientInput"/>.</summary>
-        public const float ClientInputHz = 20f;
+        /// <summary>Whether the server should generate RPCs / state changes. Paused while final delivery settles.</summary>
+        public static bool WorkloadEnabled = true;
+
+        /// <summary>Shared cadence for frame-driven input and churn, set from the actual network tick rate.</summary>
+        public static int TickRate = 20;
+        public static double TickInterval => 1.0 / TickRate;
+
+        // Whole-test counters include warmup and the delivery grace period. They add no network traffic.
+        public static long RpcsSent;
+        public static long RpcsReceived;
+        public static long SyncMutations;
+        public static int FinalStateObjects;
+        private static ulong s_finalStateHash;
+        public static string FinalStateHash => s_finalStateHash.ToString("x16");
 
         /// <summary>Server-side count of client input RPCs received (incremented by the SendRPC scripts).</summary>
         public static long ServerInputsReceived;
 
         public static void Spawned(int slot)
         {
+            // Reset on the first RPC-prefab spawn, before any RPC can arrive on the client.
+            // Resetting when the harness detects the test would discard early deliveries.
+            if (slot == 4 && s_counts[slot] == 0)
+            {
+                RpcsSent = RpcsReceived = SyncMutations = 0;
+                FinalStateObjects = 0;
+                s_finalStateHash = 0;
+            }
             if ((uint)slot < MaxSlots)
                 s_counts[slot]++;
+        }
+
+        /// <summary>Capture each object's final SyncVar state before the netcode resets it on despawn.
+        /// The sum is independent of spawn/despawn order. This checks exact convergence, not a spatial tolerance.</summary>
+        public static void RecordFinalState(float a, float b, float c, Vector3 d)
+        {
+            if (Mode != BenchMode.SyncVars) return;
+            ulong hash = 14695981039346656037UL;
+            hash = HashFloat(hash, a);
+            hash = HashFloat(hash, b);
+            hash = HashFloat(hash, c);
+            hash = HashFloat(hash, d.x);
+            hash = HashFloat(hash, d.y);
+            hash = HashFloat(hash, d.z);
+            unchecked { s_finalStateHash += hash; }
+            FinalStateObjects++;
+        }
+
+        private static ulong HashFloat(ulong hash, float value)
+        {
+            // Treat +0 and -0 as the same value.
+            uint bits = value == 0f ? 0u : unchecked((uint)BitConverter.SingleToInt32Bits(value));
+            return unchecked((hash ^ bits) * 1099511628211UL);
         }
 
         public static void Despawned(int slot)
@@ -77,17 +123,14 @@ namespace PurrNet.NetBench
             }
         }
 
-        /// <summary>Fixed-rate helper for Update-driven loops: returns true once per <paramref name="interval"/>.</summary>
-        public static bool Due(ref float accumulator, float deltaTime, float interval)
+        /// <summary>Number of workload ticks due this frame. Preserve the remainder and catch up after slow
+        /// frames, so a frame cap or hitch cannot silently reduce offered input / churn load.</summary>
+        public static int AdvanceTicks(ref double accumulator, double deltaTime, double interval)
         {
             accumulator += deltaTime;
-            if (accumulator < interval)
-                return false;
-
-            accumulator -= interval;
-            if (accumulator > interval)
-                accumulator = 0f;
-            return true;
+            int ticks = (int)Math.Floor((accumulator + interval * 1e-7) / interval);
+            accumulator = Math.Max(0, accumulator - ticks * interval);
+            return ticks;
         }
     }
 }

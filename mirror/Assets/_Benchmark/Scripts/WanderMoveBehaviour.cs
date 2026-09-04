@@ -17,17 +17,23 @@ namespace StinkySteak.MirrorBenchmark
 
             _config.ApplyConfig(ref _wrapper);
             _wrapper.NetworkStart(transform);
+            BenchmarkTickSystem.Tick += OnTick;
         }
 
-        public override void OnStopServer() => BenchRegistry.Despawned(3);
+        public override void OnStopServer()
+        {
+            BenchmarkTickSystem.Tick -= OnTick;
+            BenchRegistry.Despawned(3);
+        }
         public override void OnStartClient() => BenchRegistry.Spawned(3);
         public override void OnStopClient() => BenchRegistry.Despawned(3);
 
-        private void FixedUpdate()
+        private void OnTick(float delta)
         {
             if (isClient) return;
 
-            _wrapper.NetworkUpdate(transform);
+            if (!BenchRegistry.MovementEnabled) return;
+            _wrapper.NetworkUpdate(transform, delta);
         }
     }
 }

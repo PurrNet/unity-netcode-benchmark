@@ -26,7 +26,8 @@ namespace StinkySteak.MirrorBenchmark
         public void OnTick(float delta)
         {
             if (isClient) return;
-            _wrapper.NetworkUpdate(transform);
+            if (!BenchRegistry.MovementEnabled) return;
+            _wrapper.NetworkUpdate(transform, delta);
         }
     }
 }

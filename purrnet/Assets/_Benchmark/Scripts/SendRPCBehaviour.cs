@@ -9,7 +9,7 @@ using UnityEngine;
 //   SyncVars    (SyncVars)    server changes one of four synced fields per tick
 // Payloads are floats on purpose: some netcodes varint-pack integers by default and others do not,
 // floats are 4 bytes everywhere, so the tests compare framing and batching rather than int encoding.
-public class SendRPCBehaviour : NetworkBehaviour
+public class SendRPCBehaviour : NetworkBehaviour, ITick
 {
     [SerializeField] TMP_Text _text;
 
@@ -19,7 +19,7 @@ public class SendRPCBehaviour : NetworkBehaviour
     private SyncVar<Vector3> _syncD = new SyncVar<Vector3>(Vector3.zero);
 
     private int _seq;
-    private float _inputAcc;
+    private double _inputAcc;
 
     protected override void OnSpawned(bool asServer)
     {
@@ -29,13 +29,8 @@ public class SendRPCBehaviour : NetworkBehaviour
 
     protected override void OnDespawned(bool asServer)
     {
+        BenchRegistry.RecordFinalState(_syncA.value, _syncB.value, _syncC.value, _syncD.value);
         BenchRegistry.Despawned(4);
-    }
-
-    private void FixedUpdate()
-    {
-        if (isClient) return;
-        OnTick();
     }
 
     private void Update()
@@ -43,15 +38,17 @@ public class SendRPCBehaviour : NetworkBehaviour
         if (isServer || !isClient) return;
         if (BenchRegistry.Mode != BenchMode.ClientInput) return;
 
-        if (BenchRegistry.Due(ref _inputAcc, Time.deltaTime, 1f / BenchRegistry.ClientInputHz))
+        for (int ticks = BenchRegistry.AdvanceTicks(ref _inputAcc, Time.unscaledDeltaTime, BenchRegistry.TickInterval); ticks > 0; ticks--)
             ServerInput(Random.insideUnitSphere, Time.time);
     }
 
-    private void OnTick()
+    public void OnTick(float delta)
     {
+        if (!isServer || !BenchRegistry.WorkloadEnabled) return;
         switch (BenchRegistry.Mode)
         {
             case BenchMode.Broadcast:
+                BenchRegistry.RpcsSent++;
                 var v = Random.Range(-10000f, 10000f);
                 SomeData(v);
                 _text.SetText(v.ToString());
@@ -64,6 +61,7 @@ public class SendRPCBehaviour : NetworkBehaviour
 
     private void MutateSyncVar()
     {
+        BenchRegistry.SyncMutations++;
         switch (_seq++ & 3)
         {
             case 0: _syncA.value = Random.Range(-10000f, 10000f); break;
@@ -76,6 +74,7 @@ public class SendRPCBehaviour : NetworkBehaviour
     [ObserversRpc]
     private void SomeData(float data)
     {
+        if (!isServer) BenchRegistry.RpcsReceived++;
         _text.SetText(data.ToString());
     }
 

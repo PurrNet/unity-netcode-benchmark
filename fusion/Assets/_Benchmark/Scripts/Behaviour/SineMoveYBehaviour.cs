@@ -29,7 +29,7 @@ namespace StinkySteak.FusionBenchmark
             if (!Object.HasStateAuthority) return;
             if (!BenchRegistry.MovementEnabled) return;
 
-            _wrapper.NetworkUpdate(transform);
+            _wrapper.NetworkUpdate(transform, Runner.DeltaTime);
         }
     }
 }

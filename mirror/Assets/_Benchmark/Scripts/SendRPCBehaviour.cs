@@ -1,5 +1,6 @@
 using Mirror;
 using PurrNet.NetBench;
+using StinkySteak.MirrorBenchmark;
 using TMPro;
 using UnityEngine;
 
@@ -19,22 +20,26 @@ public class SendRPCBehaviour : NetworkBehaviour
     [SyncVar] private Vector3 _syncD;
 
     private int _seq;
-    private float _inputAcc;
+    private double _inputAcc;
 
     public override void OnStartServer()
     {
         BenchRegistry.Spawned(4);
         _seq = Random.Range(0, 4);
+        BenchmarkTickSystem.Tick += OnTick;
     }
 
-    public override void OnStopServer() => BenchRegistry.Despawned(4);
-    public override void OnStartClient() => BenchRegistry.Spawned(4);
-    public override void OnStopClient() => BenchRegistry.Despawned(4);
-
-    private void FixedUpdate()
+    public override void OnStopServer()
     {
-        if (isClient) return;
-        OnTick();
+        BenchmarkTickSystem.Tick -= OnTick;
+        BenchRegistry.RecordFinalState(_syncA, _syncB, _syncC, _syncD);
+        BenchRegistry.Despawned(4);
+    }
+    public override void OnStartClient() => BenchRegistry.Spawned(4);
+    public override void OnStopClient()
+    {
+        BenchRegistry.RecordFinalState(_syncA, _syncB, _syncC, _syncD);
+        BenchRegistry.Despawned(4);
     }
 
     private void Update()
@@ -42,15 +47,17 @@ public class SendRPCBehaviour : NetworkBehaviour
         if (!isClientOnly) return;
         if (BenchRegistry.Mode != BenchMode.ClientInput) return;
 
-        if (BenchRegistry.Due(ref _inputAcc, Time.deltaTime, 1f / BenchRegistry.ClientInputHz))
+        for (int ticks = BenchRegistry.AdvanceTicks(ref _inputAcc, Time.unscaledDeltaTime, BenchRegistry.TickInterval); ticks > 0; ticks--)
             CmdServerInput(Random.insideUnitSphere, Time.time);
     }
 
-    private void OnTick()
+    private void OnTick(float delta)
     {
+        if (!BenchRegistry.WorkloadEnabled) return;
         switch (BenchRegistry.Mode)
         {
             case BenchMode.Broadcast:
+                BenchRegistry.RpcsSent++;
                 var v = Random.Range(-10000f, 10000f);
                 SomeData(v);
                 _text.SetText(v.ToString());
@@ -63,6 +70,7 @@ public class SendRPCBehaviour : NetworkBehaviour
 
     private void MutateSyncVar()
     {
+        BenchRegistry.SyncMutations++;
         switch (_seq++ & 3)
         {
             case 0: _syncA = Random.Range(-10000f, 10000f); break;
@@ -75,6 +83,7 @@ public class SendRPCBehaviour : NetworkBehaviour
     [ClientRpc]
     private void SomeData(float data)
     {
+        if (!isServer) BenchRegistry.RpcsReceived++;
         _text.SetText(data.ToString());
     }
 

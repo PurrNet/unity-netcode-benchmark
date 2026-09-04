@@ -39,7 +39,7 @@ namespace StinkySteak.NetcodeBenchmark
             transform.position = RandomVector3.Get(_maxSpawnPositionRadius);
         }
 
-        public void NetworkUpdate(Transform transform)
+        public void NetworkUpdate(Transform transform, float deltaTime)
         {
             var desiredVelocity = GetWanderForce(transform);
             desiredVelocity = desiredVelocity.normalized * _maxSpeed;
@@ -49,7 +49,7 @@ namespace StinkySteak.NetcodeBenchmark
             steeringForce /= _mass;
 
             _velocity = Vector3.ClampMagnitude(_velocity + steeringForce, _maxSpeed);
-            transform.position += _velocity * Time.deltaTime;
+            transform.position += _velocity * deltaTime;
             transform.forward = _velocity.normalized;
 
             Debug.DrawRay(transform.position, _velocity.normalized * 2, Color.green);

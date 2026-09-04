@@ -100,7 +100,7 @@ Profiler-marker prefixes used for the development-build CPU table: `FishNet`, `T
   - `Broadcast` (SendRPC): one `[ObserversRpc]` with one `float` per tick (the upstream benchmark
     sent an `int`; see below).
   - `ClientInput`: clients call `[ServerRpc(RequireOwnership = false)] ServerInput(Vector3, float)`
-    at 20 Hz from `Update`; the server counts arrivals.
+    at the session tick rate from `Update`, with elapsed-time catch-up; the server counts arrivals.
   - `SyncVars`: the server changes one of four `SyncVar<T>` fields (`float`, `float`, `float`,
     `Vector3`) per tick.
 - **Why floats.** FishNet's writer varint-packs integers automatically (an `int` in
@@ -127,4 +127,5 @@ Profiler-marker prefixes used for the development-build CPU table: `FishNet`, `T
 - `Assets/_Benchmark/Prefab/*.prefab` and `Scenes/Benchmark.unity` are untouched; the NetworkTransform
   settings on the movement prefabs (client-authoritative flag, 1-tick interval, 0.001
   sensitivity) are the upstream benchmark's and identical across the three movement prefabs.
-- Tick rate stays at the project's 20 Hz, matching the other four projects.
+- The project default tick rate is 20 Hz; the harness selects the session's `-tickRate`, matching
+  the other four projects. Movement uses `TimeManager.TickDelta`, not the render-frame delta.

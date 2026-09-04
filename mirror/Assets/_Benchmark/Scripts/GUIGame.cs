@@ -20,6 +20,7 @@ namespace StinkySteak.MirrorBenchmark
         {
             base.Initialize();
             _networkManager = Instantiate(_networkManagerPrefab);
+            _networkManager.gameObject.AddComponent<BenchmarkTickSystem>();
             RegisterPrefabs(new StressTestEssential[] { _test_1, _test_2, _test_3 });
         }
 

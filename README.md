@@ -94,18 +94,42 @@ counters need Linux; frame stats work everywhere.
 
 ## Changes from the defaults
 
-The intent is to run every netcode exactly as it comes out of the box: package defaults, the same
-scenes, prefabs and tick rate. The three changes below are the ones that were needed for a netcode
-to work at all in this setup. Each is listed with its default so the reader can judge it.
+The intent is to preserve each netcode's networking defaults while giving it the same requested
+workload. That requires both compatibility fixes and some benchmark-side scheduling. The changes
+below are explicit so the reader can judge the tradeoffs; equivalent offered work does not mean
+forcing identical batching, compression, precision or delivery behaviour.
 
 | Netcode | What | Default | Here | Why it was needed |
 |---|---|---|---|---|
 | FishNet | Tugboat's packet size constant `MAXIMUM_UDP_MTU` (a source edit in the vendored transport; there is no inspector field for it) | 1350 | 1200 | LiteNetLib sets don't-fragment and Tugboat hands it a fixed 1350-byte MTU, so on the 1280-byte tailnet every full packet was silently dropped and MoveWander and SendRPC sent almost nothing. 1200 is Mirror's KCP default. Details in [fishnet/BENCHMARK_CHANGES.md](fishnet/BENCHMARK_CHANGES.md). |
 | NGO | Unity Transport → `Max Packet Queue Size` (inspector field on the NetworkManager prefab) | 128 | 4096 | At 128 the server overflows the queue from 50 connections up, drops packets and logs one error per connection per tick; at 100 connections and 60 Hz the logging alone saturates a core. Unity recommends raising it for large player counts. |
 | NGO | NetworkTransform → `Use Unreliable Deltas` (inspector field on the three movement prefabs) | off | on | Delivers transform deltas unreliably, which is what the other four do for transforms out of the box (Mirror's default NetworkTransform is the unreliable one, FishNet and PurrNet send transform deltas unreliably, Fusion's snapshots are unreliable). With the reliable default the server queues without bound behind Unity Transport's reliable window at 60 Hz and dies. |
+| Mirror | Benchmark workload scheduling (application code, not a Mirror source change) | The vendored Mirror provides a network send rate and frame-loop hooks, but no fixed-rate gameplay tick callback | A small custom tick loop for movement, RPC generation and SyncVar mutations, at the session's `-tickRate` | Interval-driven application work must be scheduled by the application. The loop honours the requested workload timing without changing Unity's physics timestep. |
 
-Nothing else is changed. RPCs are reliable in every netcode, and NGO's NetworkVariables are
-reliable by design. PurrNet, Mirror and Fusion run untouched.
+Mirror's custom [benchmark tick system](mirror/Assets/_Benchmark/Scripts/BenchmarkTickSystem.cs)
+accumulates elapsed time in Unity's `Update` and catches up missed ticks after a slow frame.
+It passes the tick duration to movement code and leaves `Time.fixedDeltaTime` unchanged, avoiding
+extra physics steps just to schedule network workloads. A Mirror application that wants to send
+something at an interval likewise has to arrange that timing itself, for example with Unity
+callbacks or a timer. This helper's CPU cost is included in Mirror's results. It is not a new
+networking tick implementation: Mirror still decides when and how to batch and transmit updates,
+and several workload ticks can occur within one Unity frame.
+
+The other projects use their native tick callbacks (including PurrNet's `ITick`). All movement
+uses the supplied tick duration, rather than Unity's render-frame delta. Client-input generation
+and spawn churn use the session tick rate with elapsed-time catch-up, rather than a hard-coded
+20 Hz. These are benchmark workload changes, not changes to replication defaults.
+
+The harness also records generated/received RPC counts and final SyncVar state fingerprints.
+After measurement the server pauses mutations for a 1.5-second delivery grace period; clients
+stay connected until despawn, including after their last measurement window. Whole-test RPC
+delivery and exact final-state matches are reported separately from window rates. These are
+diagnostic checks, not a guarantee of equal movement fidelity or update freshness; a state
+mismatch needs investigation before changing a netcode's precision or delivery defaults.
+
+Beyond the exceptions above, networking settings remain unchanged. RPCs are reliable in every
+netcode, and NGO's NetworkVariables are reliable by design. Native coalescing, thresholds and
+send intervals are retained.
 
 ## Caveats
 

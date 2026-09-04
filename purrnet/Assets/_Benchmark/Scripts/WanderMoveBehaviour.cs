@@ -28,7 +28,8 @@ namespace StinkySteak.MirrorBenchmark
         {
             if (isClient) return;
 
-            _wrapper.NetworkUpdate(transform);
+            if (!BenchRegistry.MovementEnabled) return;
+            _wrapper.NetworkUpdate(transform, delta);
         }
     }
 }

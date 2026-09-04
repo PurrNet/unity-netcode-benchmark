@@ -14,6 +14,7 @@ namespace StinkySteak.NetcodeBenchmark
         private Vector3 _initialPosition;
 
         private float _speed;
+        private float _elapsed;
         private float _amplitude;
 
         public static SinMoveYWrapper CreateDefault()
@@ -30,14 +31,16 @@ namespace StinkySteak.NetcodeBenchmark
 
         public void NetworkStart(Transform transform)
         {
+            _elapsed = 0f;
             _speed = Random.Range(_minSpeed, _maxSpeed);
             _amplitude = Random.Range(_minAmplitude, _maxAmplitude);
             _initialPosition = RandomVector3.Get(_positionMaxRandom);
         }
 
-        public void NetworkUpdate(Transform transform)
+        public void NetworkUpdate(Transform transform, float deltaTime)
         {
-            float sin = Mathf.Sin(Time.time * _speed) * _amplitude;
+            _elapsed += deltaTime;
+            float sin = Mathf.Sin(_elapsed * _speed) * _amplitude;
 
             transform.position = _initialPosition + (Vector3.up * sin);
         }

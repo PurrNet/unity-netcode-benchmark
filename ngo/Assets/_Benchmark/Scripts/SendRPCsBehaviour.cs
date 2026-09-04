@@ -19,7 +19,7 @@ public class SendRPCsBehaviour : NetworkBehaviour
     private readonly NetworkVariable<Vector3> _syncD = new NetworkVariable<Vector3>();
 
     private int _seq;
-    private float _inputAcc;
+    private double _inputAcc;
 
     public override void OnNetworkSpawn()
     {
@@ -32,6 +32,7 @@ public class SendRPCsBehaviour : NetworkBehaviour
 
     public override void OnNetworkDespawn()
     {
+        BenchRegistry.RecordFinalState(_syncA.Value, _syncB.Value, _syncC.Value, _syncD.Value);
         BenchRegistry.Despawned(4);
         if (IsServer && NetworkManager != null && NetworkManager.NetworkTickSystem != null)
             NetworkManager.NetworkTickSystem.Tick -= OnTick;
@@ -42,15 +43,17 @@ public class SendRPCsBehaviour : NetworkBehaviour
         if (!IsSpawned || IsServer || !IsClient) return;
         if (BenchRegistry.Mode != BenchMode.ClientInput) return;
 
-        if (BenchRegistry.Due(ref _inputAcc, Time.deltaTime, 1f / BenchRegistry.ClientInputHz))
+        for (int ticks = BenchRegistry.AdvanceTicks(ref _inputAcc, Time.unscaledDeltaTime, BenchRegistry.TickInterval); ticks > 0; ticks--)
             ServerInputServerRpc(Random.insideUnitSphere, Time.time);
     }
 
     private void OnTick()
     {
+        if (!BenchRegistry.WorkloadEnabled) return;
         switch (BenchRegistry.Mode)
         {
             case BenchMode.Broadcast:
+                BenchRegistry.RpcsSent++;
                 var v = Random.Range(-10000f, 10000f);
                 SomeDataClientRpc(v);
                 _text.SetText(v.ToString());
@@ -63,6 +66,7 @@ public class SendRPCsBehaviour : NetworkBehaviour
 
     private void MutateSyncVar()
     {
+        BenchRegistry.SyncMutations++;
         switch (_seq++ & 3)
         {
             case 0: _syncA.Value = Random.Range(-10000f, 10000f); break;
@@ -75,6 +79,7 @@ public class SendRPCsBehaviour : NetworkBehaviour
     [ClientRpc]
     private void SomeDataClientRpc(float data)
     {
+        if (!IsServer) BenchRegistry.RpcsReceived++;
         _text.SetText(data.ToString());
     }
 

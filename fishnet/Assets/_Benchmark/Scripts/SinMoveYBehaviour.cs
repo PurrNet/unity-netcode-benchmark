@@ -32,7 +32,7 @@ namespace StinkySteak.FishnetBenchmark
         {
             if (!BenchRegistry.MovementEnabled) return;
 
-            _wrapper.NetworkUpdate(transform);
+            _wrapper.NetworkUpdate(transform, (float)TimeManager.TickDelta);
         }
     }
 }

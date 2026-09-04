@@ -22,7 +22,7 @@ public class SendRPCBehabiour : NetworkBehaviour
     [SerializeField] TMP_Text _text;
 
     private int _seq;
-    private float _inputAcc;
+    private double _inputAcc;
 
     public override void Spawned()
     {
@@ -43,6 +43,7 @@ public class SendRPCBehabiour : NetworkBehaviour
 
     public override void Despawned(NetworkRunner runner, bool hasState)
     {
+        if (hasState) BenchRegistry.RecordFinalState(SyncA, SyncB, SyncC, SyncD);
         BenchRegistry.Despawned(4);
     }
 
@@ -51,17 +52,18 @@ public class SendRPCBehabiour : NetworkBehaviour
         if (Runner == null || !Runner.IsRunning || Runner.IsServer || !Object || !Object.IsValid) return;
         if (BenchRegistry.Mode != BenchMode.ClientInput) return;
 
-        if (BenchRegistry.Due(ref _inputAcc, Time.deltaTime, 1f / BenchRegistry.ClientInputHz))
+        for (int ticks = BenchRegistry.AdvanceTicks(ref _inputAcc, Time.unscaledDeltaTime, BenchRegistry.TickInterval); ticks > 0; ticks--)
             ServerInputRpc(Random.insideUnitSphere, Time.time);
     }
 
     public override void FixedUpdateNetwork()
     {
-        if (!Object.HasStateAuthority) return;
+        if (!Object.HasStateAuthority || !BenchRegistry.WorkloadEnabled) return;
 
         switch (BenchRegistry.Mode)
         {
             case BenchMode.Broadcast:
+                BenchRegistry.RpcsSent++;
                 var v = Random.Range(-10000f, 10000f);
                 SomeDataClientRpc(v);
                 break;
@@ -73,6 +75,7 @@ public class SendRPCBehabiour : NetworkBehaviour
 
     private void MutateSyncVar()
     {
+        BenchRegistry.SyncMutations++;
         switch (_seq++ & 3)
         {
             case 0: SyncA = Random.Range(-10000f, 10000f); break;
@@ -85,6 +88,7 @@ public class SendRPCBehabiour : NetworkBehaviour
     [Rpc(sources: RpcSources.StateAuthority, targets: RpcTargets.All)]
     private void SomeDataClientRpc(float data)
     {
+        if (!Runner.IsServer) BenchRegistry.RpcsReceived++;
         _text.SetText(data.ToString());
     }
 

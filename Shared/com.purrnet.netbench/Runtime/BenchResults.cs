@@ -55,6 +55,17 @@ namespace PurrNet.NetBench
         public long inputsReceived;
         public double inputsPerSec;
 
+        // Rate counters cover the measurement window; totals cover spawn through final despawn.
+        public double rpcsSentPerSec;
+        public double rpcsReceivedPerSec;
+        public double syncMutationsPerSec;
+        public long rpcsSent;
+        public long rpcsReceived;
+        public long syncMutations;
+        public bool deliveryComplete;
+        public int finalStateObjects;
+        public string finalStateHash;
+
         public int rttSamples;
         public double rttAvgMs;
         public double rttP50Ms;

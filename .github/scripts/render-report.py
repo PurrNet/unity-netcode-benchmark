@@ -206,7 +206,7 @@ TEMPLATE = r"""<meta charset="utf-8">
 
   <section>
     <h2>Run notes</h2>
-    <p>Every netcode runs the same scenario: the server spawns N objects and replicates them to every client. On-wire bytes are read from the network interface (UDP/IP headers, ACKs and resends included). CPU is the whole server process, all threads, as % of one core with the frame loop capped at 60 fps; nothing is subtracted, so the Idle row is what holding N connections costs on its own. Fusion is relay-based (Photon Cloud): its traffic is measured on the public interface, but the server still sends one stream per client, so its downstream is comparable. Round trips are only shown as the difference to each netcode's own Idle round trip, since the absolute value is the route from the client runners to the server (and Fusion's relay), not the netcode. Every session runs all netcodes on the same server machine and the same client machines, so numbers are comparable across netcodes within a session. Every netcode runs with its package defaults except three changes that were needed for it to work at all here, each listed with its default in the README: FishNet's Tugboat packet size lowered from 1350 to 1200 for the 1280-byte tailnet, NGO's Unity Transport packet queue raised from 128 to 4096, and NGO's NetworkTransforms set to unreliable deltas, which is how the other four deliver transforms out of the box.</p>
+<p>Every netcode runs the same scenario: the server spawns N objects and replicates them to every client. On-wire bytes are read from the network interface (UDP/IP headers, ACKs and resends included). CPU is the whole server process, all threads, as % of one core with the frame loop capped at 60 fps; nothing is subtracted, so the Idle row is what holding N connections costs on its own. Fusion is relay-based (Photon Cloud): its traffic is measured on the public interface, but the server still sends one stream per client, so its downstream is comparable. Round trips are only shown as the difference to each netcode's own Idle round trip, since the absolute value is the route from the client runners to the server (and Fusion's relay), not the netcode. Every session runs all netcodes on the same server machine and the same client machines, so numbers are comparable across netcodes within a session. Networking defaults are retained except for the compatibility changes listed in the README: FishNet's Tugboat packet size lowered from 1350 to 1200 for the 1280-byte tailnet, NGO's Unity Transport packet queue raised from 128 to 4096, and NGO's NetworkTransforms set to unreliable deltas, which is how the other four deliver transforms out of the box. Benchmark workload scheduling is also documented there: Mirror uses an application-level tick loop without changing Unity physics timing; the other projects use native ticks. Generated/received counts and final-state checks are diagnostic, not evidence of equal replication freshness or precision.</p>
     <ul id="warnings" class="warnings" hidden></ul>
   </section>
 
@@ -244,7 +244,10 @@ const METRICS = [
   // Absolute round trips are mostly the path (US runners to the EU server, the tailnet, Fusion's relay);
   // the same clients' Idle round trip contains all of that, so the difference is what the netcode adds.
   { id: "rttAdd", label: "RTT added", unit: "ms", lower: true, tol: { abs: 1 }, hint: "client round trip (p50) under this test minus the same clients' Idle round trip; the network path cancels out and what remains is queuing the netcode adds under load", get: (r, t) => t !== "Idle" && r.clients[t] && r.clients.Idle && r.clients[t].rttP50Ms > 0 && r.clients.Idle.rttP50Ms > 0 ? r.clients[t].rttP50Ms - r.clients.Idle.rttP50Ms : null },
-  { id: "inputs", label: "Inputs received", unit: "/s", lower: false, tol: { rel: 0.01 }, hint: "ClientInput only: server RPCs received per second (expected tick × connections)", get: (r, t) => r.server[t] ? r.server[t].inputsPerSec : null }
+  { id: "inputs", label: "Inputs received", unit: "/s", lower: false, diagnostic: true, tol: { rel: 0.01 }, hint: "ClientInput only: server RPCs received per second (expected tick × connections)", get: (r, t) => t === "ClientInput" && r.server[t] ? r.server[t].inputsPerSec : null },
+  { id: "rpcSent", label: "RPCs generated", unit: "/s", lower: false, diagnostic: true, tol: { rel: 0.01 }, hint: "SendRPC only: server broadcasts generated per second before fan-out (expected tick × objects)", get: (r, t) => t === "SendRPC" && r.server[t] ? r.server[t].rpcsSentPerSec : null },
+  { id: "rpcReceived", label: "RPCs received per client", unit: "/s", lower: false, diagnostic: true, tol: { rel: 0.01 }, hint: "SendRPC only: observed receipt rate during the client window; whole-test delivery checks appear in the notes", get: (r, t) => t === "SendRPC" && r.clients[t] ? r.clients[t].rpcsReceivedPerSec : null },
+  { id: "mutations", label: "State mutations generated", unit: "/s", lower: false, diagnostic: true, tol: { rel: 0.01 }, hint: "SyncVars only: fields changed per second before native batching/coalescing (expected tick × objects)", get: (r, t) => t === "SyncVars" && r.server[t] ? r.server[t].syncMutationsPerSec : null }
 ];
 
 const runs = DATA.runs;
@@ -322,7 +325,7 @@ function buildHeader() {
   vers.innerHTML = netcodes.map(n => `<span class="chip"><span class="sw" style="background:var(--s-${n})"></span>${NAMES[n]} <b>${(DATA.versions || {})[n] || "?"}</b></span>`).join("")
     + `<span class="chip">Unity <b>${(DATA.versions || {}).unity || (first && first.meta.unityVersion) || "?"}</b></span>`;
   const f = document.getElementById("footer");
-  f.innerHTML = (DATA.runUrl ? `Source run: <a href="${DATA.runUrl}">${DATA.runUrl}</a> · ` : "") + `Rendered ${DATA.rendered}. Lower is better on every metric except inputs received.`;
+  f.innerHTML = (DATA.runUrl ? `Source run: <a href="${DATA.runUrl}">${DATA.runUrl}</a> · ` : "") + `Rendered ${DATA.rendered}. Lower is better on cost metrics. Workload and receipt rates are diagnostic: compare them with the expected load, not a higher-is-better ranking.`;
 }
 
 // ---- Scorecard: per netcode, how far from the best across the load tests, in one session.
@@ -512,7 +515,7 @@ function baseOptions(t) {
 
 function refresh() {
   const m = metric();
-  document.getElementById("metric-hint").textContent = m.hint + (m.lower ? " · lower is better" : " · higher is better");
+  document.getElementById("metric-hint").textContent = m.hint + (m.diagnostic ? " · workload check, not a ranking" : m.lower ? " · lower is better" : " · higher is better");
   document.getElementById("charts-hint").textContent = "· " + scLabel(state.scenario) + " · click a chart to open its table";
   const colors = netcodes.map(n => css("--s-" + n));
   let empty = 0;
@@ -534,11 +537,11 @@ function buildTable() {
   const m = metric();
   const t = state.test;
   document.getElementById("table-title").textContent = t + " — " + m.label + (state.normalize ? " relative to PurrNet" : (m.unit ? " (" + m.unit + ")" : ""));
-  document.getElementById("table-hint").textContent = TEST_DESC[t] + ". " + m.hint + ". The best value per row is marked, shared when tied, not at all when the whole row ties.";
+  document.getElementById("table-hint").textContent = TEST_DESC[t] + ". " + m.hint + (m.diagnostic ? ". Workload checks are not ranked." : ". The best value per row is marked, shared when tied, not at all when the whole row ties.");
   let html = "<thead><tr><th>Session</th>" + netcodes.map(n => `<th>${NAMES[n]}</th>`).join("") + "</tr></thead><tbody>";
   scenarios.forEach(sc => {
     const vals = netcodes.map(n => value(n, sc, t));
-    const best = bestSet(vals, m.lower, state.normalize ? { rel: 0.02 } : m.tol, v => fmt(v, m.unit));
+    const best = m.diagnostic ? new Set() : bestSet(vals, m.lower, state.normalize ? { rel: 0.02 } : m.tol, v => fmt(v, m.unit));
     html += `<tr><td>${scLabel(sc)}</td>` + netcodes.map((n, i) => {
       const v = vals[i];
       if (v == null) return `<td class="na">–</td>`;
@@ -569,6 +572,17 @@ function buildNotes() {
     // spawn/despawn transition (state delivery lagged); the average still stands, on fewer samples.
     const short = TESTS.filter(t => r.clients[t] && r.clients[t].n < r.meta.measuredClients).map(t => `${t} (${r.clients[t].n}/${r.meta.measuredClients})`);
     if (short.length) items.push(`${where}: measured on fewer clients than connected: ${short.join(", ")}`);
+    const rpc = r.clients.SendRPC;
+    if (rpc && rpc.rpcDeliveryChecked > 0)
+      items.push(`${where}: complete reliable RPC delivery on ${rpc.rpcDeliveryMatched}/${rpc.rpcDeliveryChecked} checked clients (spawn through despawn, including warmup and delivery grace).`);
+    const sync = r.clients.SyncVars;
+    if (sync && sync.syncStateChecked > 0)
+      items.push(`${where}: exact final SyncVar state matched on ${sync.syncStateMatched}/${sync.syncStateChecked} checked clients. A mismatch is diagnostic; native precision and delivery delay need investigation.`);
+    ["SendRPC", "SyncVars"].forEach(t => {
+      const s = r.server[t], c = r.clients[t];
+      if (s && Object.hasOwn(s, "deliveryComplete") && (!s.deliveryComplete || !c || (t === "SendRPC" ? c.rpcDeliveryChecked : c.syncStateChecked) < r.meta.measuredClients))
+        items.push(`${where}: ${t} delivery validation is incomplete; missing checks are not passes.`);
+    });
   }));
   // All netcodes of one session are meant to run on the same server machine; if the CPU models
   // differ the session did not run that way and CPU is not comparable inside it.
