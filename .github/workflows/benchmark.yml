@@ -541,7 +541,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bench-result-${{ inputs.tag }}-client-${{ matrix.idx }}
-          path: results/
+          path: |
+            results/
+            logs/
           if-no-files-found: warn
           retention-days: 14
 
@@ -701,12 +703,17 @@ jobs:
 
       - name: Render summaries
         run: |
+          # Artifacts with a single upload path lose their parent folder, so a netcode's files can
+          # sit at all/<netcode>/ or all/results/<netcode>/; gather them by name into one folder each.
           for n in $NETCODE_LIST; do
-            DIR=$(find all -type d -path "*results/$n" | head -n1)
-            if [ -z "$DIR" ]; then
-              echo "::warning::No results for $n"
+            DIR="agg/$n"
+            mkdir -p "$DIR"
+            find all -type f \( -path "*/$n/server.json" -o -path "*/$n/client-*.json" \) -exec cp -n {} "$DIR/" \;
+            if [ ! -f "$DIR/server.json" ]; then
+              echo "::warning::No server result for $n"
               continue
             fi
+            echo "$n: $(ls "$DIR" | wc -l) result files"
             TOTAL=$(echo "$PLAN" | jq -r --arg n "$n" '.[$n].total')
             bash .github/scripts/bench-aggregate.sh \
               "$DIR" \

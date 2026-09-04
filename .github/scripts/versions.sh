@@ -3,7 +3,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-purrnet=$(jq -r '.version // "?"' purrnet/Assets/PurrNet/package.json 2>/dev/null || echo "?")
+# PurrNet is either vendored under Assets (package.json) or pulled from git via the manifest (#vTAG).
+purrnet=$(jq -r '.version // empty' purrnet/Assets/PurrNet/package.json 2>/dev/null || true)
+[ -n "$purrnet" ] || purrnet=$(jq -r '.dependencies["dev.purrnet.purrnet"] // empty' purrnet/Packages/manifest.json 2>/dev/null | sed -n 's/.*#v\{0,1\}//p')
 fishnet=$(find fishnet/Assets/FishNet -maxdepth 2 -name package.json -exec jq -r '.version // empty' {} \; 2>/dev/null | head -n1)
 mirror=$(tr -d '[:space:]' < mirror/Assets/Mirror/version.txt 2>/dev/null || echo "?")
 ngo=$(jq -r '.dependencies["com.unity.netcode.gameobjects"] // "?"' ngo/Packages/manifest.json 2>/dev/null || echo "?")

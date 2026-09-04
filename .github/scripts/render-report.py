@@ -428,7 +428,7 @@ function buildNotes() {
 // ---- Winners by goal: bandwidth, CPU and GC judged separately per test at the largest size.
 const GOALS = [
   { id: "srvDown", label: "Bandwidth", fmt: v => (v >= 100 ? v.toFixed(0) : v.toFixed(1)) + " KB/s" },
-  { id: "cpu", label: "Server CPU", unit: "%", lower: true, hint: "whole process CPU as % of one core, nothing subtracted", get: (r, t) => r.server[t] ? r.server[t].cpuPercent : null },
+  { id: "cpu", label: "Server CPU", fmt: v => v.toFixed(1) + "%" },
   { id: "gc", label: "GC", fmt: v => v + (v === 1 ? " collection" : " collections") }
 ];
 function metricById(id) { return METRICS.find(m => m.id === id); }
