@@ -85,7 +85,7 @@ framing and batching instead of integer encoding.
 | Downstream / upstream on-wire | interface byte counters (`/proc/net/dev`) read in-process; headers, ACKs and resends included |
 | CPU % | process CPU time, all threads, as % of one core; whole process, nothing subtracted |
 | Frame avg / p95 / p99 | main-thread frame time; 16.7 ms means on budget at 60 fps |
-| GC, heap, peak RSS | `GC.CollectionCount`, `GC.GetTotalMemory`, `/proc/self/status` |
+| GC alloc, collections, heap, peak RSS | the `GC Allocated In Frame` profiler counter summed over the window (all threads), `GC.CollectionCount`, `GC.GetTotalMemory`, `/proc/self/status`; every test starts on a freshly collected heap |
 | RTT p50 / p95 | each netcode's own estimate, sampled on measured clients |
 
 Server figures come from the one server process; client figures are averages over the

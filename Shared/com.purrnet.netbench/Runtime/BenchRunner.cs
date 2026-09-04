@@ -283,6 +283,7 @@ namespace PurrNet.NetBench
 
             ReadTickRate();
 
+            CollectGarbage();
             yield return Window(0, _idleSeconds);
 
             for (int i = 0; i < _tests.Length; i++)
@@ -304,6 +305,7 @@ namespace PurrNet.NetBench
                 yield return new WaitForSecondsRealtime(SlackSeconds);
                 Try(() => _adapter.DespawnAll(), "DespawnAll");
                 ResetMode();
+                CollectGarbage();
                 yield return new WaitForSecondsRealtime(CooldownSeconds);
             }
 
@@ -451,6 +453,18 @@ namespace PurrNet.NetBench
             }
         }
 
+        /// <summary>
+        /// Full collection between tests, outside any window, so the collections and heap growth counted
+        /// inside a window come from that test's own allocations rather than from where the allocator
+        /// happened to be when the window opened.
+        /// </summary>
+        private static void CollectGarbage()
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+        }
+
         /// <summary>Static only checks that untouched objects cost nothing, so it gets the short Idle window.</summary>
         private float WindowSeconds(int test) => test == TestStatic ? _idleSeconds : _benchSeconds;
 
@@ -539,6 +553,8 @@ namespace PurrNet.NetBench
                 avgFps = stats.avgFps,
                 frameCount = stats.frameCount,
                 gcCollections = stats.gcCollections,
+                gcAllocBytes = stats.gcAllocBytes,
+                gcAllocBytesPerSec = stats.gcAllocBytes >= 0 ? stats.gcAllocBytes / wall : -1,
                 managedHeapBytes = stats.managedHeapBytes,
                 peakRssBytes = stats.peakRssBytes,
                 iface = _iface,
@@ -575,7 +591,7 @@ namespace PurrNet.NetBench
             Debug.Log($"[NetBench] {result.name}: objects={result.objects} conns={result.connections} window={result.windowSeconds:F1}s " +
                       $"cpu={result.cpuPercent:F1}% frame={result.avgFrameMs:F2}ms p95={result.p95FrameMs:F2}ms " +
                       $"tx={result.txBytesPerSec:F0}B/s rx={result.rxBytesPerSec:F0}B/s rttP50={result.rttP50Ms:F1}ms " +
-                      $"inputs/s={result.inputsPerSec:F0} gc={result.gcCollections} rss={result.peakRssBytes / 1048576}MB truncated={truncated}");
+                      $"inputs/s={result.inputsPerSec:F0} gc={result.gcCollections} alloc={result.gcAllocBytesPerSec / 1024:F0}KB/s rss={result.peakRssBytes / 1048576}MB truncated={truncated}");
         }
 
         private bool Try(Action action, string what)

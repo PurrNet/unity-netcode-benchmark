@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using Unity.Profiling;
 using UnityEngine;
 
 namespace PurrNet.NetBench
@@ -26,6 +27,8 @@ namespace PurrNet.NetBench
         public double avgFps;
         public int frameCount;
         public int gcCollections;
+        /// <summary>Managed bytes allocated during the window on every thread, or -1 when the counter is unavailable.</summary>
+        public long gcAllocBytes;
         public long managedHeapBytes;
         public long peakRssBytes;
         public double wallSeconds;
@@ -42,6 +45,8 @@ namespace PurrNet.NetBench
         private double _startCpuSeconds;
         private double _startWallSeconds;
         private int _startGcCollections;
+        private ProfilerRecorder _gcAlloc;
+        private long _gcAllocBytes;
         private IfaceCounters _startIface;
         private string _iface;
         private readonly List<float> _frameMs = new List<float>();
@@ -52,6 +57,10 @@ namespace PurrNet.NetBench
             _startCpuSeconds = ReadProcessCpuSeconds();
             _startWallSeconds = NowSeconds();
             _startGcCollections = GC.CollectionCount(0);
+            // Bytes handed out by the managed allocator per frame; collection counts only say when the
+            // collector ran, this says how much garbage was made, however the collections happen to fall.
+            _gcAllocBytes = 0;
+            _gcAlloc = ProfilerRecorder.StartNew(ProfilerCategory.Memory, "GC Allocated In Frame");
             _startIface = ReadIface(iface);
             _frameMs.Clear();
         }
@@ -59,6 +68,8 @@ namespace PurrNet.NetBench
         public void SampleFrame()
         {
             _frameMs.Add(Time.unscaledDeltaTime * 1000f);
+            if (_gcAlloc.Valid)
+                _gcAllocBytes += _gcAlloc.LastValue;
         }
 
         public LoadStats End()
@@ -66,6 +77,7 @@ namespace PurrNet.NetBench
             double cpu = ReadProcessCpuSeconds() - _startCpuSeconds;
             double wall = NowSeconds() - _startWallSeconds;
             var endIface = ReadIface(_iface);
+            _gcAlloc.Dispose();
 
             var stats = new LoadStats
             {
@@ -73,6 +85,7 @@ namespace PurrNet.NetBench
                 peakRssBytes = ReadPeakResidentBytes(),
                 frameCount = _frameMs.Count,
                 gcCollections = GC.CollectionCount(0) - _startGcCollections,
+                gcAllocBytes = _gcAlloc.Valid ? _gcAllocBytes : -1,
                 managedHeapBytes = GC.GetTotalMemory(false),
                 wallSeconds = wall,
                 ifaceDelta = new IfaceCounters

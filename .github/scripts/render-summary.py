@@ -25,7 +25,7 @@ ORDER = ["purrnet", "fishnet", "mirror", "ngo", "fusion"]
 NAMES = {"purrnet": "PurrNet", "fishnet": "FishNet", "mirror": "Mirror", "ngo": "NGO", "fusion": "Fusion"}
 # Tests that carry real load; Idle and Static sit at the noise floor.
 SCORE_TESTS = ["MoveY", "MoveWander", "SyncVars", "SendRPC", "ClientInput", "SpawnChurn"]
-GOALS = [("srvDown", 0.0), ("cpu", 0.5), ("gc", 0.0)]
+GOALS = [("srvDown", 0.0), ("cpu", 0.5), ("alloc", 0.0)]
 
 SERIES = {
     "light": {"purrnet": "#eb6834", "fishnet": "#2a78d6", "mirror": "#1baf7a", "ngo": "#eda100", "fusion": "#e87ba4"},
@@ -45,7 +45,9 @@ def metric(r, mid, t):
     s = r.get("server", {}).get(t)
     if not s:
         return None
-    return {"srvDown": s.get("txBytesPerSec"), "cpu": s.get("cpuPercent"), "gc": s.get("gcCollections")}[mid]
+    alloc = s.get("gcAllocBytesPerSec")
+    return {"srvDown": s.get("txBytesPerSec"), "cpu": s.get("cpuPercent"), "gc": s.get("gcCollections"),
+            "alloc": alloc if alloc is not None and alloc >= 0 else None}[mid]
 
 
 def geomean(xs):
@@ -73,7 +75,7 @@ def scorecard(netcodes, by, sc):
             for n, v in vals:
                 if v - best <= tol:
                     wins[n] += 1
-                if g != "gc" and best > 0:
+                if best > 0:
                     rel[g][n].append(v / best)
     rows = {}
     for n in netcodes:
@@ -82,6 +84,7 @@ def scorecard(netcodes, by, sc):
         rows[n] = {
             "bw": geomean(rel["srvDown"][n]),
             "cpu": geomean(rel["cpu"][n]),
+            "alloc": geomean(rel["alloc"][n]),
             "gc": sum(r["server"][t].get("gcCollections", 0) for t in have) if have else None,
             "p99": max(r["server"][t].get("p99FrameMs", 0) for t in have) if have else None,
             "wins": wins[n] if r else None,
@@ -228,13 +231,14 @@ def main():
     # Block 1: scorecard at the reference session.
     rows = scorecard(netcodes, by, ref)
     t1 = f"At a glance, {ref[0]} connections @ {ref[1]} Hz"
-    cols1 = ["Bandwidth", "Server CPU", "GC", "Frame p99", "Wins"]
+    cols1 = ["Bandwidth", "Server CPU", "GC alloc", "Collections", "Frame p99", "Wins"]
     bw = mark_best([(rows[n]["bw"], fmt_x(rows[n]["bw"])) for n in netcodes])
     cpu = mark_best([(rows[n]["cpu"], fmt_x(rows[n]["cpu"])) for n in netcodes])
+    alloc = mark_best([(rows[n]["alloc"], fmt_x(rows[n]["alloc"])) for n in netcodes])
     gc = mark_best([(rows[n]["gc"], "–" if rows[n]["gc"] is None else str(rows[n]["gc"])) for n in netcodes])
     p99 = mark_best([(rows[n]["p99"], "–" if rows[n]["p99"] is None else f"{rows[n]['p99']:.2f} ms") for n in netcodes])
     wins = mark_best([(rows[n]["wins"], "–" if rows[n]["wins"] is None else f"{rows[n]['wins']} / {len(SCORE_TESTS) * len(GOALS)}") for n in netcodes], lower=False)
-    rows1 = [(NAMES[n], colors[n], [bw[i], cpu[i], gc[i], p99[i], wins[i]]) for i, n in enumerate(netcodes)]
+    rows1 = [(NAMES[n], colors[n], [bw[i], cpu[i], alloc[i], gc[i], p99[i], wins[i]]) for i, n in enumerate(netcodes)]
     note1 = "× best netcode, geometric mean over the load tests; lower is better"
 
     # Block 2: how it scales.
@@ -272,7 +276,7 @@ def main():
     else:
         for title, note, cols, rows_ in blocks:
             lines += md_table(title, note, cols, rows_)
-    lines.append(f"Bandwidth is server downstream on-wire and CPU is the whole server process; both are shown as a multiple of the best netcode in each of the {len(SCORE_TESTS)} load tests, averaged (geometric mean), so 1.00× is best everywhere. Wins counts tests won on bandwidth, CPU or GC.")
+    lines.append(f"Bandwidth is server downstream on-wire, CPU is the whole server process and GC alloc is managed bytes allocated per second; each is shown as a multiple of the best netcode in each of the {len(SCORE_TESTS)} load tests, averaged (geometric mean), so 1.00× is best everywhere. Collections is the count over those tests, each starting on a freshly collected heap. Wins counts tests won on bandwidth, CPU or allocation.")
     links = []
     if args.report_url:
         links.append(f"[interactive report]({args.report_url})")

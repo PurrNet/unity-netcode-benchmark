@@ -32,6 +32,9 @@ namespace PurrNet.NetBench
         public double avgFps;
         public int frameCount;
         public int gcCollections;
+        /// <summary>Managed bytes allocated during the window (all threads); -1 when the profiler counter is unavailable.</summary>
+        public long gcAllocBytes;
+        public double gcAllocBytesPerSec;
         public long managedHeapBytes;
         public long peakRssBytes;
 

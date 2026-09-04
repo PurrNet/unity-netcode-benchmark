@@ -236,7 +236,8 @@ const METRICS = [
   { id: "p95", label: "Frame p95", unit: "ms", lower: true, hint: "server main-thread frame time, 95th percentile (16.7 ms = on budget)", get: (r, t) => r.server[t] ? r.server[t].p95FrameMs : null },
   { id: "p99", label: "Frame p99", unit: "ms", lower: true, hint: "server main-thread frame time, 99th percentile", get: (r, t) => r.server[t] ? r.server[t].p99FrameMs : null },
   { id: "pkts", label: "Packets out", unit: "/s", lower: true, hint: "server datagrams sent per second", get: (r, t) => r.server[t] ? r.server[t].txPacketsPerSec : null },
-  { id: "gc", label: "GC collections", unit: "", lower: true, hint: "server GC collections during the window", get: (r, t) => r.server[t] ? r.server[t].gcCollections : null },
+  { id: "alloc", label: "GC alloc", unit: "KB/s", lower: true, hint: "managed bytes the server allocates per second, all threads; the garbage the collections are made of", get: (r, t) => r.server[t] && r.server[t].gcAllocBytesPerSec >= 0 ? r.server[t].gcAllocBytesPerSec / 1024 : null },
+  { id: "gc", label: "GC collections", unit: "", lower: true, hint: "server GC collections during the window (each test starts on a freshly collected heap)", get: (r, t) => r.server[t] ? r.server[t].gcCollections : null },
   { id: "rss", label: "Peak RSS", unit: "MB", lower: true, hint: "server peak resident memory", get: (r, t) => r.server[t] ? r.server[t].peakRssBytes / 1048576 : null },
   { id: "rtt50", label: "RTT p50", unit: "ms", lower: true, hint: "client-side, netcode-reported round trip (Fusion includes the relay hop)", get: (r, t) => r.clients[t] ? r.clients[t].rttP50Ms : null },
   { id: "rtt95", label: "RTT p95", unit: "ms", lower: true, hint: "client-side, netcode-reported round trip", get: (r, t) => r.clients[t] ? r.clients[t].rttP95Ms : null },
@@ -306,7 +307,7 @@ function buildHeader() {
 const GOALS = [
   { id: "srvDown", label: "Bandwidth", tol: 0 },
   { id: "cpu", label: "Server CPU", tol: 0.5 },
-  { id: "gc", label: "GC", tol: 0 }
+  { id: "alloc", label: "GC alloc", tol: 0 }
 ];
 function score(sc) {
   // rel[goal][netcode] = per-test ratios of value / best value in that test; wins = tests won.
@@ -318,8 +319,7 @@ function score(sc) {
     const best = Math.min(...vals.map(x => x.v));
     vals.forEach(x => {
       if (x.v - best <= g.tol) wins[g.id][x.n]++;
-      // GC is a small integer that is often 0 or 1; a ratio to the best is meaningless there.
-      if (g.id !== "gc" && best > 0) rel[g.id][x.n].push(x.v / best);
+      if (best > 0) rel[g.id][x.n].push(x.v / best);
     });
   }));
   return { rel, wins };
@@ -334,6 +334,7 @@ function buildScorecard() {
       n,
       bw: geomean(rel.srvDown[n]),
       cpu: geomean(rel.cpu[n]),
+      alloc: geomean(rel.alloc[n]),
       gc: have.length ? have.reduce((a, t) => a + r.server[t].gcCollections, 0) : null,
       p99: have.length ? Math.max(...have.map(t => r.server[t].p99FrameMs)) : null,
       rss: have.length ? Math.max(...have.map(t => r.server[t].peakRssBytes / 1048576)) : null,
@@ -344,16 +345,16 @@ function buildScorecard() {
   const best = key => { const v = rows.map(r => r[key]).filter(x => x != null); return v.length > 1 ? Math.min(...v) : null; };
   const bestWins = Math.max(...rows.map(r => r.wins));
   const cell = (r, key, f, lowerBest = true) => r[key] == null ? `<td class="na">–</td>` : `<td class="${(lowerBest ? r[key] === best(key) : r[key] === bestWins) ? "best" : ""}">${f(r[key])}</td>`;
-  const cols = ["Netcode", "Bandwidth", "Server CPU", "GC / window", "Frame p99", "Peak RSS", "Wins"];
+  const cols = ["Netcode", "Bandwidth", "Server CPU", "GC alloc", "Collections", "Frame p99", "Peak RSS", "Wins"];
   document.getElementById("scorecard").innerHTML =
     "<thead><tr>" + cols.map(c => `<th>${c}</th>`).join("") + "</tr></thead><tbody>" +
     rows.map(r => `<tr><td class="name">${chip(r.n)}${r.conns != null && r.conns !== sc.size ? `<span class="sub">${r.conns} clients</span>` : ""}</td>` +
-      cell(r, "bw", fmtX) + cell(r, "cpu", fmtX) + cell(r, "gc", v => String(v)) + cell(r, "p99", v => v.toFixed(2) + " ms") + cell(r, "rss", v => v.toFixed(0) + " MB") +
+      cell(r, "bw", fmtX) + cell(r, "cpu", fmtX) + cell(r, "alloc", fmtX) + cell(r, "gc", v => String(v)) + cell(r, "p99", v => v.toFixed(2) + " ms") + cell(r, "rss", v => v.toFixed(0) + " MB") +
       cell(r, "wins", v => v + " / " + (SCORE_TESTS.length * GOALS.length), false) + "</tr>").join("") + "</tbody>";
   document.getElementById("score-hint").textContent =
     scLabel(sc) + ". Bandwidth (server downstream) and server CPU are the geometric mean over the " + SCORE_TESTS.length +
     " load tests of this netcode's value divided by the best netcode's value in that test: 1.00× is the best in every test, 2× is twice the best on average. " +
-    "GC is the sum of collections over those tests; frame p99 and peak RSS are the worst of them. Wins counts tests where the netcode had the lowest bandwidth, CPU (within 0.5 points) or GC; ties share the win.";
+    "GC alloc is the same ratio for managed bytes allocated per second. Collections is the sum over those tests; frame p99 and peak RSS are the worst of them. Wins counts tests where the netcode had the lowest bandwidth, CPU (within 0.5 points) or allocation; ties share the win.";
 }
 
 // ---- How it scales: multiplier between the smallest and largest connection count (at the base tick)

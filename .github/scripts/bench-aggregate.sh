@@ -51,11 +51,11 @@ if [ -f "$SERVER_FILE" ]; then
     | "Window: '"$WINDOW"'s · Objects: '"$OBJECTS"' · Measured clients: '"${#CLIENT_FILES[@]}"' · Server CPU: \($run.cpuModel) x\($run.cpuCount) · Tick: \($run.tickRate) Hz · \(if $run.devBuild then "Development" else "Release" end) build · Connected at start: \($run.connectedAtStart)/\($run.expectedClients)"
       + (if ($run.error // "") != "" then "\n\n> ⚠️ Server reported: `\($run.error)`" else "" end)
       + "\n\n### Server\n\n"
-      + "| Test | Objects | Conns | Down on-wire | Per-conn down | Up on-wire | Pkts out/s | Inputs in/s | CPU | Avg frame | p95 | p99 | GC | Heap | Peak RSS |\n"
-      + "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n"
+      + "| Test | Objects | Conns | Down on-wire | Per-conn down | Up on-wire | Pkts out/s | Inputs in/s | CPU | Avg frame | p95 | p99 | GC | Alloc | Heap | Peak RSS |\n"
+      + "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n"
       + ( [ $run.tests[]
             | (if .connections > 0 then .txBytesPerSec / .connections else null end) as $perConn
-            | "| \(.name)\(if .truncated then " ⚠️" else "" end) | \(.objects) | \(.connections) | \(.txBytesPerSec|hbR) | \($perConn|hbR) | \(.rxBytesPerSec|hbR) | \(.txPacketsPerSec|floor) | \(if (.inputsPerSec // 0) > 0 then (.inputsPerSec|floor) else "-" end) | \(.cpuPercent|r1)% | \(.avgFrameMs|r2) ms | \(.p95FrameMs|r2) ms | \(.p99FrameMs|r2) ms | \(.gcCollections) | \(.managedHeapBytes|mb) | \(.peakRssBytes|mb) |"
+            | "| \(.name)\(if .truncated then " ⚠️" else "" end) | \(.objects) | \(.connections) | \(.txBytesPerSec|hbR) | \($perConn|hbR) | \(.rxBytesPerSec|hbR) | \(.txPacketsPerSec|floor) | \(if (.inputsPerSec // 0) > 0 then (.inputsPerSec|floor) else "-" end) | \(.cpuPercent|r1)% | \(.avgFrameMs|r2) ms | \(.p95FrameMs|r2) ms | \(.p99FrameMs|r2) ms | \(.gcCollections) | \(if (.gcAllocBytesPerSec // -1) >= 0 then (.gcAllocBytesPerSec|hbR) else "-" end) | \(.managedHeapBytes|mb) | \(.peakRssBytes|mb) |"
           ] | join("\n") )
       + "\n\nOn-wire = bytes on the `\($run.tests[0].iface // "?")` interface (UDP/IP headers, ACKs and resends included). CPU = whole process, all threads, % of one core; frame loop capped at \($run.targetFps) fps.\n"
       # CPU-by-marker table (Development builds only): top markers by peak per-frame µs, one column per test.
