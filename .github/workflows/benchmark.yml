@@ -15,7 +15,7 @@ name: Benchmark
 # Fusion sessions share one Photon CCU plan, so two connection counts must not run Fusion at once.
 #
 # Every process runs the same BenchRunner scenario (Shared/com.purrnet.netbench): Idle window, then
-# the eight tests with `bench_objects` objects each, `bench_seconds` of steady state per test.
+# the seven tests with `bench_objects` objects each, `bench_seconds` of steady state per test.
 # Results are per-process JSON files aggregated per netcode by bench-aggregate.sh.
 #
 # Job budget: server (1) + measured (N) + loadgen (M) must fit the runner pool's concurrency
@@ -53,9 +53,9 @@ on:
         required: false
         default: "100"
       bench_seconds:
-        description: "Steady-state measurement window per test, seconds"
+        description: "Steady-state measurement window per test, seconds (Idle and Static always use 5)"
         required: true
-        default: "20"
+        default: "10"
       bench_objects:
         description: "Objects spawned per test (moving objects / RPC emitters)"
         required: true

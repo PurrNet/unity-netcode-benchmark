@@ -66,7 +66,6 @@ The server spawns `N` objects (100 by default) and replicates them to every clie
 | Test | Per object, every tick |
 |---|---|
 | MoveY | sine movement on Y |
-| MoveAllAxis | sine movement on a random 3D axis |
 | MoveWander | wander steering, position and rotation |
 | SendRPC | one observers RPC carrying one `float` |
 | Static | nothing; objects are spawned and never touched |
@@ -95,7 +94,8 @@ single-process measured clients (the remaining connections run as load generator
 ## Running it
 
 Dispatch **Netcode Scaling Benchmark** (`.github/workflows/scaling.yml`). Defaults run all five
-netcodes in three sessions, `10@20,100@20,100@60` (connections@tickHz), with 20-second windows.
+netcodes in three sessions, `10@20,100@20,100@60` (connections@tickHz), with 10-second windows
+(Idle and Static use 5, since they only check the floor).
 Inside a session the five netcodes run back to back on the same server machine and the same
 client machines; sessions run one after another on the dedicated server, about 40 minutes each.
 Useful inputs: `netcodes`, `sessions`, `bench_seconds`, `bench_objects`, `profiling`
@@ -103,7 +103,7 @@ Useful inputs: `netcodes`, `sessions`, `bench_seconds`, `bench_objects`, `profil
 `runner` and `loadgen_runner` pick the machines; the defaults below are the published setup.
 
 Quick reference run while iterating on one netcode: `netcodes: purrnet`, `sessions: 10,100`,
-`bench_seconds: 10` (about 12 minutes).
+`bench_seconds: 5` (about 8 minutes).
 
 Each run renders the job summary, uploads raw per-process JSON as the `benchmark-results`
 artifact, and commits `docs/index.html` (interactive report), `docs/latest.json` and the
@@ -121,7 +121,7 @@ How a session works: one server runner and the client runners meet over a Tailsc
 stay up for the whole session. The server announces which netcode is next on a small HTTP endpoint,
 every runner launches that netcode's player, and every process is the same harness driven by
 `Shared/com.purrnet.netbench` (`-role server|client`), which waits for all clients, runs the Idle
-window and the eight tests, writes JSON and quits. Clients detect the active test from the spawned
+window and the seven tests, writes JSON and quits. Clients detect the active test from the spawned
 objects themselves, so no cross-netcode signalling is needed inside a netcode. Locally:
 
 ```bash

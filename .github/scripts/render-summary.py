@@ -24,7 +24,7 @@ from pathlib import Path
 ORDER = ["purrnet", "fishnet", "mirror", "ngo", "fusion"]
 NAMES = {"purrnet": "PurrNet", "fishnet": "FishNet", "mirror": "Mirror", "ngo": "NGO", "fusion": "Fusion"}
 # Tests that carry real load; Idle and Static sit at the noise floor.
-SCORE_TESTS = ["MoveY", "MoveAllAxis", "MoveWander", "SyncVars", "SendRPC", "ClientInput", "SpawnChurn"]
+SCORE_TESTS = ["MoveY", "MoveWander", "SyncVars", "SendRPC", "ClientInput", "SpawnChurn"]
 GOALS = [("srvDown", 0.0), ("cpu", 0.5), ("gc", 0.0)]
 
 SERIES = {

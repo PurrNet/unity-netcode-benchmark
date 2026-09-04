@@ -217,15 +217,15 @@ const DATA = __DATA__;
 
 const ORDER = ["purrnet", "fishnet", "mirror", "ngo", "fusion"];
 const NAMES = { purrnet: "PurrNet", fishnet: "FishNet", mirror: "Mirror", ngo: "NGO", fusion: "Fusion" };
-const TESTS = ["Idle", "MoveY", "MoveAllAxis", "MoveWander", "SyncVars", "SendRPC", "ClientInput", "Static", "SpawnChurn"];
+const TESTS = ["Idle", "MoveY", "MoveWander", "SyncVars", "SendRPC", "ClientInput", "Static", "SpawnChurn"];
 const TEST_DESC = {
-  Idle: "baseline · connected, nothing spawned", MoveY: "replication · N objects, sine on Y", MoveAllAxis: "replication · N objects, sine on a random axis",
+  Idle: "baseline · connected, nothing spawned", MoveY: "replication · N objects, sine on Y",
   MoveWander: "replication · N objects, wander (position + rotation)", SyncVars: "replication · N objects, 1 synced field changed per tick",
   SendRPC: "messaging · N objects, 1 observers RPC (float) per tick", ClientInput: "messaging · 1 object, each client sends 1 RPC per tick",
   Static: "lifecycle · N objects, never touched", SpawnChurn: "lifecycle · N alive, N/50 despawned + spawned per tick"
 };
 // Tests that carry real load; Idle and Static sit at the noise floor and would only add noise to averages.
-const SCORE_TESTS = ["MoveY", "MoveAllAxis", "MoveWander", "SyncVars", "SendRPC", "ClientInput", "SpawnChurn"];
+const SCORE_TESTS = ["MoveY", "MoveWander", "SyncVars", "SendRPC", "ClientInput", "SpawnChurn"];
 const kb = v => v == null ? null : v / 1024;
 const METRICS = [
   { id: "srvDown", label: "Server downstream", unit: "KB/s", lower: true, hint: "bytes the server puts on the wire to all clients", get: (r, t) => kb(r.server[t] && r.server[t].txBytesPerSec) },

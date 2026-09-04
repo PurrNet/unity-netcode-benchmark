@@ -85,7 +85,7 @@ if [ ${#CLIENT_FILES[@]} -gt 0 ]; then
     | ([ $runs[].tests[].name ] | unique) as $names
     | "### Measured clients (avg of \($n))\n\n"
       + "| Test | Down per client | Up per client | RTT avg | RTT p50 | RTT p95 | RTT p99 | Samples | Truncated |\n|---|---|---|---|---|---|---|---|---|\n"
-      + ( [ ("Idle", "MoveY", "MoveAllAxis", "MoveWander", "SendRPC", "Static", "SpawnChurn", "ClientInput", "SyncVars") as $name
+      + ( [ ("Idle", "MoveY", "MoveWander", "SendRPC", "Static", "SpawnChurn", "ClientInput", "SyncVars", "MoveAllAxis") as $name
             | [ $runs[].tests[] | select(.name == $name) ] as $rows
             | select(($rows | length) > 0)
             | "| \($name) | \($rows | avg(.rxBytesPerSec) | hbR) | \($rows | avg(.txBytesPerSec) | hbR) | \($rows | avg(.rttAvgMs) | r2) ms | \($rows | avg(.rttP50Ms) | r2) ms | \($rows | avg(.rttP95Ms) | r2) ms | \($rows | avg(.rttP99Ms) | r2) ms | \($rows | map(.rttSamples) | add) | \([ $rows[] | select(.truncated) ] | length)/\($rows | length) |"

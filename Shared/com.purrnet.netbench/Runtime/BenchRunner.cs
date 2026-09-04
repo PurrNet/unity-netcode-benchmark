@@ -23,8 +23,8 @@ namespace PurrNet.NetBench
     ///
     /// Arguments:
     ///   -role server|client   -count N (server: expected clients)   -serverHost H  -port P
-    ///   -session S -region R -photonAppId ID (relay netcodes)       -tests 1,2,3,4,5,6,7,8
-    ///   -benchSeconds S (20)  -warmupSeconds S (3)  -idleSeconds S (5)  -benchObjects N (100)
+    ///   -session S -region R -photonAppId ID (relay netcodes)       -tests 1,3,4,5,6,7,8 (2 = MoveAllAxis is opt-in)
+    ///   -benchSeconds S (10)  -warmupSeconds S (3)  -idleSeconds S (5, also the Static window)  -benchObjects N (100)
     ///   -tickRate HZ (0 = the project's configured rate; applied to the netcode before it starts)
     ///   -connectTimeout S (120)  -maxRunSeconds S (900)  -fps N (60)  -netIface NAME (auto)
     ///   -results PATH  -loadgen (client is load only, not a measured sample)
@@ -112,7 +112,7 @@ namespace PurrNet.NetBench
             _loadgen = CommandLine.Has("-loadgen");
             _expectedClients = CommandLine.GetInt("-count", 1);
             _objects = CommandLine.GetInt("-benchObjects", 100);
-            _benchSeconds = CommandLine.GetFloat("-benchSeconds", 20f);
+            _benchSeconds = CommandLine.GetFloat("-benchSeconds", 10f);
             _warmupSeconds = CommandLine.GetFloat("-warmupSeconds", 3f);
             _idleSeconds = CommandLine.GetFloat("-idleSeconds", 5f);
             _connectTimeout = CommandLine.GetFloat("-connectTimeout", 120f);
@@ -122,7 +122,8 @@ namespace PurrNet.NetBench
             _iface = ResolveIface(CommandLine.Get("-netIface"));
 
             var tests = new List<int>();
-            foreach (var part in CommandLine.Get("-tests", "1,2,3,4,5,6,7,8").Split(','))
+            // MoveAllAxis (2) measures the same as MoveY on every netcode so far; run it with -tests when wanted.
+            foreach (var part in CommandLine.Get("-tests", "1,3,4,5,6,7,8").Split(','))
             {
                 if (int.TryParse(part.Trim(), out var t) && t > 0 && t < TestNames.Length)
                     tests.Add(t);
@@ -297,7 +298,7 @@ namespace PurrNet.NetBench
 
                 Debug.Log($"[NetBench] Test {test} {TestNames[test]}: spawned {spawned} objects (mode={BenchRegistry.Mode}, movement={BenchRegistry.MovementEnabled}), warming up {_warmupSeconds}s");
                 yield return new WaitForSecondsRealtime(_warmupSeconds);
-                yield return Window(test, _benchSeconds);
+                yield return Window(test, WindowSeconds(test));
 
                 // Let late-starting client windows finish before the objects vanish.
                 yield return new WaitForSecondsRealtime(SlackSeconds);
@@ -353,7 +354,6 @@ namespace PurrNet.NetBench
                 yield return Window(0, _idleSeconds);
 
             var remaining = new List<int>(_tests);
-            float clientWindow = Mathf.Max(1f, _benchSeconds - 1f);
 
             bool disconnected = false;
             while (remaining.Count > 0)
@@ -389,7 +389,8 @@ namespace PurrNet.NetBench
                 ApplyMode(test);
                 Debug.Log($"[NetBench] Test {test} {TestNames[test]} detected ({BenchRegistry.Count(slot)} objects, mode={BenchRegistry.Mode}), warming up {_warmupSeconds}s");
                 yield return new WaitForSecondsRealtime(_warmupSeconds);
-                yield return Window(test, clientWindow);
+                // Slightly shorter than the server's window so the client never measures past a despawn.
+                yield return Window(test, Mathf.Max(1f, WindowSeconds(test) - 1f));
                 remaining.Remove(test);
 
                 // Nothing left to observe after the last test; a relay client may never see the
@@ -449,6 +450,9 @@ namespace PurrNet.NetBench
                 Application.targetFrameRate = _fps;
             }
         }
+
+        /// <summary>Static only checks that untouched objects cost nothing, so it gets the short Idle window.</summary>
+        private float WindowSeconds(int test) => test == TestStatic ? _idleSeconds : _benchSeconds;
 
         private IEnumerator Window(int test, float seconds)
         {
