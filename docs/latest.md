@@ -7,27 +7,27 @@ _Last run 2026-09-04: PurrNet 1.23.0-beta.26 · FishNet 4.7.3 · Mirror 96.0.1 �
 
 <details><summary>Same tables as text</summary>
 
-**At a glance, 100 connections @ 20 Hz** (× best netcode, geometric mean over the load tests; lower is better)
+**At a glance, 100 connections @ 20 Hz** (averages over the load tests; lower is better)
 
-| Netcode | Bandwidth | Server CPU | Collections | Frame p99 | Wins |
-|---|---:|---:|---:|---:|---:|
-| PurrNet | **1.07×** | 1.20× | **5** | **16.7 ms** | **8 / 12** |
-| FishNet | 1.29× | **1.11×** | 82 | 17.5 ms | 5 / 12 |
-| Mirror | 2.39× | 1.86× | 52 | **16.7 ms** | 0 / 12 |
-| NGO | 2.56× | 5.37× | 12 | 46.5 ms | 1 / 12 |
-| Fusion | 2.08× | 2.60× | 24 | **16.7 ms** | 0 / 12 |
+| Netcode | Bandwidth | Server CPU | GC alloc | Collections | Frame p99 | Wins |
+|---|---:|---:|---:|---:|---:|---:|
+| PurrNet | **1.27 MB/s** | 8.0% | 978 KB/s | **4** | **16.7 ms** | **11 / 18** |
+| FishNet | 1.56 MB/s | **6.9%** | **783 KB/s** | 80 | 17.5 ms | 7 / 18 |
+| Mirror | 2.67 MB/s | 11.9% | 3.41 MB/s | 53 | **16.7 ms** | 0 / 18 |
+| NGO (stalled 4/6) | – | – | – | 11 | 51.2 ms | 2 / 18 |
+| Fusion | 2.47 MB/s | 16.8% | 953 KB/s | 25 | **16.7 ms** | 1 / 18 |
 
-**How it scales** (cost multiplier; linear = 10.0× for 10 → 100 conn, linear = 3.00× for 20 → 60 Hz)
+**What one more costs** (marginal server cost; 10 → 100 connections at 20 Hz; 20 → 60 Hz at 100 connections)
 
-| Netcode | Bandwidth 10 → 100 conn | Server CPU 10 → 100 conn | Bandwidth 20 → 60 Hz | Server CPU 20 → 60 Hz |
+| Netcode | Bandwidth per conn | Server CPU per conn | Bandwidth per Hz | Server CPU per Hz |
 |---|---:|---:|---:|---:|
-| PurrNet | 9.92× | 3.55× | 1.42× | 1.48× |
-| FishNet | 10.0× | **3.47×** | 1.92× | 1.82× |
-| Mirror | 10.3× | 4.86× | 1.26× | 1.52× |
-| NGO | **6.90×** | 8.14× | **0.33×** | **0.65×** |
-| Fusion | 10.0× | **3.43×** | 3.07× | 3.64× |
+| PurrNet | **13.0 KB/s** | 0.064 pts | 23.3 KB/s | **0.116 pts** |
+| FishNet | 16.0 KB/s | **0.053 pts** | 56.2 KB/s | 0.171 pts |
+| Mirror | 27.4 KB/s | 0.104 pts | **16.6 KB/s** | 0.153 pts |
+| NGO | – | – | – | – |
+| Fusion | 25.3 KB/s | 0.134 pts | 146 KB/s | 0.969 pts |
 
 </details>
 
-Bandwidth is server downstream on-wire, CPU is the whole server process and GC alloc is managed bytes allocated per second; each is shown as a multiple of the best netcode in each of the 6 load tests, averaged (geometric mean), so 1.00× is best everywhere. Collections is the count over those tests, each starting on a freshly collected heap. Wins counts tests won on bandwidth, CPU or allocation.
-Every metric per test (bandwidth, CPU, frame times, RTT, GC, memory) and every session are in the [interactive report](https://purrnet.github.io/unity-netcode-benchmark/), [workflow run](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/33889595415), [raw datapoints](latest.json).
+Averages over the 6 load tests: bandwidth is server downstream on-wire to all clients, CPU is the whole server process as a share of one core, GC alloc is managed bytes allocated per second. Collections is the count over those tests, each starting on a freshly collected heap. Wins counts tests won on bandwidth, CPU or allocation. A test is a stall when the server's frame p99 passed twice the 60 fps budget, it dropped more than a sixth of its frames, it lost clients, or its memory ran to four times its Idle footprint: it wins nothing and is left out of the averages.
+Every metric per test (bandwidth, CPU, frame times, RTT, GC, memory) and every session are in the [interactive report](https://purrnet.github.io/unity-netcode-benchmark/), [workflow run](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/33908349862), [raw datapoints](latest.json).
