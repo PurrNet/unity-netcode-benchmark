@@ -89,7 +89,7 @@ class DeliveryReportChecks(unittest.TestCase):
                 self.assertIn({'time': '900s time', 'harness_time': '780s harness time',
                                'crash': 'did not complete', 'host_oom': 'infrastructure failure'}.get(case, '8 GiB memory'), error)
 
-    def test_scoring_distinguishes_inherited_rss_stalls_and_incomplete_runs_for_every_netcode(self):
+    def test_completion_is_independent_of_speed_and_inherited_rss_for_every_netcode(self):
         spec = importlib.util.spec_from_file_location('summary', SCRIPTS / 'render-summary.py')
         summary = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(summary)
@@ -130,10 +130,21 @@ for (const n of netcodes) {
     r.server[t] = saved;
   }
   state.category = 'state';
-  assert.equal(stalledAnywhere(n, sc), false); // 52 GiB inherited VmHWM isn't a local stall.
+  assert.equal(runFailure(n, sc), null); // Lifetime RSS does not establish non-completion.
   r.server.SendRPC.p99FrameMs = 9000;
-  assert.equal(stalled(n, sc, 'SendRPC'), true);
-  assert.equal(stalled(n, sc, 'ClientInput'), false);
+  r.server.SendRPC.avgFps = 0.18;
+  state.category = 'messaging';
+  buildScorecard();
+  assert.equal(categoryFailure(n, sc, ['SendRPC']), null);
+  assert.equal(unscored(n, sc, 'SendRPC'), false);
+  assert.equal(marginal(n, sc, sc, 'cpu', 1), 0);
+  assert.ok(!elements.scorecard.innerHTML.includes('Did not complete'));
+  assert.ok(elements.scorecard.innerHTML.includes('9000.0 ms'));
+  r.server.SendRPC.deliveryComplete = false;
+  assert.ok(categoryFailure(n, sc, ['SendRPC']));
+  assert.equal(marginal(n, sc, sc, 'cpu', 1), null);
+  r.server.SendRPC.deliveryComplete = true;
+  r.server.SendRPC.avgFps = 60;
   r.server.SendRPC.p99FrameMs = 16.7;
   r.meta.serverError = 'resource limit exceeded (8 GiB memory)';
   buildScorecard();
@@ -142,7 +153,6 @@ for (const n of netcodes) {
   assert.ok(elements.warnings.innerHTML.includes(r.meta.serverError));
   assert.ok(runFailure(n, sc));
   assert.equal(marginal(n, sc, sc, 'cpu', 1), null);
-  assert.equal(stalledAnywhere(n, sc), false); // Failure is not "stalled 6/6".
   delete r.meta.serverError;
   const saved = r.server.SyncVars;
   delete r.server.SyncVars;
@@ -170,10 +180,19 @@ for (const n of netcodes) {
                         self.assertEqual(row['cpu'] is None, tests == failed_tests)
                         self.assertNotIn('wins', row)
                         self.assertEqual(bool(row['error']), tests == failed_tests)
-            self.assertFalse(summary.stalled_anywhere(r))
+            self.assertIsNone(summary.run_failure(r))
             r['server']['SendRPC']['p99FrameMs'] = 9000
-            self.assertTrue(summary.stalled(r, 'SendRPC'))
-            self.assertFalse(summary.stalled(r, 'ClientInput'))
+            r['server']['SendRPC']['avgFps'] = 0.18
+            row = summary.scorecard([n], by, (100, 60), ['SendRPC'])[n]
+            self.assertIsNone(row['error'])
+            self.assertEqual(row['p99'], 9000)
+            self.assertIsNotNone(row['cpu'])
+            self.assertEqual(summary.marginal(by, n, (100, 60), (100, 60), 'cpu', 1), 0)
+            r['server']['SendRPC']['deliveryComplete'] = False
+            self.assertIsNotNone(summary.category_failure(r, ['SendRPC']))
+            self.assertIsNone(summary.marginal(by, n, (100, 60), (100, 60), 'cpu', 1))
+            r['server']['SendRPC']['deliveryComplete'] = True
+            r['server']['SendRPC']['avgFps'] = 60
             r['server']['SendRPC']['p99FrameMs'] = 16.7
             for failure in ('resource', 'missing', 'truncated'):
                 item = copy.deepcopy(r)
@@ -187,7 +206,7 @@ for (const n of netcodes) {
                 self.assertIsNone(rows[n]['bw'])
                 self.assertIsNone(rows[n]['cpu'])
                 self.assertNotIn('wins', rows[n])
-                self.assertEqual(rows[n]['stalls'], 0)
+                self.assertIsNotNone(rows[n]['error'])
 
     def test_chart_selector_excludes_single_test_diagnostics_and_rtt(self):
         tests = ('Idle', 'MoveY', 'MoveWander', 'SyncVars', 'SendRPC', 'ClientInput', 'Static', 'SpawnChurn')
@@ -242,7 +261,7 @@ assert.ok(!elements.warnings.innerHTML.includes('state matched'));
 if (DATA.runs.length === 1) assert.equal(elements.warnings.hidden, true);
 buildScorecard();
 assert.ok(elements['score-hint'].textContent.split(/\s+/).length <= 35);
-assert.ok(elements['score-hint'].textContent.includes('Incomplete or stalled categories have no averages'));
+assert.ok(elements['score-hint'].textContent.includes('Categories that did not complete have no averages'));
 assert.ok(METRICS.every(m => m.hint.split(/\s+/).length <= 15));
 '''
                     subprocess.run(['node'], input=context + js[:js.index('\nbuildHeader();')] + checks,

@@ -43,31 +43,12 @@ def esc(s):
     return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-STALL_MS = 33.3
-
-
-def stalled(r, t):
-    """Window-local stalls only. RSS is a lifetime peak and cannot establish a later stall."""
-    s = r.get("server", {}).get(t) if r else None
-    if not s:
-        return False
-    expected = (r.get("meta") or {}).get("expectedClients") or 0
-    fps = s.get("avgFps") or 0
-    return ((s.get("p99FrameMs") or 0) > STALL_MS or (0 < fps < 54)
-            or (expected > 0 and (s.get("connections") or 0) < 0.9 * expected))
-
-
 def run_failure(r):
     if not r:
         return "no datapoint"
     if (r.get("meta") or {}).get("serverError"):
         return r["meta"]["serverError"]
-    have = sum(bool(r.get("server", {}).get(t)) and not r["server"][t].get("truncated") for t in SCORE_TESTS)
-    return f"incomplete ({have}/{len(SCORE_TESTS)} load tests)" if have < len(SCORE_TESTS) else None
-
-
-def stalled_anywhere(r):
-    return any(stalled(r, t) for t in SCORE_TESTS)
+    return category_failure(r, SCORE_TESTS)
 
 
 def category_failure(r, tests):
@@ -79,14 +60,15 @@ def category_failure(r, tests):
     def complete(t):
         w = r.get("server", {}).get(t)
         return bool(w and not w.get("truncated") and not (
-            meta.get("serverError") and t in ("SendRPC", "SyncVars") and w.get("deliveryComplete") is not True))
+            t in ("SendRPC", "SyncVars") and (w.get("deliveryComplete") is False or
+            (meta.get("serverError") and w.get("deliveryComplete") is not True))))
     have = sum(complete(t) for t in tests)
     return f"incomplete ({have}/{len(tests)} tests)" if have < len(tests) else None
 
 
 def metric(r, mid, t, tests=None):
     s = r.get("server", {}).get(t) if r else None
-    if not s or (run_failure(r) if tests is None else category_failure(r, tests)) or stalled(r, t):
+    if not s or (run_failure(r) if tests is None else category_failure(r, tests)):
         return None
     alloc = s.get("gcAllocBytesPerSec")
     return {"srvDown": s.get("txBytesPerSec"), "cpu": s.get("cpuPercent"), "gc": s.get("gcCollections"),
@@ -128,17 +110,15 @@ def scorecard(netcodes, by, sc, tests=None):
     for n in netcodes:
         r = by.get((n, sc))
         have = [t for t in selected if r and r.get("server", {}).get(t)]
-        stalls = [t for t in selected if stalled(r, t)]
         def average(mid):
             vals = [metric(r, mid, t, tests) for t in selected]
-            return mean(vals) if not stalls and all(v is not None for v in vals) else None
+            return mean(vals) if all(v is not None for v in vals) else None
         rows[n] = {
             "bw": average("srvDown"),
             "cpu": average("cpu"),
             "alloc": average("alloc"),
             "gc": sum(r["server"][t].get("gcCollections", 0) for t in have) if have else None,
             "p99": max(r["server"][t].get("p99FrameMs", 0) for t in have) if have else None,
-            "stalls": len(stalls),
             "error": run_failure(r) if tests is None else category_failure(r, tests),
         }
     return rows
@@ -146,9 +126,8 @@ def scorecard(netcodes, by, sc, tests=None):
 
 def marginal(by, n, frm, to, mid, units):
     """(cost at the larger session - cost at the smaller) / units added, averaged over the load tests.
-    A server that fell over in either session has no measurable marginal cost."""
-    if (run_failure(by.get((n, frm))) or run_failure(by.get((n, to))) or
-            stalled_anywhere(by.get((n, frm))) or stalled_anywhere(by.get((n, to)))):
+    Both sessions must have a complete suite."""
+    if run_failure(by.get((n, frm))) or run_failure(by.get((n, to))):
         return None
     deltas = []
     for t in SCORE_TESTS:
@@ -326,9 +305,7 @@ def main():
                                for n in netcodes], **options)
             columns.append((title, cells))
         def status(n):
-            if rows[n]["error"]:
-                return rows[n]["error"].replace(" (", " ").replace(" tests)", "").replace("host memory exhausted", "host OOM")
-            return f"stalled {rows[n]['stalls']}/{len(tests)}" if rows[n]["stalls"] else "complete"
+            return "Did not complete" if rows[n]["error"] else "Completed"
         table_rows = [(NAMES[n], colors[n], [(status(n), False)] + [cells[i] for _, cells in columns])
                       for i, n in enumerate(netcodes)]
         blocks.append((category, f"{ref[0]} connections @ {ref[1]} Hz · " + ", ".join(tests),
@@ -370,7 +347,7 @@ def main():
     else:
         for title, note, cols, rows_ in blocks:
             lines += md_table(title, note, cols, rows_)
-    lines.append("Categories are reported separately, with no combined ranking. Bandwidth, CPU and allocation: averages; collections: total; frame p99: maximum. Incomplete or stalled categories have no averages. Idle and Static remain baselines; scaling requires the full suite.")
+    lines.append("Categories are reported separately, with no combined ranking. Bandwidth, CPU and allocation: averages; collections: total; frame p99: maximum. Categories that did not complete have no averages. Completed means the test finished; frame p99 shows slowdowns. Idle and Static remain baselines; scaling requires the full suite.")
     links = []
     if args.report_url:
         links.append(f"[interactive report]({args.report_url})")

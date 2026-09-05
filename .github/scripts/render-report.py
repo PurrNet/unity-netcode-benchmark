@@ -179,7 +179,7 @@ TEMPLATE = r"""<meta charset="utf-8">
     <details class="explanation">
       <summary>How to read this</summary>
       <p>Green marks the best values within tolerance; all-equal rows or columns have no highlight. There is no combined ranking.</p>
-      <p>Stalled: frame p99 &gt; 33.3 ms, 0 &lt; recorded FPS &lt; 54, or clients &lt; 90% of target. Any stall hides that category's averages.</p>
+      <p>Completed means the test finished, not that it met a frame-time target. Frame p99 shows slowdowns; delivery and connection problems stay in the notes.</p>
       <p>Each category is reported separately. Missing or truncated tests prevent that category's averages and best-value highlights; completed categories remain usable after a later failure. Run errors stay in the notes. Idle and Static are baselines.</p>
       <p>Peak RSS is the process-lifetime maximum, not category-local memory. It remains available in the per-test view.</p>
     </details>
@@ -337,27 +337,19 @@ function buildHeader() {
 }
 
 // ---- Category measurements for each netcode in one session.
-// Only this window's timing and connection count can establish a stall. VmHWM is cumulative.
-function stalled(n, sc, t) {
-  const r = run(n, sc); if (!r) return false;
-  const w = r.server[t]; if (!w) return false;
-  return w.p99FrameMs > 33.3 || (w.avgFps > 0 && w.avgFps < 54) ||
-    (r.meta.expectedClients > 0 && w.connections < 0.9 * r.meta.expectedClients);
-}
-function stalledAnywhere(n, sc) { return SCORE_TESTS.some(t => stalled(n, sc, t)); }
 function runFailure(n, sc) {
   const r = run(n, sc); if (!r) return "no datapoint";
   if (r.meta.serverError) return r.meta.serverError;
-  const have = SCORE_TESTS.filter(t => r.server[t] && !r.server[t].truncated).length;
-  return have < SCORE_TESTS.length ? `incomplete (${have}/${SCORE_TESTS.length} load tests)` : null;
+  return categoryFailure(n, sc, SCORE_TESTS);
 }
-function unscored(n, sc, t) { return !!categoryFailure(n, sc, [t]) || stalled(n, sc, t); }
+function unscored(n, sc, t) { return !!categoryFailure(n, sc, [t]); }
 function categoryFailure(n, sc, tests) {
   const r = run(n, sc); if (!r) return "no datapoint";
   if (r.meta.process?.status === "host-oom") return "host memory exhausted";
   const complete = tests.filter(t => {
     const w = r.server[t];
-    return w && !w.truncated && !(r.meta.serverError && ["SendRPC", "SyncVars"].includes(t) && w.deliveryComplete !== true);
+    return w && !w.truncated && !(["SendRPC", "SyncVars"].includes(t) &&
+      (w.deliveryComplete === false || (r.meta.serverError && w.deliveryComplete !== true)));
   }).length;
   return complete < tests.length ? `incomplete (${complete}/${tests.length} tests)` : null;
 }
@@ -369,15 +361,13 @@ function buildScorecard() {
   const rows = netcodes.map(n => {
     const r = run(n, sc);
     const have = r ? tests.filter(t => r.server[t]) : [];
-    // Plain averages over the load tests, in the metric's own unit. A netcode that stalled in any of
-    // them gets no average: one over the tests it survived would not compare with the others'.
+    // Average the same completed tests for every netcode, including slow measurements.
     const avg = mid => {
       const vals = tests.map(t => rawM(mid, n, sc, t));
-      return categoryFailure(n, sc, tests) || tests.some(t => stalled(n, sc, t)) || vals.some(v => v == null) ? null : mean(vals);
+      return categoryFailure(n, sc, tests) || vals.some(v => v == null) ? null : mean(vals);
     };
     return {
       n,
-      stalls: r ? tests.filter(t => stalled(n, sc, t)).length : 0,
       err: categoryFailure(n, sc, tests),
       bw: avg("srvDown"),
       cpu: avg("cpu"),
@@ -398,19 +388,18 @@ function buildScorecard() {
   ].filter(([, key]) => rows.some(r => r[key] != null));
   document.getElementById("scorecard").innerHTML =
     "<thead><tr><th>Netcode</th>" + COLS.map(([label]) => `<th>${label}</th>`).join("") + "</tr></thead><tbody>" +
-    rows.map((r, i) => `<tr><td class="name">${chip(r.n)}${r.conns != null && r.conns !== sc.size ? `<span class="sub">${r.conns} clients</span>` : ""}${r.err ? `<span class="sub stall">${r.err}</span>` : r.stalls ? `<span class="sub stall">stalled in ${r.stalls} of ${tests.length} tests</span>` : ""}</td>` +
+    rows.map((r, i) => `<tr><td class="name">${chip(r.n)}${r.conns != null && r.conns !== sc.size ? `<span class="sub">${r.conns} clients</span>` : ""}<span class="sub${r.err ? " stall" : ""}">${r.err ? "Did not complete" : "Completed"}</span></td>` +
       COLS.map(([, key, f]) => cell(r, i, key, f)).join("") + "</tr>").join("") + "</tbody>";
   document.getElementById("score-hint").textContent =
-    category.hint + ". Bandwidth, CPU and allocation: averages; collections: total; frame p99: maximum. Incomplete or stalled categories have no averages.";
+    category.hint + ". Bandwidth, CPU and allocation: averages; collections: total; frame p99: maximum. Categories that did not complete have no averages.";
 }
 
 // ---- What one more costs: (cost at the larger session - cost at the smaller) / (units added), averaged
 //      over the load tests. Unlike a multiplier this does not flatter a netcode with an expensive floor.
 function marginal(n, from, to, mid, units) {
-  // A server that fell over in either session has no measurable marginal cost.
-  if (runFailure(n, from) || runFailure(n, to) || stalledAnywhere(n, from) || stalledAnywhere(n, to)) return null;
+  // Scaling needs the complete suite in both sessions.
+  if (runFailure(n, from) || runFailure(n, to)) return null;
   const deltas = SCORE_TESTS.map(t => {
-    if (stalled(n, from, t) || stalled(n, to, t)) return null;
     const a = rawM(mid, n, from, t), b = rawM(mid, n, to, t);
     return (a != null && b != null) ? (b - a) / units : null;
   }).filter(v => v != null);
@@ -437,7 +426,7 @@ function buildScaling() {
     "<thead><tr><th>Netcode</th>" + cols.map(c => `<th>${c.g.label}<br>${c.a.label}</th>`).join("") + "</tr></thead><tbody>" +
     rows.map((r, ri) => `<tr><td class="name">${chip(r.n)}</td>` + r.cells.map((v, i) => v == null ? `<td class="na">–</td>` : `<td class="${bestPer[i].has(ri) ? "best" : ""}">${fmtCost(v, cols[i].g.unit)}</td>`).join("") + "</tr>").join("") + "</tbody>";
   document.getElementById("scaling-hint").textContent = axes.map(a => a.note).join("; ") +
-    ". Added cost averaged across load tests. CPU is in percentage points. A dash means missing or stalled data.";
+    ". Added cost averaged across load tests. CPU is in percentage points. A dash means missing data or a session that did not complete.";
 }
 
 // ---- Per-test bar charts for the selected metric and session.
@@ -529,7 +518,7 @@ function refresh() {
     const data = netcodes.map(n => value(n, state.scenario, t));
     if (data.every(v => v == null)) empty++;
     ch.options = baseOptions(t);
-    ch.data.labels = netcodes.map(n => NAMES[n] + (categoryFailure(n, state.scenario, [t]) ? " (incomplete)" : stalled(n, state.scenario, t) ? " (stalled)" : ""));
+    ch.data.labels = netcodes.map(n => NAMES[n] + (categoryFailure(n, state.scenario, [t]) ? " (Did not complete)" : ""));
     ch.data.datasets = [{ data, backgroundColor: colors, borderColor: colors, borderWidth: 0, borderRadius: 3, barPercentage: 0.7, categoryPercentage: 0.8 }];
     ch.update("none");
   });
@@ -552,7 +541,7 @@ function buildTable() {
       const v = vals[i];
       if (v == null) return `<td class="na">–</td>`;
       const r = run(n, sc);
-      const note = unscored(n, sc, t) ? `<span class="sub stall">${categoryFailure(n, sc, [t]) ? "incomplete" : "stalled"}</span>` : r && r.connections !== sc.size ? `<span class="rel" title="actual connections">${r.connections}c</span>` : "";
+      const note = unscored(n, sc, t) ? `<span class="sub stall">Did not complete</span>` : r && r.connections !== sc.size ? `<span class="rel" title="actual connections">${r.connections}c</span>` : "";
       return `<td class="${best.has(i) ? "best" : ""}">${fmt(v, m.unit)}${note}</td>`;
     }).join("") + "</tr>";
   });

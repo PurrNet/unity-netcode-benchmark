@@ -192,8 +192,10 @@ send intervals are retained except for the documented FishNet SyncVar override.
   harness re-applies 60 fps at every measurement window.
 - **Categories, not an overall verdict.** At a glance separates state replication (MoveY,
   MoveWander, SyncVars), messaging (server broadcast and client-to-server RPCs), and spawn / despawn
-  (SpawnChurn). Idle and Static remain unscored baselines. A stall removes that category's averages;
-  missing or truncated tests remove its averages and best-value highlights. There is no combined ranking.
+  (SpawnChurn). Idle and Static remain baselines. Status is **Completed** or **Did not complete**;
+  slow frames do not change completion status or hide averages. Frame p99 shows the slowdown.
+  Missing or truncated tests and unfinished delivery checkpoints remove that category's averages
+  and best-value highlights. Delivery and connection problems remain in the notes. There is no combined ranking.
   Completed categories remain usable after
   a later failure, with the run error still shown. Scaling still requires the full suite in both sessions.
 - **Resource limits.** Every netcode keeps the same tests, including NGO at 100 connections / 60 Hz
@@ -208,5 +210,5 @@ send intervals are retained except for the documented FishNet SyncVar override.
   limit hit does not prevent publication; a host OOM or broken fleet barrier does.
   These guards apply to new fleet runs; older results are not retroactively capped.
 - **Peak RSS is cumulative.** It is the process-lifetime high-water mark as of each test, not that
-  test's own peak. A large earlier allocation does not mark a later, healthy window as stalled.
+  test's own peak. It does not determine completion status.
 - Release builds by default; `profiling` builds add profiler overhead.
