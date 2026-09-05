@@ -150,6 +150,8 @@ TEMPLATE = r"""<meta charset="utf-8">
   td.name .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: -1px; }
   td .sub { color: var(--muted); font-size: 11px; margin-left: 6px; font-weight: 400; }
   td .sub.stall { color: var(--warn); }
+  td.who { font-family: "Instrument Sans", system-ui, sans-serif; font-weight: 500; text-align: right; }
+  td.who .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin: 0 6px 0 10px; vertical-align: -1px; }
   tr.overloaded td, td.overloaded { background: var(--warn-wash); }
   .overload-note { color: var(--warn); }
 
@@ -178,6 +180,8 @@ TEMPLATE = r"""<meta charset="utf-8">
   <section>
     <h2>At a glance <span class="hint">&#xb7; lower is better</span></h2>
     <div class="row"><span class="lbl">Session</span><div class="seg scenarios" role="group" aria-label="Session"></div></div>
+    <div class="tablewrap"><table id="winners"></table></div>
+    <p class="hint" id="winners-hint"></p>
     <div class="row"><span class="lbl">Category</span><div class="seg" id="categories" role="group" aria-label="Category"></div></div>
     <div class="tablewrap"><table id="scorecard"></table></div>
     <p id="score-hint"></p>
@@ -368,12 +372,33 @@ function categoryFailure(n, sc, tests) {
   }).length;
   return complete < tests.length ? `incomplete (${complete}/${tests.length} tests)` : null;
 }
-function buildScorecard() {
+const SCORE_TOL = { bw: { rel: 0.02 }, cpu: { rel: 0.02 }, alloc: { rel: 0.02 }, gc: { abs: 0 }, p99: { abs: 0.2 } };
+const SCORE_FMT = { bw: fmtKb, cpu: fmtPct, alloc: fmtKb, gc: String, p99: v => v.toFixed(1) };
+// Which netcodes are best in this column, among those that completed the category without overloading.
+function winners(rows, key) { return bestSet(rows.map(r => r.err || r.over ? null : r[key]), true, SCORE_TOL[key], SCORE_FMT[key]); }
+
+// ---- Who's ahead: the best netcode per category and column, no averaging across categories.
+function buildWinners() {
   const sc = state.scenario;
-  const category = CATEGORIES.find(c => c.id === state.category);
-  const tests = category.tests;
-  document.getElementById("categories").innerHTML = CATEGORIES.map(c => `<button type="button" data-category="${c.id}" aria-pressed="${c.id === state.category}">${c.label}</button>`).join("");
-  const rows = netcodes.map(n => {
+  const cols = [["Bandwidth", "bw"], ["Server CPU", "cpu"], ["GC alloc", "alloc"]];
+  const table = CATEGORIES.map(c => ({ c, rows: categoryRows(sc, c.tests) }));
+  const shown = cols.filter(([, key]) => table.some(({ rows }) => rows.some(r => r[key] != null)));
+  const who = (rows, key) => {
+    const eligible = rows.filter(r => !r.err && !r.over && r[key] != null);
+    if (!eligible.length) return `<td class="na">–</td>`;
+    const set = winners(rows, key);
+    if (!set.size) return `<td class="who na">tie</td>`;
+    return `<td class="who">${rows.map((r, i) => set.has(i) ? `<span class="sw" style="background:var(--s-${r.n})"></span>${NAMES[r.n]}` : "").join("")}</td>`;
+  };
+  document.getElementById("winners").innerHTML =
+    "<thead><tr><th>Who's ahead</th>" + shown.map(([label]) => `<th>${label}</th>`).join("") + "</tr></thead><tbody>" +
+    table.map(({ c, rows }) => `<tr><td>${c.label}<span class="sub">${c.hint}</span></td>` + shown.map(([, key]) => who(rows, key)).join("") + "</tr>").join("") + "</tbody>";
+  document.getElementById("winners-hint").textContent =
+    scLabel(sc) + ". Lowest average in each category among netcodes that completed it without overloading; ties within 2% share the cell. Nothing is averaged across categories.";
+}
+
+function categoryRows(sc, tests) {
+  return netcodes.map(n => {
     const r = run(n, sc);
     const have = r ? tests.filter(t => r.server[t]) : [];
     // Average the same completed tests for every netcode, including slow measurements.
@@ -393,10 +418,17 @@ function buildScorecard() {
       conns: r ? r.connections : null
     };
   });
-  const TOL = { bw: { rel: 0.02 }, cpu: { rel: 0.02 }, alloc: { rel: 0.02 }, gc: { abs: 0 }, p99: { abs: 0.2 } };
-  const FMT = { bw: fmtKb, cpu: fmtPct, alloc: fmtKb, gc: String, p99: v => v.toFixed(1) };
+}
+
+function buildScorecard() {
+  const sc = state.scenario;
+  const category = CATEGORIES.find(c => c.id === state.category);
+  const tests = category.tests;
+  document.getElementById("categories").innerHTML = CATEGORIES.map(c => `<button type="button" data-category="${c.id}" aria-pressed="${c.id === state.category}">${c.label}</button>`).join("");
+  buildWinners();
+  const rows = categoryRows(sc, tests);
   const bests = {};
-  Object.keys(TOL).forEach(k => { bests[k] = bestSet(rows.map(r => r.err || r.over ? null : r[k]), true, TOL[k], FMT[k]); });
+  Object.keys(SCORE_TOL).forEach(k => { bests[k] = winners(rows, k); });
   const cell = (r, i, key, f) => r[key] == null ? `<td class="na">–</td>` : `<td class="${bests[key].has(i) ? "best" : ""}">${f(r[key])}</td>`;
   const COLS = [
     ["Bandwidth", "bw", fmtKb], ["Server CPU", "cpu", fmtPct], ["GC alloc", "alloc", fmtKb], ["Collections", "gc", v => String(v)],

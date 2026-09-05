@@ -199,7 +199,8 @@ def svg_tables(blocks, theme):
         out.append(f'<text x="{pad}" y="{y + 17}" font-weight="600" fill="{t["ink"]}">{esc(title)}</text>')
         out.append(f'<text x="{width - pad}" y="{y + 17}" text-anchor="end" fill="{t["muted"]}" font-size="12">{esc(subtitle)}</text>')
         y += titleh
-        out.append(f'<text x="{pad}" y="{y + 21}" fill="{t["muted"]}" font-size="11" letter-spacing="0.5">NETCODE</text>')
+        first = "CATEGORY" if rows and all(color is None for _, color, _ in rows) else "NETCODE"
+        out.append(f'<text x="{pad}" y="{y + 21}" fill="{t["muted"]}" font-size="11" letter-spacing="0.5">{first}</text>')
         for i, c in enumerate(cols):
             x = pad + col0 + colw * (i + 1) - 6
             lines = c.split("\n")
@@ -209,8 +210,9 @@ def svg_tables(blocks, theme):
         y += headh
         out.append(f'<line x1="{pad}" y1="{y}" x2="{width - pad}" y2="{y}" stroke="{t["grid"]}" stroke-width="1"/>')
         for label, color, cells in rows:
-            out.append(f'<rect x="{pad}" y="{y + 9}" width="9" height="9" rx="2" fill="{color}"/>')
-            out.append(f'<text x="{pad + 15}" y="{y + 18}" fill="{t["ink"]}" font-weight="600">{esc(label)}</text>')
+            if color:
+                out.append(f'<rect x="{pad}" y="{y + 9}" width="9" height="9" rx="2" fill="{color}"/>')
+            out.append(f'<text x="{pad + (15 if color else 0)}" y="{y + 18}" fill="{t["ink"]}" font-weight="600">{esc(label)}</text>')
             for i, (text, best) in enumerate(cells):
                 x0 = pad + col0 + colw * i
                 if best:
@@ -224,7 +226,8 @@ def svg_tables(blocks, theme):
 
 
 def md_table(title, note, cols, rows):
-    out = [f"**{title}** ({note})", "", "| Netcode | " + " | ".join(c.replace("\n", " ") for c in cols) + " |",
+    first = "Category" if rows and all(color is None for _, color, _ in rows) else "Netcode"
+    out = [f"**{title}** ({note})", "", f"| {first} | " + " | ".join(c.replace("\n", " ") for c in cols) + " |",
            "|---|" + "|".join("---:" for _ in cols) + "|"]
     for label, _, cells in rows:
         out.append(f"| {label} | " + " | ".join(f"**{s}**" if best else s for s, best in cells) + " |")
@@ -297,6 +300,26 @@ def main():
     # One scorecard per category; no overall pass/fail scorecard.
     blocks = []
     t1 = f"At a glance, {ref[0]} connections @ {ref[1]} Hz"
+    # Who's ahead: the best netcode per category and column, among those that completed it without
+    # overloading; ties within 2% share the cell. Nothing is averaged across categories.
+    strip_cols = [("Bandwidth", "bw", fmt_kbs), ("Server CPU", "cpu", fmt_pct), ("GC alloc", "alloc", fmt_kbs)]
+    strip_rows = []
+    for category, tests in CATEGORIES:
+        rows = scorecard(netcodes, by, ref, tests)
+        cells = []
+        for _, key, formatter in strip_cols:
+            eligible = [n for n in netcodes if not rows[n]["error"] and not rows[n]["overloaded"] and rows[n][key] is not None]
+            if not eligible:
+                cells.append(("–", False))
+                continue
+            marked = mark_best([(None if rows[n]["error"] or rows[n]["overloaded"] else rows[n][key],
+                                 "–" if rows[n][key] is None else formatter(rows[n][key])) for n in netcodes])
+            names = [NAMES[n] for n, (_, best) in zip(netcodes, marked) if best]
+            cells.append((", ".join(names) if names else "tie", False))
+        strip_rows.append((category, None, cells))
+    if any(text not in ("–", "tie") for _, _, cells in strip_rows for text, _ in cells):
+        blocks.append((f"Who's ahead, {ref[0]} connections @ {ref[1]} Hz", "best per category; no averaging across categories",
+                       [title for title, _, _ in strip_cols], strip_rows))
     for category, tests in CATEGORIES:
         rows = scorecard(netcodes, by, ref, tests)
         specs = [
@@ -344,7 +367,7 @@ def main():
         out_dir = Path(args.svg_out)
         out_dir.mkdir(parents=True, exist_ok=True)
         for theme in ("light", "dark"):
-            themed = [(t, s, c, [(l, SERIES[theme][n], cells) for (l, _, cells), n in zip(r, netcodes)]) for (t, s, c, r) in blocks]
+            themed = [(t, s, c, [(l, SERIES[theme][n] if color else None, cells) for (l, color, cells), n in zip(r, netcodes + [None] * len(r))]) for (t, s, c, r) in blocks]
             (out_dir / f"latest-{theme}.svg").write_text(svg_tables(themed, theme), encoding="utf-8")
         rel = args.svg_out.rstrip("/\\").replace("\\", "/")
         lines.append("<picture>")
