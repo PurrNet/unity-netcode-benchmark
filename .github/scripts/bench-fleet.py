@@ -15,6 +15,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
+import bench_resources as resources
+
 NETCODES = ('purrnet', 'fishnet', 'mirror', 'ngo', 'fusion')
 # Cover the existing 15-minute process watchdog, its kill grace and delayed client startup.
 # This is a coordination ceiling, not a shorter cutoff on a player's own measurement window.
@@ -88,6 +90,8 @@ class Coordinator:
         self.acks = {0: set()}
         self.finished = set()
         self.failed = set()
+        self.missing_results = set()
+        self.limited = set()
         self.current = 0
         self.aborted = ''
         self.condition = threading.Condition()
@@ -116,9 +120,10 @@ class Coordinator:
             self.acks[index] = set()
             self.condition.notify_all()
 
-    def next(self, worker, completed, ok=True):
+    def next(self, worker, completed, ok=True, has_results=False):
         with self.condition:
-            if worker not in self.workers or type(completed) is not int or type(ok) is not bool:
+            if (worker not in self.workers or type(completed) is not int or
+                    type(ok) is not bool or type(has_results) is not bool):
                 raise ValueError('Invalid worker acknowledgement')
             if completed < 0 or completed > len(self.plan['cases']) or completed not in (self.current, self.current - 1):
                 raise ValueError('Stale or future acknowledgement')
@@ -128,14 +133,19 @@ class Coordinator:
                 self.acks[completed].add(worker)
                 if not ok:
                     self.failed.add((worker, completed))
+                    if not has_results:
+                        self.missing_results.add((worker, completed))
             self.condition.notify_all()
             # One open request, not repeated HTTP polling during a measurement window.
             self.condition.wait_for(lambda: self.aborted or self.current > completed)
             if self.aborted:
                 return dict(kind='abort', reason=self.aborted)
+            # A terminated server can make clients fail to connect or finish. Only accept those
+            # failures when they left diagnostics; never excuse a launch failure/missing output.
+            accepted = ok or (completed in self.limited and has_results)
             if self.current > len(self.plan['cases']):
-                return dict(kind='done')
-            return dict(kind='case', case=self.plan['cases'][self.current - 1])
+                return dict(kind='done', accepted=accepted)
+            return dict(kind='case', case=self.plan['cases'][self.current - 1], accepted=accepted)
 
     def finish(self, worker):
         with self.condition:
@@ -162,7 +172,7 @@ def control_server(state, bind, port):
                     raise ValueError('Invalid request length')
                 data = json.loads(self.rfile.read(length))
                 if self.path == '/next':
-                    response = state.next(data['worker'], data['completed'], data.get('ok', True))
+                    response = state.next(data['worker'], data['completed'], data.get('ok', True), data.get('has_results', False))
                 elif self.path == '/finished':
                     response = state.finish(data['worker'])
                 else:
@@ -248,8 +258,9 @@ def stop_process(process):
     process.wait()
 
 
-def run_players(commands, timeout=900):
+def run_players(commands, timeout=900, memory_bytes=0):
     processes, streams, codes = [], [], []
+    groups = []
     timed_out = set()
     cancelled = threading.Event()
     watchdog_thread = None
@@ -277,6 +288,9 @@ def run_players(commands, timeout=900):
         for cmd, log, _ in commands:
             stream = log.open('wb')
             streams.append(stream)
+            if memory_bytes:
+                group, cmd = resources.guarded_command(cmd, memory_bytes)
+                groups.append(group)
             processes.append(subprocess.Popen(cmd, stdout=stream, stderr=subprocess.STDOUT,
                                               start_new_session=os.name == 'posix'))
         # Popen.wait(timeout=...) polls waitpid on Linux. Use a sleeping watchdog plus a blocking
@@ -286,14 +300,30 @@ def run_players(commands, timeout=900):
         for process in processes:
             code = process.wait()
             codes.append(124 if process.pid in timed_out else code)
+        for index, (cmd, _, result) in enumerate(commands):
+            stats = resources.counters(groups[index]) if memory_bytes else None
+            record = resources.process_record(codes[index], timeout, memory_bytes, stats)
+            if '-maxRunSeconds' in cmd:
+                record['harnessMaxSeconds'] = float(cmd[cmd.index('-maxRunSeconds') + 1])
+                try:
+                    raw = json.loads(result.read_text(encoding='utf-8'))
+                    if record['status'] == 'exited' and raw.get('error') == 'timeout':
+                        record.update(status='resource-limit-exceeded', reason='time', limit=record['harnessMaxSeconds'])
+                except (OSError, ValueError):
+                    pass  # Missing/invalid results are handled separately, not inferred as a timeout.
+            resources.write_record(result, record)
     finally:
         cancelled.set()
         if watchdog_thread:
             watchdog_thread.join()
         for process in processes:
             stop_process(process)
-        for stream in streams:
-            stream.close()
+        try:
+            for group in groups:
+                resources.privileged('cleanup', group)
+        finally:
+            for stream in streams:
+                stream.close()
     return codes
 
 
@@ -314,7 +344,9 @@ def prepare(plan, root):
         shutil.copy2(source, provenance / f'{netcode}.json')
 
 
-def run_server(plan, root, env, execute=run_players):
+def run_server(plan, root, env, execute=None):
+    if execute is None:
+        execute = lambda commands: run_players(commands, memory_bytes=resources.SERVER_MEMORY_BYTES)
     state = Coordinator(plan)
     server = control_server(state, env['CONTROL_BIND'], int(env.get('PHASE_PORT', '8788')))
     failed = []
@@ -335,18 +367,28 @@ def run_server(plan, root, env, execute=run_players):
             state.publish(case['id'])
             command = player_command(case, 'server', 0, 1, root, env)
             code = execute([command])[0]
+            process_file = resources.record_path(command[2])
+            outcome = json.loads(process_file.read_text()) if process_file.exists() else {}
+            if outcome.get('status') == 'resource-limit-exceeded':
+                with state.condition:
+                    state.limited.add(case['id'])
             # Preserve partial results and the original harness's own failure diagnostics.
-            if not command[2].is_file() or not command[2].stat().st_size:
+            # A contained resource failure is a benchmark outcome, not a broken fleet barrier.
+            if (outcome.get('status') == 'host-oom' or
+                    ((not command[2].is_file() or not command[2].stat().st_size) and
+                     outcome.get('status') != 'resource-limit-exceeded')):
                 failed.append(case['id'])
-            event('server-exited', id=case['id'], exit_code=code)
+            event('server-exited', id=case['id'], exit_code=code, process=outcome)
             state.wait_for(lambda: state.acks[case['id']] == state.workers,
                            max(0, exit_deadline - time.monotonic()),
                            f"case {case['id']} process-exit acknowledgements")
             event('case-finished', id=case['id'])
         state.publish(len(plan['cases']) + 1)
         state.wait_for(lambda: state.finished == state.workers, 120, 'final acknowledgements')
-        event('fleet-finished', failed_servers=failed, failed_workers=sorted(state.failed))
-        return int(bool(failed or state.failed))
+        unexpected = {pair for pair in state.failed if pair[1] not in state.limited or pair in state.missing_results}
+        event('fleet-finished', failed_servers=failed, failed_workers=sorted(unexpected),
+              limited_cases=sorted(state.limited), client_failures=sorted(state.failed))
+        return int(bool(failed or unexpected))
     except Exception as error:
         event('fleet-aborted', reason=str(error), case=state.current,
               missing_ready=sorted(state.workers - state.ready),
@@ -362,13 +404,14 @@ def run_worker(plan, root, env, execute=run_players):
     worker = env['WORKER_ID']
     role, index = worker.split('-')
     url = f"http://{env['SERVER_IP']}:{env.get('PHASE_PORT', '8788')}"
-    completed, ok = 0, True
+    completed, ok, has_results = 0, True, True
     failed = False
     while True:
-        message = request(url, '/next', dict(worker=worker, completed=completed, ok=ok))
+        message = request(url, '/next', dict(worker=worker, completed=completed, ok=ok, has_results=has_results))
         if message['kind'] == 'abort':
             released(env)
             raise RuntimeError(message['reason'])
+        failed |= not message.get('accepted', ok)
         if message['kind'] == 'done':
             request(url, '/finished', dict(worker=worker), retry_seconds=120)
             released(env)
@@ -384,8 +427,8 @@ def run_worker(plan, root, env, execute=run_players):
             # exiting into an artifact upload while another runner is still measuring.
             event('worker-launch-failed', id=case['id'], worker=worker, error=str(error))
             codes = [1] * count
-        ok = all(code == 0 for code in codes) and all(c[2].is_file() for c in commands)
-        failed |= not ok
+        has_results = all(c[2].is_file() and c[2].stat().st_size > 0 for c in commands)
+        ok = all(code == 0 for code in codes) and has_results
         completed = case['id']
         event('worker-exited', id=completed, worker=worker, exit_codes=codes)
 
@@ -415,6 +458,12 @@ def main():
     root = Path.cwd()
     if args.operation == 'prepare':
         prepare(plan, root)
+        if not env.get('WORKER_ID'):
+            # Fail before joining the fleet if this runner cannot enforce the shared policy.
+            log = root / 'logs' / 'resource-preflight.log'
+            result = root / 'logs' / 'resource-preflight.json'
+            if run_players([(['/bin/true'], log, result)], memory_bytes=resources.SERVER_MEMORY_BYTES) != [0]:
+                raise RuntimeError('Server resource-guard preflight failed')
         return 0
     def interrupted(*_):
         raise KeyboardInterrupt('Runner cancelled')

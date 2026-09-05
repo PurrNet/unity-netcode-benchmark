@@ -294,7 +294,7 @@ jobs:
             TAG=$(jq -r .tag <<< "$entry")
             TOTAL=$(jq -r .total <<< "$entry")
             DIR="all/results/$TAG/$NETCODE"
-            if [ ! -s "$DIR/server.json" ]; then
+            if [ ! -s "$DIR/server.json" ] && [ ! -s "$DIR/process-server.json" ]; then
               echo "::warning::Missing server result for $TAG/$NETCODE"
               continue
             fi

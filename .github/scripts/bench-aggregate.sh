@@ -25,6 +25,11 @@ mkdir -p "$OUT_DIR"
 SERVER_FILE=$(find "$RESULTS_DIR" -type f -name server.json | head -n1)
 [ -z "$SERVER_FILE" ] && SERVER_FILE="$RESULTS_DIR/server.json"
 mapfile -t CLIENT_FILES < <(find "$RESULTS_DIR" -type f -name 'client-*.json' | sort)
+PROCESS_FILE=$(find "$RESULTS_DIR" -type f -name process-server.json | head -n1)
+SERVER_VALID=false
+if [ -s "$SERVER_FILE" ] && jq -e 'type == "object" and (.tests | type == "array")' "$SERVER_FILE" >/dev/null 2>&1; then
+  SERVER_VALID=true
+fi
 
 JQ_LIB='
 def hbR:
@@ -44,7 +49,7 @@ def byName: map({key: .name, value: .}) | from_entries;
   echo ""
 } >> "$SUMMARY"
 
-if [ -f "$SERVER_FILE" ]; then
+if [ "$SERVER_VALID" = true ]; then
   jq -r "$JQ_LIB"'
     . as $run
     | ($run.tests | byName) as $t
@@ -98,7 +103,7 @@ fi
 
 # A server result whose expected client count is not this session's total was not produced by this
 # session (a self-hosted runner can leave an earlier session's files in the workspace); no datapoint.
-if [ -f "$SERVER_FILE" ]; then
+if [ "$SERVER_VALID" = true ]; then
   EXPECTED=$(jq -r '.expectedClients // 0' "$SERVER_FILE")
   if [ "$EXPECTED" != "$TOTAL" ]; then
     echo "::error::$NETCODE ($TAG): server result expects $EXPECTED clients but this session runs $TOTAL; not writing a datapoint"
@@ -109,10 +114,15 @@ fi
 # Datapoint for the cross-netcode scaling table. Inputs go through files (--slurpfile), not
 # arguments: with 25+ clients the concatenated JSON exceeds the exec argument limit.
 TMP_DIR=$(mktemp -d)
-if [ -f "$SERVER_FILE" ]; then
+if [ "$SERVER_VALID" = true ]; then
   cp "$SERVER_FILE" "$TMP_DIR/server.json"
 else
   echo "null" > "$TMP_DIR/server.json"
+fi
+if [ -n "$PROCESS_FILE" ]; then
+  cp "$PROCESS_FILE" "$TMP_DIR/process.json"
+else
+  echo '{}' > "$TMP_DIR/process.json"
 fi
 if [ ${#CLIENT_FILES[@]} -gt 0 ]; then
   jq -s '[ .[] | select(.measured == true) ]' "${CLIENT_FILES[@]}" > "$TMP_DIR/clients.json"
@@ -123,8 +133,9 @@ fi
 jq -n \
   --arg netcode "$NETCODE" --argjson connections "$TOTAL" --arg tag "$TAG" \
   --slurpfile serverFile "$TMP_DIR/server.json" --slurpfile clientsFile "$TMP_DIR/clients.json" \
+  --slurpfile processFile "$TMP_DIR/process.json" \
   "$JQ_LIB"'
-  $serverFile[0] as $server | $clientsFile[0] as $clients
+  $serverFile[0] as $server | $clientsFile[0] as $clients | $processFile[0] as $process
   | ($server.tests // [] | byName) as $st
   | {
       netcode: $netcode,
@@ -137,9 +148,18 @@ jq -n \
       meta: {
         cpuModel: $server.cpuModel, cpuCount: $server.cpuCount, devBuild: $server.devBuild,
         tickRate: $server.tickRate, requestedTickRate: ($server.requestedTickRate // 0), unityVersion: $server.unityVersion,
-        connectedAtStart: $server.connectedAtStart, expectedClients: $server.expectedClients,
-        serverError: (if ($server.error // "") != "" then $server.error
-                      elif ($server.completed // true) == false then "did not complete: the server died after \($server.tests | length) tests"
+        connectedAtStart: $server.connectedAtStart, expectedClients: ($server.expectedClients // $connections),
+        process: $process,
+        serverError: (if $process.status == "resource-limit-exceeded" then
+                        "resource limit exceeded (" + (if $process.reason == "memory" then "\($process.limit / 1073741824) GiB memory"
+                                                      else "\($process.limit)s time" end) + ")"
+                      elif $process.status == "host-oom" then "host memory exhausted (infrastructure failure)"
+                      elif $server.error == "timeout" then "resource limit exceeded (" +
+                        (if $process.harnessMaxSeconds then "\($process.harnessMaxSeconds)s harness time" else "harness time" end) + ")"
+                      elif $server == null then "did not complete: no valid server result"
+                      elif ($server.error // "") != "" then $server.error
+                      elif ($process.exitCode // 0) != 0 then "server exited with code \($process.exitCode)"
+                      elif $server.completed == false then "did not complete: the server died after \($server.tests | length) tests"
                       else null end),
         measuredClients: ($clients | length)
       },

@@ -8,7 +8,7 @@ on a dedicated server, with bandwidth, CPU, frame time and memory compared side 
 
 Live report: **https://purrnet.github.io/unity-netcode-benchmark/** (scorecard, scaling table, comparison
 metrics per test and session). Raw datapoints of the latest run are in `docs/latest.json`.
-Single-test workload/delivery diagnostics are kept in the raw data and relevant run notes, not the chart selector.
+Detailed workload/delivery diagnostics stay in the raw data. Run notes show only problems, not successful checks or routine measurements.
 RTT measurements remain in the raw data only; they are not used for comparisons.
 
 ## What runs
@@ -193,4 +193,16 @@ send intervals are retained except for the documented FishNet SyncVar override.
 - **Did not complete.** A netcode whose server dies mid-session shows as "did not complete" in
   the report rather than being scored on the tests it survived; one whose server could not hold
   the frame budget in a test is marked stalled there and wins nothing.
+- **Resource limits.** Every netcode keeps the same tests, including NGO at 100 connections / 60 Hz
+  and reliable RPCs. Each server case has an 8 GiB cgroup memory ceiling with no swap, the existing
+  780-second harness timeout and a 900-second external watchdog (10-second termination grace).
+  The memory ceiling includes the server and its Xvfb wrapper, including charged file cache and
+  kernel memory; it is not an RSS threshold. Limits are enforced outside Unity, with no memory
+  polling during measurement. A runner without cgroup v2 memory controls fails preparation.
+  Limit hits show as **resource limit exceeded**, retain completed measurement windows and receive
+  no averages, wins or best-value highlights. Missing later tests stay missing, not zero. A contained
+  limit hit does not prevent publication; a host OOM or broken fleet barrier does.
+  These guards apply to new fleet runs; older results are not retroactively capped.
+- **Peak RSS is cumulative.** It is the process-lifetime high-water mark as of each test, not that
+  test's own peak. A large earlier allocation does not mark a later, healthy window as stalled.
 - Release builds by default; `profiling` builds add profiler overhead.

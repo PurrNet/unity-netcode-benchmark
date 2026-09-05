@@ -45,20 +45,23 @@ STALL_MS = 33.3
 
 
 def stalled(r, t):
-    """The server did not keep up in this test: frame p99 past twice the 60 fps budget, a sixth of its
-    frames dropped, clients lost, or memory run away to four times its own Idle footprint."""
+    """Window-local stalls only. RSS is a lifetime peak and cannot establish a later stall."""
     s = r.get("server", {}).get(t) if r else None
     if not s:
         return False
-    if (r.get("meta") or {}).get("serverError"):
-        return True
-    idle = r.get("server", {}).get("Idle") or {}
     expected = (r.get("meta") or {}).get("expectedClients") or 0
-    idle_rss = idle.get("peakRssBytes") or 0
     fps = s.get("avgFps") or 0
     return ((s.get("p99FrameMs") or 0) > STALL_MS or (0 < fps < 54)
-            or (expected > 0 and (s.get("connections") or 0) < 0.9 * expected)
-            or (idle_rss > 0 and (s.get("peakRssBytes") or 0) > 4 * idle_rss))
+            or (expected > 0 and (s.get("connections") or 0) < 0.9 * expected))
+
+
+def run_failure(r):
+    if not r:
+        return "no datapoint"
+    if (r.get("meta") or {}).get("serverError"):
+        return r["meta"]["serverError"]
+    have = sum(bool(r.get("server", {}).get(t)) and not r["server"][t].get("truncated") for t in SCORE_TESTS)
+    return f"incomplete ({have}/{len(SCORE_TESTS)} load tests)" if have < len(SCORE_TESTS) else None
 
 
 def stalled_anywhere(r):
@@ -66,8 +69,8 @@ def stalled_anywhere(r):
 
 
 def metric(r, mid, t):
-    s = r.get("server", {}).get(t)
-    if not s or stalled(r, t):
+    s = r.get("server", {}).get(t) if r else None
+    if not s or run_failure(r) or stalled(r, t):
         return None
     alloc = s.get("gcAllocBytesPerSec")
     return {"srvDown": s.get("txBytesPerSec"), "cpu": s.get("cpuPercent"), "gc": s.get("gcCollections"),
@@ -127,14 +130,18 @@ def scorecard(netcodes, by, sc):
         r = by.get((n, sc))
         have = [t for t in SCORE_TESTS if r and r.get("server", {}).get(t)]
         stalls = [t for t in SCORE_TESTS if stalled(r, t)]
+        def average(mid):
+            vals = [metric(r, mid, t) for t in SCORE_TESTS]
+            return mean(vals) if not stalls and all(v is not None for v in vals) else None
         rows[n] = {
-            "bw": mean(metric(r, "srvDown", t) for t in SCORE_TESTS) if r and not stalls else None,
-            "cpu": mean(metric(r, "cpu", t) for t in SCORE_TESTS) if r and not stalls else None,
-            "alloc": mean(metric(r, "alloc", t) for t in SCORE_TESTS) if r and not stalls else None,
+            "bw": average("srvDown"),
+            "cpu": average("cpu"),
+            "alloc": average("alloc"),
             "gc": sum(r["server"][t].get("gcCollections", 0) for t in have) if have else None,
             "p99": max(r["server"][t].get("p99FrameMs", 0) for t in have) if have else None,
             "wins": wins[n] if r else None,
             "stalls": len(stalls),
+            "error": run_failure(r),
         }
     return rows
 
@@ -142,7 +149,8 @@ def scorecard(netcodes, by, sc):
 def marginal(by, n, frm, to, mid, units):
     """(cost at the larger session - cost at the smaller) / units added, averaged over the load tests.
     A server that fell over in either session has no measurable marginal cost."""
-    if stalled_anywhere(by.get((n, frm))) or stalled_anywhere(by.get((n, to))):
+    if (run_failure(by.get((n, frm))) or run_failure(by.get((n, to))) or
+            stalled_anywhere(by.get((n, frm))) or stalled_anywhere(by.get((n, to)))):
         return None
     deltas = []
     for t in SCORE_TESTS:
@@ -150,7 +158,7 @@ def marginal(by, n, frm, to, mid, units):
         b = metric(by[(n, to)], mid, t) if (n, to) in by else None
         if a is not None and b is not None:
             deltas.append((b - a) / units)
-    return sum(deltas) / len(deltas) if deltas else None
+    return sum(deltas) / len(deltas) if len(deltas) == len(SCORE_TESTS) else None
 
 
 def fmt_cost(v, unit):
@@ -301,19 +309,25 @@ def main():
     bw = mark_best([(rows[n]["bw"], fmt_kbs(rows[n]["bw"])) for n in netcodes])
     cpu = mark_best([(rows[n]["cpu"], fmt_pct(rows[n]["cpu"])) for n in netcodes])
     alloc = mark_best([(rows[n]["alloc"], fmt_kbs(rows[n]["alloc"])) for n in netcodes])
-    gc = mark_best([(rows[n]["gc"], "–" if rows[n]["gc"] is None else str(rows[n]["gc"])) for n in netcodes], abs_tol=0)
-    p99 = mark_best([(rows[n]["p99"], "–" if rows[n]["p99"] is None else f"{rows[n]['p99']:.1f} ms") for n in netcodes], abs_tol=0.2)
+    gc = mark_best([(None if rows[n]["error"] else rows[n]["gc"], "–" if rows[n]["gc"] is None else str(rows[n]["gc"])) for n in netcodes], abs_tol=0)
+    p99 = mark_best([(None if rows[n]["error"] else rows[n]["p99"], "–" if rows[n]["p99"] is None else f"{rows[n]['p99']:.1f} ms") for n in netcodes], abs_tol=0.2)
     n_goals = len(goals_in_use(netcodes, by, ref))
-    wins = mark_best([(rows[n]["wins"], "–" if rows[n]["wins"] is None else f"{rows[n]['wins']} / {len(SCORE_TESTS) * n_goals}") for n in netcodes], lower=False, abs_tol=0)
+    wins = mark_best([(None if rows[n]["error"] else rows[n]["wins"], "–" if rows[n]["wins"] is None else f"{rows[n]['wins']} / {len(SCORE_TESTS) * n_goals}") for n in netcodes], lower=False, abs_tol=0)
     # Columns the dataset does not have (older runs lack allocation) are left out rather than shown as dashes.
     columns = [("Bandwidth", "bw", bw), ("Server CPU", "cpu", cpu), ("GC alloc", "alloc", alloc), ("Collections", "gc", gc), ("Frame p99", "p99", p99), ("Wins", "wins", wins)]
     columns = [c for c in columns if any(rows[n][c[1]] is not None for n in netcodes)]
     cols1 = [c[0] for c in columns]
     def label(n):
         r = by.get((n, ref))
-        if r and (r.get("meta") or {}).get("serverError"):
-            return NAMES[n] + " (did not complete)"
+        error = run_failure(r)
+        if error:
+            return NAMES[n] + (" (resource limit exceeded)" if error.startswith("resource limit exceeded") else " (incomplete)")
         return NAMES[n] + (f" (stalled {rows[n]['stalls']}/{len(SCORE_TESTS)})" if rows[n]["stalls"] else "")
+    # Keep partial measurements visible, but never award them best-value highlights.
+    for _, _, cells in columns:
+        for i, n in enumerate(netcodes):
+            if rows[n]["error"]:
+                cells[i] = (cells[i][0], False)
     rows1 = [(label(n), colors[n], [c[2][i] for c in columns]) for i, n in enumerate(netcodes)]
     note1 = "averages over the load tests; lower is better"
 
@@ -354,14 +368,14 @@ def main():
     else:
         for title, note, cols, rows_ in blocks:
             lines += md_table(title, note, cols, rows_)
-    lines.append(f"Averages over the {len(SCORE_TESTS)} load tests: bandwidth is server downstream on-wire to all clients, CPU is the whole server process as a share of one core, GC alloc is managed bytes allocated per second. Collections is the count over those tests, each starting on a freshly collected heap. Wins counts tests won on bandwidth, CPU or allocation. A test is a stall when the server's frame p99 passed twice the 60 fps budget, it dropped more than a sixth of its frames, it lost clients, or its memory ran to four times its Idle footprint: it wins nothing and is left out of the averages.")
+    lines.append(f"Across {len(SCORE_TESTS)} load tests: bandwidth, CPU and allocation are averages; collections are totals; frame p99 is the maximum. Wins count lowest bandwidth, CPU or allocation; ties share wins. Incomplete or stalled runs have no averages.")
     links = []
     if args.report_url:
         links.append(f"[interactive report]({args.report_url})")
     if args.run_url:
         links.append(f"[workflow run]({args.run_url})")
     links.append("[raw datapoints](latest.json)")
-    lines.append("Comparison metrics per test (bandwidth, CPU, frame times, GC, memory) and every session are in the " + ", ".join(links) + ".")
+    lines.append("Full results: " + " · ".join(links) + ".")
     print("\n".join(lines))
 
 

@@ -29,5 +29,5 @@ _Last run 2026-09-04: PurrNet 1.23.0-beta.27 · FishNet 4.7.3 · Mirror 96.0.1 �
 
 </details>
 
-Averages over the 6 load tests: bandwidth is server downstream on-wire to all clients, CPU is the whole server process as a share of one core, GC alloc is managed bytes allocated per second. Collections is the count over those tests, each starting on a freshly collected heap. Wins counts tests won on bandwidth, CPU or allocation. A test is a stall when the server's frame p99 passed twice the 60 fps budget, it dropped more than a sixth of its frames, it lost clients, or its memory ran to four times its Idle footprint: it wins nothing and is left out of the averages.
-Comparison metrics per test (bandwidth, CPU, frame times, GC, memory) and every session are in the [interactive report](https://purrnet.github.io/unity-netcode-benchmark/), [workflow run](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/33924304494), [raw datapoints](latest.json).
+Across 6 load tests: bandwidth, CPU and allocation are averages; collections are totals; frame p99 is the maximum. Wins count lowest bandwidth, CPU or allocation; ties share wins. Incomplete or stalled runs have no averages.
+Full results: [interactive report](https://purrnet.github.io/unity-netcode-benchmark/) · [workflow run](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/33924304494) · [raw datapoints](latest.json).

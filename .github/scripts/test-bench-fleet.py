@@ -200,6 +200,23 @@ class Protocol(unittest.TestCase):
         with self.assertRaises(ValueError):
             state.finish('client-1')
 
+    def test_limited_case_accepts_client_failure_only_with_diagnostics(self):
+        state = fleet.Coordinator(self.plan())
+        state.ready = state.workers.copy()
+        state.publish(1)
+        state.limited.add(1)
+        with ThreadPoolExecutor() as pool:
+            try:
+                client = pool.submit(state.next, 'client-1', 1, False, True)
+                loadgen = pool.submit(state.next, 'loadgen-1', 1, False, False)
+                state.wait_for(lambda: state.acks[1] == state.workers, 2, 'exits')
+                state.publish(2)
+                self.assertTrue(client.result(2)['accepted'])
+                self.assertFalse(loadgen.result(2)['accepted'])
+                self.assertEqual(state.missing_results, {('loadgen-1', 1)})
+            finally:
+                state.abort('test cleanup')
+
     def test_http_long_poll_and_shutdown(self):
         state = fleet.Coordinator(self.plan())
         server = fleet.control_server(state, '127.0.0.1', 0)
@@ -218,6 +235,54 @@ class Protocol(unittest.TestCase):
 
 
 class Processes(unittest.TestCase):
+    def test_resource_status_is_evidence_based_and_kept_separate_from_raw_results(self):
+        resources = fleet.resources
+        cap = resources.SERVER_MEMORY_BYTES
+        for code, events, status in [
+            (0, {}, 'exited'),
+            (-9, {}, 'exited'),  # SIGKILL does not establish OOM.
+            (-9, {'max': 1, 'oom': 1, 'oom_kill': 2}, 'resource-limit-exceeded'),
+            (0, {'max': 1}, 'resource-limit-exceeded'),  # Cap-induced reclaim invalidates the run too.
+            (-9, {'oom_kill': 1}, 'host-oom'),
+            (124, {}, 'resource-limit-exceeded'),
+        ]:
+            with self.subTest(code=code, events=events):
+                record = resources.process_record(code, 900, cap, dict(memoryEvents=events))
+                self.assertEqual(record['status'], status)
+                self.assertEqual(record['memoryLimitBytes'], cap)
+                self.assertEqual(record['swapLimitBytes'], 0)
+        with tempfile.TemporaryDirectory() as tmp:
+            result = Path(tmp) / 'server.json'
+            original = b'{"completed":false,"tests":[{"name":"Idle","cpuPercent":1.2}]}'
+            result.write_bytes(original)
+            resources.write_record(result, resources.process_record(124, 900))
+            self.assertEqual(result.read_bytes(), original)
+            self.assertEqual(json.loads(resources.record_path(result).read_text())['reason'], 'time')
+
+    def test_resource_names_cannot_target_another_cgroup(self):
+        for name in ('', '/', '..', 'system.slice', 'netbench-../system.slice', 'netbench-' + 'g' * 32):
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                fleet.resources.group_path(name)
+
+    @unittest.skipUnless(os.name == 'posix' and os.environ.get('NETBENCH_TEST_CGROUP_V2') == '1',
+                         'opt-in Linux cgroup v2 integration (requires root or passwordless sudo)')
+    def test_real_kernel_limit_preserves_partial_result_and_next_case_is_clean(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = root / 'server.json'
+            source = ('import pathlib,sys; pathlib.Path(sys.argv[1]).write_text(\'{"tests":[{"name":"Idle"}]}\'); '
+                      'b=bytearray(160*1024*1024)')
+            command = ([sys.executable, '-c', source, str(result)], root / 'oom.log', result)
+            codes = fleet.run_players([command], timeout=10, memory_bytes=64 * 1024 ** 2)
+            self.assertNotEqual(codes, [0])
+            outcome = json.loads(fleet.resources.record_path(result).read_text())
+            self.assertEqual(outcome['status'], 'resource-limit-exceeded')
+            self.assertEqual(outcome['reason'], 'memory')
+            self.assertEqual(json.loads(result.read_text())['tests'], [{'name': 'Idle'}])
+            command = ([sys.executable, '-c', 'pass'], root / 'next.log', root / 'next.json')
+            self.assertEqual(fleet.run_players([command], memory_bytes=64 * 1024 ** 2), [0])
+            self.assertEqual(json.loads(fleet.resources.record_path(command[2]).read_text())['status'], 'exited')
+
     def test_player_arguments_preserve_workload_and_isolate_outputs(self):
         env = environment(BENCH_SECONDS='10', BENCH_OBJECTS='100', BENCH_CPUS='2-3',
                           SERVER_IP='100.1.2.3', GITHUB_RUN_ID='123', GITHUB_RUN_ATTEMPT='2',
@@ -266,6 +331,19 @@ class Processes(unittest.TestCase):
             commands = [([sys.executable, '-c', 'import time; time.sleep(60)'], root / 'timeout.log', root / 'result')]
             self.assertEqual(fleet.run_players(commands, timeout=0.05), [124])
 
+    def test_harness_timeout_is_a_resource_outcome_even_with_completed_json(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = root / 'server.json'
+            source = ('import pathlib,sys; pathlib.Path(sys.argv[1]).write_text('
+                      '\'{"completed":true,"error":"timeout","tests":[]}\')')
+            cmd = [sys.executable, '-c', source, str(result), '-maxRunSeconds', '780']
+            self.assertEqual(fleet.run_players([(cmd, root / 'timeout.log', result)]), [0])
+            outcome = json.loads(fleet.resources.record_path(result).read_text())
+            self.assertEqual(outcome['status'], 'resource-limit-exceeded')
+            self.assertEqual(outcome['limit'], 780)
+            self.assertEqual(outcome['reason'], 'time')
+
     @unittest.skipUnless(os.name == 'posix', 'Linux process-group cleanup')
     def test_orphan_child_is_killed_before_ack(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -288,6 +366,12 @@ class Processes(unittest.TestCase):
                 self.fail('Child is still running after acknowledgement would have been sent')
 
     def test_whole_suite_real_processes_and_http_no_case_overlap(self):
+        self.check_suite()
+
+    def test_resource_failure_keeps_the_case_and_waits_for_every_worker(self):
+        self.check_suite(resource_failure=True)
+
+    def check_suite(self, resource_failure=False):
         env = environment()
         env.update(NETCODES='mirror,fishnet', SESSIONS='1@20,4@60,2@20', MEASURED_CLIENTS='1', LOADGEN_PROCS='2',
                    CONTROL_BIND='127.0.0.1', SERVER_IP='127.0.0.1', PHASE_PORT=str(free_port()))
@@ -317,7 +401,14 @@ class Processes(unittest.TestCase):
                     active[case_id] = active.get(case_id, 0) + 1
                     observed.append(case_id)
                 try:
-                    return fleet.run_players(commands)
+                    if resource_failure and commands[0][2].name == 'server-0-1.json' and case_id == 1:
+                        # Killed before the first result; this is still a publishable benchmark outcome.
+                        fleet.resources.write_record(commands[0][2], fleet.resources.process_record(
+                            -9, 900, fleet.resources.SERVER_MEMORY_BYTES, dict(memoryEvents={'oom': 1})))
+                        return [-9]
+                    codes = fleet.run_players(commands)
+                    # Clients can report "never connected" when the cap hits during server startup.
+                    return [1] * len(codes) if resource_failure and case_id == 1 else codes
                 finally:
                     with lock:
                         active[case_id] -= 1
@@ -332,8 +423,8 @@ class Processes(unittest.TestCase):
                     self.assertEqual(server.result(20), 0)
                     self.assertTrue(all(w.result(2) == 0 for w in workers))
             self.assertEqual(sorted(set(observed)), list(range(1, 7)))
-            results = list((root / 'results').rglob('*.json'))
-            self.assertEqual(len(results), sum(1 + c['total'] for c in plan['cases']))
+            results = [r for r in (root / 'results').rglob('*.json') if not r.name.startswith('process-')]
+            self.assertEqual(len(results), sum(1 + c['total'] for c in plan['cases']) - int(resource_failure))
             self.assertEqual(len({json.loads(r.read_text())['pid'] for r in results}), len(results))
 
 

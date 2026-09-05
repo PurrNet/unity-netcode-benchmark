@@ -33,6 +33,7 @@ namespace PurrNet.NetBench
         /// <summary>True when gcAllocBytes came from heap growth between frames rather than the profiler counter.</summary>
         public bool gcAllocEstimated;
         public long managedHeapBytes;
+        /// <summary>Process-lifetime RSS high-water mark, not a per-window peak.</summary>
         public long peakRssBytes;
         public double wallSeconds;
         public IfaceCounters ifaceDelta;

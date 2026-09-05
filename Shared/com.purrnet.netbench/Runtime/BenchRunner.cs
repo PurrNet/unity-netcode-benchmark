@@ -677,7 +677,14 @@ namespace PurrNet.NetBench
                 if (!string.IsNullOrEmpty(dir))
                     Directory.CreateDirectory(dir);
 
-                File.WriteAllText(_resultsPath, JsonUtility.ToJson(_run, true));
+                // Keep the last complete snapshot if a resource guard kills us during this write.
+                // Both paths are on the same filesystem; replacement is outside the timed window.
+                var temporaryPath = _resultsPath + ".tmp";
+                File.WriteAllText(temporaryPath, JsonUtility.ToJson(_run, true));
+                if (File.Exists(_resultsPath))
+                    File.Replace(temporaryPath, _resultsPath, null);
+                else
+                    File.Move(temporaryPath, _resultsPath);
                 if (!quiet)
                     Debug.Log($"[NetBench] Results written to {_resultsPath}");
             }

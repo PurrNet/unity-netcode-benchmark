@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Regression checks for delivery aggregation and report notes (requires bash, jq and Node)."""
 import copy
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -42,6 +43,114 @@ def sample(name):
 
 
 class DeliveryReportChecks(unittest.TestCase):
+    def test_resource_outcomes_survive_aggregation_without_inventing_windows(self):
+        script = workflow_script('benchmark.yml', 'Render per-session datapoints')
+        for case in ('partial', 'missing', 'invalid', 'time', 'harness_time', 'crash', 'host_oom'):
+            with self.subTest(case=case), tempfile.TemporaryDirectory(prefix='bench-resource-report-') as tmp:
+                root = Path(tmp)
+                scripts = root / '.github/scripts'
+                scripts.mkdir(parents=True)
+                shutil.copy2(SCRIPTS / 'bench-aggregate.sh', scripts / 'bench-aggregate.sh')
+                results = root / 'all/results/c100t60/ngo'
+                results.mkdir(parents=True)
+                server = dict(expectedClients=100, connectedAtStart=100, completed=False, tickRate=60,
+                              targetFps=60, tests=[sample('Idle')])
+                process = dict(exitCode=-9, status='resource-limit-exceeded', reason='memory',
+                               limit=8 * 1024 ** 3, memoryLimitBytes=8 * 1024 ** 3,
+                               memoryEvents=dict(oom=1), cgroupPeakBytes=8 * 1024 ** 3,
+                               watchdogSeconds=900, harnessMaxSeconds=780)
+                if case == 'time':
+                    process.update(exitCode=124, reason='time', limit=900)
+                if case in ('harness_time', 'crash'):
+                    process.update(exitCode=0, status='exited', memoryEvents={})
+                if case == 'harness_time':
+                    server.update(error='timeout', completed=True)
+                if case == 'host_oom':
+                    process.update(status='host-oom')
+                if case != 'missing':
+                    (results / 'server.json').write_text('{' if case == 'invalid' else json.dumps(server), encoding='utf-8')
+                (results / 'process-server.json').write_text(json.dumps(process), encoding='utf-8')
+                env = dict(os.environ, PLAN=json.dumps(dict(cases=[dict(netcode='ngo', tag='c100t60', total=100)])),
+                           BENCH_SECONDS='10', BENCH_OBJECTS='100', GITHUB_STEP_SUMMARY=(root / 'summary.md').as_posix())
+                output = subprocess.run([BASH, '-euo', 'pipefail', '-c', script], cwd=root, env=env,
+                                        capture_output=True, text=True, encoding='utf-8', timeout=30)
+                self.assertEqual(output.returncode, 0, output.stdout + output.stderr)
+                data = json.loads((root / 'scaling/dp-ngo-c100t60.json').read_text())
+                self.assertEqual(data['meta']['process'], process)
+                self.assertEqual(data['meta']['expectedClients'], 100)
+                self.assertEqual(data['server'], {} if case in ('missing', 'invalid') else {'Idle': server['tests'][0]})
+                error = data['meta']['serverError']
+                self.assertIn({'time': '900s time', 'harness_time': '780s harness time',
+                               'crash': 'did not complete', 'host_oom': 'infrastructure failure'}.get(case, '8 GiB memory'), error)
+
+    def test_scoring_distinguishes_inherited_rss_stalls_and_incomplete_runs_for_every_netcode(self):
+        spec = importlib.util.spec_from_file_location('summary', SCRIPTS / 'render-summary.py')
+        summary = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(summary)
+        fixture = dict(size=100, tick=60, connections=100, clients={}, meta=dict(expectedClients=100),
+                       server={t: dict(sample(t), connections=100, avgFps=60, p99FrameMs=16.7,
+                                       gcAllocBytesPerSec=1024, peakRssBytes=52 * 1024 ** 3)
+                               for t in ['Idle'] + summary.SCORE_TESTS})
+        fixture['server']['Idle']['peakRssBytes'] = 200 * 1024 ** 2
+        runs = [dict(copy.deepcopy(fixture), netcode=n) for n in summary.ORDER]
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source, output = root / 'source.json', root / 'report.html'
+            source.write_text(json.dumps(runs), encoding='utf-8')
+            subprocess.run([sys.executable, str(SCRIPTS / 'render-report.py'), str(source), str(output)], check=True, capture_output=True)
+            js = re.search(r'<script>\s*(.*?)</script>', output.read_text(encoding='utf-8'), re.S).group(1)
+            context = "const assert = require('node:assert/strict'); const elements = {}; const document = {getElementById: id => elements[id] ||= {}};\n"
+            checks = r'''
+const sc = scenarios[0];
+for (const n of netcodes) {
+  const r = run(n, sc);
+  assert.equal(stalledAnywhere(n, sc), false); // 52 GiB inherited VmHWM isn't a local stall.
+  r.server.SendRPC.p99FrameMs = 9000;
+  assert.equal(stalled(n, sc, 'SendRPC'), true);
+  assert.equal(stalled(n, sc, 'ClientInput'), false);
+  r.server.SendRPC.p99FrameMs = 16.7;
+  r.meta.serverError = 'resource limit exceeded (8 GiB memory)';
+  buildScorecard();
+  assert.ok(elements.scorecard.innerHTML.includes(r.meta.serverError));
+  assert.equal(score(sc).wins.cpu[n], 0);
+  assert.equal(marginal(n, sc, sc, 'cpu', 1), null);
+  assert.equal(stalledAnywhere(n, sc), false); // Failure is not "stalled 6/6".
+  delete r.meta.serverError;
+  const saved = r.server.SyncVars;
+  delete r.server.SyncVars;
+  assert.ok(runFailure(n, sc).startsWith('incomplete'));
+  assert.equal(score(sc).wins.cpu[n], 0);
+  r.server.SyncVars = saved;
+  r.server.SyncVars.truncated = true;
+  assert.ok(runFailure(n, sc));
+  r.server.SyncVars.truncated = false;
+}
+'''
+            result = subprocess.run(['node'], input=context + js[:js.index('\nbuildHeader();')] + checks,
+                                    text=True, capture_output=True, encoding='utf-8', timeout=30)
+            self.assertEqual(result.returncode, 0, result.stderr)
+        for r in runs:
+            n = r['netcode']
+            by = {(n, (100, 60)): r}
+            self.assertFalse(summary.stalled_anywhere(r))
+            r['server']['SendRPC']['p99FrameMs'] = 9000
+            self.assertTrue(summary.stalled(r, 'SendRPC'))
+            self.assertFalse(summary.stalled(r, 'ClientInput'))
+            r['server']['SendRPC']['p99FrameMs'] = 16.7
+            for failure in ('resource', 'missing', 'truncated'):
+                item = copy.deepcopy(r)
+                if failure == 'resource':
+                    item['meta']['serverError'] = 'resource limit exceeded (8 GiB memory)'
+                elif failure == 'missing':
+                    del item['server']['SyncVars']
+                else:
+                    item['server']['SyncVars']['truncated'] = True
+                rows = summary.scorecard([n], {(n, (100, 60)): item}, (100, 60))
+                self.assertIsNone(rows[n]['bw'])
+                self.assertIsNone(rows[n]['cpu'])
+                self.assertEqual(rows[n]['wins'], 0)
+                self.assertEqual(rows[n]['stalls'], 0)
+
     def test_chart_selector_excludes_single_test_diagnostics_and_rtt(self):
         tests = ('Idle', 'MoveY', 'MoveWander', 'SyncVars', 'SendRPC', 'ClientInput', 'Static', 'SpawnChurn')
         server = {t: dict(sample(t), gcAllocBytesPerSec=1024, rpcsSentPerSec=200,
@@ -76,7 +185,7 @@ const document = {
   getElementById: id => elements[id] ||= {addEventListener() {}}
 };
 '''
-                    checks = '''
+                    checks = r'''
 const expected = ['srvDown', 'cpu', 'cliDown', 'srvUp', 'cliUp', 'p99', 'pkts', 'alloc', 'gc', 'rss'];
 assert.deepEqual(METRICS.map(m => m.id), expected);
 assert.deepEqual(AVAILABLE.map(m => m.id), expected);
@@ -89,8 +198,14 @@ assert.ok(DATA.runs.some(r => r.server.SyncVars?.syncMutationsPerSec > 0));
 assert.ok(DATA.runs.some(r => r.clients.SyncVars?.syncSilenceAvgMs > 0));
 assert.ok(DATA.runs.some(r => r.clients.Idle?.rttP50Ms > 0));
 buildNotes();
-assert.ok(elements.warnings.innerHTML.includes('RPC delivery'));
-assert.ok(elements.warnings.innerHTML.includes('field silence'));
+assert.ok(!elements.warnings.innerHTML.includes('complete reliable RPC delivery'));
+assert.ok(!elements.warnings.innerHTML.includes('field silence'));
+assert.ok(!elements.warnings.innerHTML.includes('state matched'));
+if (DATA.runs.length === 1) assert.equal(elements.warnings.hidden, true);
+buildScorecard();
+assert.ok(elements['score-hint'].textContent.split(/\s+/).length <= 35);
+assert.ok(elements['score-hint'].textContent.includes('Incomplete or stalled runs have no averages'));
+assert.ok(METRICS.every(m => m.hint.split(/\s+/).length <= 15));
 '''
                     subprocess.run(['node'], input=context + js[:js.index('\nbuildHeader();')] + checks,
                                    text=True, encoding='utf-8', check=True, capture_output=True, timeout=30)
@@ -264,19 +379,20 @@ const el = {}, document = {getElementById: () => el};
 '''
                 output = subprocess.run(['node'], input=context + notes + '\nbuildNotes(); console.log(el.innerHTML);',
                                         text=True, encoding='utf-8', check=True, capture_output=True, timeout=30).stdout
-                if checked:
-                    self.assertIn(f'RPC delivery on {matched}/{checked} checked clients', output)
-                    self.assertIn(f'SyncVar state matched on {matched}/{checked} checked clients', output)
+                if case == 'mismatch':
+                    self.assertIn(f'incomplete RPC delivery on {checked - matched}/{checked} checked clients', output)
+                    self.assertIn(f'final-state mismatch on {checked - matched}/{checked} checked clients', output)
                 else:
                     self.assertNotIn('checked clients', output)
-                self.assertEqual('validation is incomplete' in output,
+                self.assertEqual('delivery checks incomplete' in output,
                                  case in ('client_incomplete', 'server_incomplete', 'missing_client'))
-                self.assertEqual('observation is missing or incomplete' in output,
+                self.assertEqual('observations missing or incomplete' in output,
                                  case in ('missing_client', 'no_observation', 'mixed_clients'))
-                if case == 'coalesced':
-                    self.assertIn('client-visible SyncVar changes 120.0/s', output)
-                    self.assertIn('nominal 200/s', output)
-                    self.assertIn('field silence 350.0 ms', output)
+                self.assertNotIn('field silence', output)
+                self.assertNotIn('client-visible SyncVar changes', output)
+                self.assertNotIn('state matched', output)
+                if case in ('match', 'coalesced', 'legacy'):
+                    self.assertEqual(output.strip(), '')
 
 
 if __name__ == '__main__':

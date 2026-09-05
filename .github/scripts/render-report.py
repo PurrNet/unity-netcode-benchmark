@@ -123,6 +123,9 @@ TEMPLATE = r"""<meta charset="utf-8">
   section h2 { font-size: 16px; font-weight: 600; margin: 0; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }
   section h2 .hint { font-weight: 400; }
   section > p { margin: 0; color: var(--ink-2); max-width: 78ch; }
+  .explanation { color: var(--ink-2); font-size: 12px; max-width: 90ch; }
+  .explanation summary { cursor: pointer; color: var(--muted); }
+  .explanation p { margin: 8px 0 0; }
   .hint { color: var(--muted); font-size: 12px; }
 
   .controls { display: grid; gap: 12px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--ring); border-radius: 8px; }
@@ -171,14 +174,20 @@ TEMPLATE = r"""<meta charset="utf-8">
   </header>
 
   <section>
-    <h2>At a glance <span class="hint">&#xb7; one row per netcode, lower is better everywhere</span></h2>
+    <h2>At a glance <span class="hint">&#xb7; lower costs, more wins</span></h2>
     <div class="row"><span class="lbl">Session</span><div class="seg scenarios" role="group" aria-label="Session"></div></div>
     <div class="tablewrap"><table id="scorecard"></table></div>
     <p id="score-hint"></p>
+    <details class="explanation">
+      <summary>Scoring rules</summary>
+      <p>Wins: lowest bandwidth, CPU or allocation per test. Ties share wins; CPU values within 0.5 percentage points tie. Green marks the best values within tolerance; all-equal rows or columns have no highlight.</p>
+      <p>Stalled: frame p99 &gt; 33.3 ms, 0 &lt; recorded FPS &lt; 54, or clients &lt; 90% of target. Stalled tests cannot win; any stall hides the run's averages.</p>
+      <p>Failed or incomplete runs have no averages or wins. Their recorded values remain visible without best-value highlights. Peak RSS is the process-lifetime maximum, not a per-test peak.</p>
+    </details>
   </section>
 
   <section id="scaling-section" hidden>
-    <h2>What one more costs <span class="hint">&#xb7; marginal server cost of a connection and of a tick per second; lower is better</span></h2>
+    <h2>What one more costs <span class="hint">&#xb7; added cost per connection or Hz</span></h2>
     <div class="tablewrap"><table id="scaling"></table></div>
     <p id="scaling-hint"></p>
   </section>
@@ -190,7 +199,7 @@ TEMPLATE = r"""<meta charset="utf-8">
       <div class="row"><span class="lbl">Metric</span><div class="seg" id="metrics" role="group" aria-label="Metric"></div></div>
       <div class="row">
         <span class="lbl">View</span>
-        <button class="toggle" id="normalize" aria-pressed="false" title="Divide every value by PurrNet's value in the same test and session">Relative to PurrNet</button>
+        <button class="toggle" id="normalize" aria-pressed="false" title="Ratio to PurrNet in the same test and session">Relative to PurrNet</button>
         <button class="toggle" id="logscale" aria-pressed="false">Log scale</button>
         <span class="hint" id="metric-hint"></span>
       </div>
@@ -206,7 +215,7 @@ TEMPLATE = r"""<meta charset="utf-8">
 
   <section>
     <h2>Run notes</h2>
-<p>Every netcode runs the same scenario: the server spawns N objects and replicates them to every client. On-wire bytes are read from the network interface (UDP/IP headers, ACKs and resends included). CPU is the whole server process, all threads, as % of one core with the frame loop capped at 60 fps; nothing is subtracted, so the Idle row is what holding N connections costs on its own. Fusion is relay-based (Photon Cloud): its traffic is measured on the public interface, but the server still sends one stream per client, so its downstream is comparable. Every session runs all netcodes on the same server machine and the same client machines, so numbers are comparable across netcodes within a session. Networking defaults are retained except for the documented compatibility and workload changes in the README: FishNet's Tugboat packet size lowered from 1350 to 1200 for the 1280-byte tailnet, NGO's Unity Transport packet queue raised from 128 to 4096, and NGO's NetworkTransforms set to unreliable deltas, which is how the other four deliver transforms out of the box. For the tick-driven SyncVars scenario, the four FishNet fields also have their additional 0.1-second send interval removed after initialization; channel and permissions remain unchanged. Benchmark workload scheduling is also documented there: Mirror uses an application-level tick loop without changing Unity physics timing; the other projects use native ticks. Generated/received counts, frame-sampled client-visible field changes and field silence accompany final-state checks. Field silence is time since a value last changed locally, not time since the server wrote it. These checks do not establish equal one-way latency or replication precision.</p>
+    <p>Same workload and machines within each session. Traffic includes protocol overhead; CPU covers the whole server process. Fusion uses Photon Cloud. See the <a href="https://github.com/PurrNet/unity-netcode-benchmark#changes-from-the-defaults">README</a> for setup changes and measurement limits. Detailed diagnostics are in the raw results.</p>
     <ul id="warnings" class="warnings" hidden></ul>
   </section>
 
@@ -221,10 +230,10 @@ const ORDER = ["purrnet", "fishnet", "mirror", "ngo", "fusion"];
 const NAMES = { purrnet: "PurrNet", fishnet: "FishNet", mirror: "Mirror", ngo: "NGO", fusion: "Fusion" };
 const TESTS = ["Idle", "MoveY", "MoveWander", "SyncVars", "SendRPC", "ClientInput", "Static", "SpawnChurn"];
 const TEST_DESC = {
-  Idle: "baseline · connected, nothing spawned", MoveY: "replication · N objects, sine on Y",
-  MoveWander: "replication · N objects, wander (position + rotation)", SyncVars: "replication · N objects, 1 synced field changed per tick",
-  SendRPC: "messaging · N objects, 1 observers RPC (float) per tick", ClientInput: "messaging · 1 object, each client sends 1 RPC per tick",
-  Static: "lifecycle · N objects, never touched", SpawnChurn: "lifecycle · N alive, N/50 despawned + spawned per tick"
+  Idle: "Connected; no objects", MoveY: "N objects moving on Y",
+  MoveWander: "N objects moving and rotating", SyncVars: "1 field update per object per tick",
+  SendRPC: "1 float RPC per object per tick", ClientInput: "1 RPC per client per tick",
+  Static: "N unchanged objects", SpawnChurn: "Replace N/50 objects per tick; N kept alive"
 };
 // Tests that carry real load; Idle and Static sit at the noise floor and would only add noise to averages.
 const SCORE_TESTS = ["MoveY", "MoveWander", "SyncVars", "SendRPC", "ClientInput", "SpawnChurn"];
@@ -232,16 +241,16 @@ const kb = v => v == null ? null : v / 1024;
 // tol: values this close to the best count as tied ({rel: fraction of the best} or {abs: units}).
 // Cross-test comparison metrics only; single-test workload/delivery diagnostics stay in raw data and notes.
 const METRICS = [
-  { id: "srvDown", label: "Server downstream", unit: "KB/s", lower: true, tol: { rel: 0.01 }, hint: "bytes the server puts on the wire to all clients", get: (r, t) => kb(r.server[t] && r.server[t].txBytesPerSec) },
-  { id: "cpu", label: "Server CPU", unit: "%", lower: true, tol: { abs: 0.5 }, hint: "whole process CPU as % of one core, nothing subtracted", get: (r, t) => r.server[t] ? r.server[t].cpuPercent : null },
-  { id: "cliDown", label: "Per-client downstream", unit: "KB/s", lower: true, tol: { rel: 0.01 }, hint: "average received by one measured client", get: (r, t) => kb(r.clients[t] && r.clients[t].rxBytesPerSec) },
-  { id: "srvUp", label: "Server upstream", unit: "KB/s", lower: true, tol: { rel: 0.01 }, hint: "bytes the server receives from all clients", get: (r, t) => kb(r.server[t] && r.server[t].rxBytesPerSec) },
-  { id: "cliUp", label: "Per-client upstream", unit: "KB/s", lower: true, tol: { rel: 0.01 }, hint: "average sent by one measured client", get: (r, t) => kb(r.clients[t] && r.clients[t].txBytesPerSec) },
-  { id: "p99", label: "Frame p99", unit: "ms", lower: true, tol: { abs: 0.2 }, hint: "server main-thread frame time, 99th percentile; the loop is capped at 60 fps, so 16.7 ms is on budget and anything above means the server could not keep up", get: (r, t) => r.server[t] ? r.server[t].p99FrameMs : null },
+  { id: "srvDown", label: "Server downstream", unit: "KB/s", lower: true, tol: { rel: 0.01 }, hint: "server traffic sent to all clients", get: (r, t) => kb(r.server[t] && r.server[t].txBytesPerSec) },
+  { id: "cpu", label: "Server CPU", unit: "%", lower: true, tol: { abs: 0.5 }, hint: "whole server process; 100% = one CPU core", get: (r, t) => r.server[t] ? r.server[t].cpuPercent : null },
+  { id: "cliDown", label: "Per-client downstream", unit: "KB/s", lower: true, tol: { rel: 0.01 }, hint: "traffic received per measured client", get: (r, t) => kb(r.clients[t] && r.clients[t].rxBytesPerSec) },
+  { id: "srvUp", label: "Server upstream", unit: "KB/s", lower: true, tol: { rel: 0.01 }, hint: "server traffic received from all clients", get: (r, t) => kb(r.server[t] && r.server[t].rxBytesPerSec) },
+  { id: "cliUp", label: "Per-client upstream", unit: "KB/s", lower: true, tol: { rel: 0.01 }, hint: "traffic sent per measured client", get: (r, t) => kb(r.clients[t] && r.clients[t].txBytesPerSec) },
+  { id: "p99", label: "Frame p99", unit: "ms", lower: true, tol: { abs: 0.2 }, hint: "server frame time, 99th percentile; 16.7 ms budget at 60 fps", get: (r, t) => r.server[t] ? r.server[t].p99FrameMs : null },
   { id: "pkts", label: "Packets out", unit: "/s", lower: true, tol: { rel: 0.01 }, hint: "server datagrams sent per second", get: (r, t) => r.server[t] ? r.server[t].txPacketsPerSec : null },
-  { id: "alloc", label: "GC alloc", unit: "KB/s", lower: true, tol: { rel: 0.02 }, hint: "managed bytes the server allocates per second, all threads, from heap growth between frames; the garbage the collections are made of", get: (r, t) => r.server[t] && r.server[t].gcAllocBytesPerSec >= 0 ? r.server[t].gcAllocBytesPerSec / 1024 : null },
-  { id: "gc", label: "GC collections", unit: "", lower: true, tol: { abs: 0 }, hint: "server GC collections during the window (each test starts on a freshly collected heap)", get: (r, t) => r.server[t] ? r.server[t].gcCollections : null },
-  { id: "rss", label: "Peak RSS", unit: "MB", lower: true, tol: { rel: 0.02 }, hint: "server peak resident memory", get: (r, t) => r.server[t] ? r.server[t].peakRssBytes / 1048576 : null },
+  { id: "alloc", label: "GC alloc", unit: "KB/s", lower: true, tol: { rel: 0.02 }, hint: "managed allocations per second, all server threads", get: (r, t) => r.server[t] && r.server[t].gcAllocBytesPerSec >= 0 ? r.server[t].gcAllocBytesPerSec / 1024 : null },
+  { id: "gc", label: "GC collections", unit: "", lower: true, tol: { abs: 0 }, hint: "server garbage collections during the test", get: (r, t) => r.server[t] ? r.server[t].gcCollections : null },
+  { id: "rss", label: "Peak RSS", unit: "MB", lower: true, tol: { rel: 0.02 }, hint: "process-lifetime peak server memory in RAM, as of this test", get: (r, t) => r.server[t] ? r.server[t].peakRssBytes / 1048576 : null },
 ];
 
 const runs = DATA.runs;
@@ -272,6 +281,7 @@ function value(n, sc, t) {
   const v = raw(n, sc, t);
   if (v == null) return null;
   if (!state.normalize) return v;
+  if (unscored("purrnet", sc, t)) return null;
   const base = raw("purrnet", sc, t);
   if (base == null || base === 0) return null;
   return v / base;
@@ -319,7 +329,7 @@ function buildHeader() {
   vers.innerHTML = netcodes.map(n => `<span class="chip"><span class="sw" style="background:var(--s-${n})"></span>${NAMES[n]} <b>${(DATA.versions || {})[n] || "?"}</b></span>`).join("")
     + `<span class="chip">Unity <b>${(DATA.versions || {}).unity || (first && first.meta.unityVersion) || "?"}</b></span>`;
   const f = document.getElementById("footer");
-  f.innerHTML = (DATA.runUrl ? `Source run: <a href="${DATA.runUrl}">${DATA.runUrl}</a> · ` : "") + `Rendered ${DATA.rendered}. Lower is better on cost metrics. Workload and receipt rates are diagnostic: compare them with the expected load, not a higher-is-better ranking.`;
+  f.innerHTML = (DATA.runUrl ? `<a href="${DATA.runUrl}">Source run</a> · ` : "") + `Rendered ${DATA.rendered}.`;
 }
 
 // ---- Scorecard: per netcode, how far from the best across the load tests, in one session.
@@ -329,25 +339,27 @@ const GOALS = [
   { id: "alloc", label: "GC alloc", tol: 0 }
 ];
 const goalsInUse = GOALS.filter(g => AVAILABLE.some(m => m.id === g.id));
-// A server that did not keep up in a test: frame p99 past twice the 60 fps budget, a sixth of its
-// frames dropped, clients lost, or memory run away to four times its own Idle footprint. Its
-// bandwidth and CPU then describe a stall, not the netcode, so the test is left out of scoring.
+// Only this window's timing and connection count can establish a stall. VmHWM is cumulative.
 function stalled(n, sc, t) {
   const r = run(n, sc); if (!r) return false;
-  if (r.meta.serverError) return true;
   const w = r.server[t]; if (!w) return false;
-  const idleRss = r.server.Idle ? r.server.Idle.peakRssBytes : 0;
   return w.p99FrameMs > 33.3 || (w.avgFps > 0 && w.avgFps < 54) ||
-    (r.meta.expectedClients > 0 && w.connections < 0.9 * r.meta.expectedClients) ||
-    (idleRss > 0 && w.peakRssBytes > 4 * idleRss);
+    (r.meta.expectedClients > 0 && w.connections < 0.9 * r.meta.expectedClients);
 }
 function stalledAnywhere(n, sc) { return SCORE_TESTS.some(t => stalled(n, sc, t)); }
+function runFailure(n, sc) {
+  const r = run(n, sc); if (!r) return "no datapoint";
+  if (r.meta.serverError) return r.meta.serverError;
+  const have = SCORE_TESTS.filter(t => r.server[t] && !r.server[t].truncated).length;
+  return have < SCORE_TESTS.length ? `incomplete (${have}/${SCORE_TESTS.length} load tests)` : null;
+}
+function unscored(n, sc, t) { return !!runFailure(n, sc) || stalled(n, sc, t) || !!run(n, sc)?.server[t]?.truncated; }
 function score(sc) {
   // rel[goal][netcode] = per-test ratios of value / best value in that test; wins = tests won.
   const rel = {}, wins = {};
   GOALS.forEach(g => { rel[g.id] = {}; wins[g.id] = {}; netcodes.forEach(n => { rel[g.id][n] = []; wins[g.id][n] = 0; }); });
   SCORE_TESTS.forEach(t => goalsInUse.forEach(g => {
-    const vals = netcodes.map(n => ({ n, v: stalled(n, sc, t) ? null : rawM(g.id, n, sc, t) })).filter(x => x.v != null);
+    const vals = netcodes.map(n => ({ n, v: unscored(n, sc, t) ? null : rawM(g.id, n, sc, t) })).filter(x => x.v != null);
     if (!vals.length) return;
     const best = Math.min(...vals.map(x => x.v));
     vals.forEach(x => {
@@ -365,11 +377,14 @@ function buildScorecard() {
     const have = r ? SCORE_TESTS.filter(t => r.server[t]) : [];
     // Plain averages over the load tests, in the metric's own unit. A netcode that stalled in any of
     // them gets no average: one over the tests it survived would not compare with the others'.
-    const avg = mid => stalledAnywhere(n, sc) ? null : mean(SCORE_TESTS.map(t => rawM(mid, n, sc, t)));
+    const avg = mid => {
+      const vals = SCORE_TESTS.map(t => rawM(mid, n, sc, t));
+      return runFailure(n, sc) || stalledAnywhere(n, sc) || vals.some(v => v == null) ? null : mean(vals);
+    };
     return {
       n,
       stalls: r ? SCORE_TESTS.filter(t => stalled(n, sc, t)).length : 0,
-      err: r && r.meta.serverError ? r.meta.serverError : null,
+      err: runFailure(n, sc),
       bw: avg("srvDown"),
       cpu: avg("cpu"),
       alloc: avg("alloc"),
@@ -383,7 +398,7 @@ function buildScorecard() {
   const TOL = { bw: { rel: 0.02 }, cpu: { rel: 0.02 }, alloc: { rel: 0.02 }, gc: { abs: 0 }, p99: { abs: 0.2 }, rss: { rel: 0.02 }, wins: { abs: 0 } };
   const FMT = { bw: fmtKb, cpu: fmtPct, alloc: fmtKb, gc: String, p99: v => v.toFixed(1), rss: v => v.toFixed(0), wins: String };
   const bests = {};
-  Object.keys(TOL).forEach(k => { bests[k] = bestSet(rows.map(r => r[k]), k !== "wins", TOL[k], FMT[k]); });
+  Object.keys(TOL).forEach(k => { bests[k] = bestSet(rows.map(r => r.err ? null : r[k]), k !== "wins", TOL[k], FMT[k]); });
   const cell = (r, i, key, f) => r[key] == null ? `<td class="na">–</td>` : `<td class="${bests[key].has(i) ? "best" : ""}">${f(r[key])}</td>`;
   const COLS = [
     ["Bandwidth", "bw", fmtKb], ["Server CPU", "cpu", fmtPct], ["GC alloc", "alloc", fmtKb], ["Collections", "gc", v => String(v)],
@@ -394,21 +409,20 @@ function buildScorecard() {
     rows.map((r, i) => `<tr><td class="name">${chip(r.n)}${r.conns != null && r.conns !== sc.size ? `<span class="sub">${r.conns} clients</span>` : ""}${r.err ? `<span class="sub stall">${r.err}</span>` : r.stalls ? `<span class="sub stall">stalled in ${r.stalls} of ${SCORE_TESTS.length} tests</span>` : ""}</td>` +
       COLS.map(([, key, f]) => cell(r, i, key, f)).join("") + "</tr>").join("") + "</tbody>";
   document.getElementById("score-hint").textContent =
-    scLabel(sc) + ". Averages over the " + SCORE_TESTS.length + " load tests: bandwidth is what the server puts on the wire to all clients, CPU is the whole server process as a share of one core, GC alloc is managed bytes allocated per second. " +
-    "Collections is the sum over those tests; frame p99 and peak RSS are the worst of them (the loop is capped at 60 fps, so 16.7 ms means every test stayed on budget). Wins counts tests where the netcode had the lowest bandwidth, CPU (within 0.5 points) or allocation; ties share the win. Nothing is marked best when the column is a tie. A netcode that stalled in any test shows no averages, since one over the tests it survived would not compare. A test counts as stalled when the server's frame p99 passed twice the budget, it dropped more than a sixth of its frames, it lost clients, or its memory ran to four times its Idle footprint: it wins nothing and stays out of the averages, since a server that stopped serving also stops spending.";
+    "Across " + SCORE_TESTS.length + " load tests: bandwidth, CPU and allocation are averages; collections are totals; frame p99 and memory are maxima. Incomplete or stalled runs have no averages.";
 }
 
 // ---- What one more costs: (cost at the larger session - cost at the smaller) / (units added), averaged
 //      over the load tests. Unlike a multiplier this does not flatter a netcode with an expensive floor.
 function marginal(n, from, to, mid, units) {
   // A server that fell over in either session has no measurable marginal cost.
-  if (stalledAnywhere(n, from) || stalledAnywhere(n, to)) return null;
+  if (runFailure(n, from) || runFailure(n, to) || stalledAnywhere(n, from) || stalledAnywhere(n, to)) return null;
   const deltas = SCORE_TESTS.map(t => {
     if (stalled(n, from, t) || stalled(n, to, t)) return null;
     const a = rawM(mid, n, from, t), b = rawM(mid, n, to, t);
     return (a != null && b != null) ? (b - a) / units : null;
   }).filter(v => v != null);
-  return deltas.length ? deltas.reduce((x, y) => x + y, 0) / deltas.length : null;
+  return deltas.length === SCORE_TESTS.length ? deltas.reduce((x, y) => x + y, 0) / deltas.length : null;
 }
 function fmtCost(v, unit) { return v == null ? "–" : (Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : Math.abs(v) >= 1 ? v.toFixed(2) : v.toFixed(3)) + " " + unit; }
 function buildScaling() {
@@ -430,8 +444,8 @@ function buildScaling() {
   document.getElementById("scaling").innerHTML =
     "<thead><tr><th>Netcode</th>" + cols.map(c => `<th>${c.g.label}<br>${c.a.label}</th>`).join("") + "</tr></thead><tbody>" +
     rows.map((r, ri) => `<tr><td class="name">${chip(r.n)}</td>` + r.cells.map((v, i) => v == null ? `<td class="na">–</td>` : `<td class="${bestPer[i].has(ri) ? "best" : ""}">${fmtCost(v, cols[i].g.unit)}</td>`).join("") + "</tr>").join("") + "</tbody>";
-  document.getElementById("scaling-hint").textContent = "Difference between the two sessions divided by what was added, averaged over the load tests: " + axes.map(a => a.label + " from " + a.note).join("; ") +
-    ". Bandwidth in KB/s, CPU in percentage points of one core. A dash means the server stalled somewhere in one of the two sessions, so its cost could not be measured.";
+  document.getElementById("scaling-hint").textContent = axes.map(a => a.note).join("; ") +
+    ". Added cost averaged across load tests. CPU is in percentage points. A dash means missing or stalled data.";
 }
 
 // ---- Per-test bar charts for the selected metric and session.
@@ -510,7 +524,7 @@ function baseOptions(t) {
 function refresh() {
   const m = metric();
   document.getElementById("metric-hint").textContent = m.hint + (m.lower ? " · lower is better" : " · higher is better");
-  document.getElementById("charts-hint").textContent = "· " + scLabel(state.scenario) + " · click a chart to open its table";
+  document.getElementById("charts-hint").textContent = "· " + scLabel(state.scenario) + " · click for table";
   const colors = netcodes.map(n => css("--s-" + n));
   let empty = 0;
   TESTS.forEach(t => {
@@ -518,11 +532,12 @@ function refresh() {
     const data = netcodes.map(n => value(n, state.scenario, t));
     if (data.every(v => v == null)) empty++;
     ch.options = baseOptions(t);
+    ch.data.labels = netcodes.map(n => NAMES[n] + (runFailure(n, state.scenario) ? " (incomplete)" : stalled(n, state.scenario, t) ? " (stalled)" : ""));
     ch.data.datasets = [{ data, backgroundColor: colors, borderColor: colors, borderWidth: 0, borderRadius: 3, barPercentage: 0.7, categoryPercentage: 0.8 }];
     ch.update("none");
   });
   if (empty === TESTS.length)
-    document.getElementById("charts-hint").textContent += " · no " + m.label.toLowerCase() + " data in this session (its client results are missing); pick another session or metric";
+    document.getElementById("charts-hint").textContent += " · no " + m.label.toLowerCase() + " data; choose another session or metric";
   buildTable();
 }
 
@@ -531,16 +546,16 @@ function buildTable() {
   const m = metric();
   const t = state.test;
   document.getElementById("table-title").textContent = t + " — " + m.label + (state.normalize ? " relative to PurrNet" : (m.unit ? " (" + m.unit + ")" : ""));
-  document.getElementById("table-hint").textContent = TEST_DESC[t] + ". " + m.hint + ". The best value per row is marked, shared when tied, not at all when the whole row ties.";
+  document.getElementById("table-hint").textContent = m.hint + ". Only valid results receive best-value highlights.";
   let html = "<thead><tr><th>Session</th>" + netcodes.map(n => `<th>${NAMES[n]}</th>`).join("") + "</tr></thead><tbody>";
   scenarios.forEach(sc => {
     const vals = netcodes.map(n => value(n, sc, t));
-    const best = bestSet(vals, m.lower, state.normalize ? { rel: 0.02 } : m.tol, v => fmt(v, m.unit));
+    const best = bestSet(vals.map((v, i) => unscored(netcodes[i], sc, t) ? null : v), m.lower, state.normalize ? { rel: 0.02 } : m.tol, v => fmt(v, m.unit));
     html += `<tr><td>${scLabel(sc)}</td>` + netcodes.map((n, i) => {
       const v = vals[i];
       if (v == null) return `<td class="na">–</td>`;
       const r = run(n, sc);
-      const note = r && r.connections !== sc.size ? `<span class="rel" title="actual connections">${r.connections}c</span>` : "";
+      const note = unscored(n, sc, t) ? `<span class="sub stall">${runFailure(n, sc) ? "incomplete" : "stalled"}</span>` : r && r.connections !== sc.size ? `<span class="rel" title="actual connections">${r.connections}c</span>` : "";
       return `<td class="${best.has(i) ? "best" : ""}">${fmt(v, m.unit)}${note}</td>`;
     }).join("") + "</tr>";
   });
@@ -555,34 +570,30 @@ function buildNotes() {
     const r = run(n, sc);
     const where = NAMES[n] + " at " + scLabel(sc);
     if (!r) { items.push(where + ": no datapoint"); return; }
+    if (r.meta.serverError) { items.push(`${where}: ${r.meta.serverError}.`); return; }
     if (r.meta.connectedAtStart !== r.meta.expectedClients)
-      items.push(`${where}: only ${r.meta.connectedAtStart} of ${r.meta.expectedClients} clients connected before the connect timeout`);
+      items.push(`${where}: connected ${r.meta.connectedAtStart}/${r.meta.expectedClients} clients.`);
     else if (r.connections !== sc.size)
       items.push(`${where}: ran with ${r.connections} clients`);
     if (r.meta.tickRate && r.meta.tickRate !== sc.tick)
-      items.push(`${where}: the netcode reported a ${r.meta.tickRate} Hz tick, not the requested ${sc.tick} Hz`);
-    if (r.meta.serverError) items.push(`${where}: server reported ${r.meta.serverError}`);
+      items.push(`${where}: tick rate ${r.meta.tickRate} Hz; requested ${sc.tick} Hz.`);
     // A test measured on fewer clients than connected means some clients never observed its
     // spawn/despawn transition (state delivery lagged); the average still stands, on fewer samples.
     const short = TESTS.filter(t => r.clients[t] && r.clients[t].n < r.meta.measuredClients).map(t => `${t} (${r.clients[t].n}/${r.meta.measuredClients})`);
-    if (short.length) items.push(`${where}: measured on fewer clients than connected: ${short.join(", ")}`);
+    if (short.length) items.push(`${where}: missing client measurements: ${short.join(", ")}.`);
     const rpc = r.clients.SendRPC;
-    if (rpc && rpc.rpcDeliveryChecked > 0)
-      items.push(`${where}: complete reliable RPC delivery on ${rpc.rpcDeliveryMatched}/${rpc.rpcDeliveryChecked} checked clients (spawn through despawn, including warmup and delivery grace).`);
+    if (rpc && rpc.rpcDeliveryChecked > 0 && rpc.rpcDeliveryMatched < rpc.rpcDeliveryChecked)
+      items.push(`${where}: incomplete RPC delivery on ${rpc.rpcDeliveryChecked - rpc.rpcDeliveryMatched}/${rpc.rpcDeliveryChecked} checked clients.`);
     const sync = r.clients.SyncVars;
-    if (sync && sync.syncObservationClients > 0) {
-      const expected = r.server.SyncVars ? r.server.SyncVars.objects * r.meta.tickRate : null;
-      items.push(`${where}: client-visible SyncVar changes ${sync.syncObservedChangesPerSec.toFixed(1)}/s per client (nominal ${expected == null ? "unknown" : expected}/s); longest observed field silence ${sync.syncSilenceMaxMs.toFixed(1)} ms, on ${sync.syncObservationClients}/${r.meta.measuredClients} measured clients. Frame-sampled observations, not per-mutation delivery or one-way latency.`);
-    }
     if (r.server.SyncVars && Object.hasOwn(r.server.SyncVars, "syncObservationAvailable") &&
         (!sync || !sync.syncObservationClients || sync.syncObservationClients < r.meta.measuredClients))
-      items.push(`${where}: client-visible SyncVar observation is missing or incomplete; no freshness conclusion can be drawn from final-state matching alone.`);
-    if (sync && sync.syncStateChecked > 0)
-      items.push(`${where}: exact final SyncVar state matched on ${sync.syncStateMatched}/${sync.syncStateChecked} checked clients. A mismatch is diagnostic; native precision and delivery delay need investigation.`);
+      items.push(`${where}: SyncVars client observations missing or incomplete.`);
+    if (sync && sync.syncStateChecked > 0 && sync.syncStateMatched < sync.syncStateChecked)
+      items.push(`${where}: SyncVars final-state mismatch on ${sync.syncStateChecked - sync.syncStateMatched}/${sync.syncStateChecked} checked clients; check precision and delivery.`);
     ["SendRPC", "SyncVars"].forEach(t => {
       const s = r.server[t], c = r.clients[t];
       if (s && Object.hasOwn(s, "deliveryComplete") && (!s.deliveryComplete || !c || (t === "SendRPC" ? c.rpcDeliveryChecked : c.syncStateChecked) < r.meta.measuredClients))
-        items.push(`${where}: ${t} delivery validation is incomplete; missing checks are not passes.`);
+        items.push(`${where}: ${t} delivery checks incomplete.`);
     });
   }));
   // All netcodes of one session are meant to run on the same server machine; if the CPU models
@@ -592,7 +603,7 @@ function buildNotes() {
     netcodes.forEach(n => { const r = run(n, sc); if (r && r.meta.cpuModel) models[NAMES[n]] = r.meta.cpuModel; });
     const distinct = [...new Set(Object.values(models))];
     if (distinct.length > 1)
-      items.push(`${scLabel(sc)}: servers ran on different CPU models (${Object.entries(models).map(([n, m]) => `${n}: ${m}`).join("; ")}), so CPU is not comparable across netcodes in that session`);
+      items.push(`${scLabel(sc)}: different server CPUs; CPU results are not comparable (${Object.entries(models).map(([n, m]) => `${n}: ${m}`).join("; ")}).`);
   });
   const ul = document.getElementById("warnings");
   ul.innerHTML = items.map(t => `<li>${t}</li>`).join("");
