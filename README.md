@@ -192,8 +192,11 @@ send intervals are retained except for the documented FishNet SyncVar override.
   harness re-applies 60 fps at every measurement window.
 - **Categories, not an overall verdict.** At a glance separates state replication (MoveY,
   MoveWander, SyncVars), messaging (server broadcast and client-to-server RPCs), and spawn / despawn
-  (SpawnChurn). Idle and Static remain baselines. Status is **Completed** or **Did not complete**;
-  slow frames do not change completion status or hide averages. Frame p99 shows the slowdown.
+  (SpawnChurn). Idle and Static remain baselines. Status is **Completed**, **Overloaded** or
+  **Did not complete**. Overloaded means the test finished but the server could not hold the
+  60 fps budget (frame p99 past twice the budget, or more than a sixth of its frames dropped):
+  its numbers stay on the page, since a saturated server's bandwidth and CPU are still what it
+  did, but they can read lower than a healthy server's and are never highlighted as best.
   Missing or truncated tests and unfinished delivery checkpoints remove that category's averages
   and best-value highlights. Delivery and connection problems remain in the notes. There is no combined ranking.
   Completed categories remain usable after

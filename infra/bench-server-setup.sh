@@ -156,8 +156,10 @@ chown "$RUNNER_USER:$RUNNER_USER" "$RUNNER_DIR/.env"
 SVC=$(cat "$RUNNER_DIR/.service")
 mkdir -p "/etc/systemd/system/$SVC.d"
 # The runner and everything it spawns inherit CPUs 0-1; the workflow moves the player to BENCH_CPUS with taskset.
-# MemoryMax: a server that runs away (NGO reached 50 GB at 60 Hz) is killed by the cgroup before it
-# starves the runner agent, tailscaled and sshd on a 64 GB box.
+# MemoryMax caps the runner agent and anything else it spawns. The benchmark server player is not
+# under it: bench_resources.py moves each server case into its own root-level cgroup with an 8 GiB
+# ceiling, which is the limit that actually stops a runaway (NGO reached 50 GB at 60 Hz before it).
+# This one is the backstop for everything outside that private group on a 64 GB box.
 cat > "/etc/systemd/system/$SVC.d/cpus.conf" <<CONF
 [Service]
 CPUAffinity=$HOUSEKEEPING

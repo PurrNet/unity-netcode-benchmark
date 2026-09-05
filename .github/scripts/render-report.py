@@ -179,7 +179,7 @@ TEMPLATE = r"""<meta charset="utf-8">
     <details class="explanation">
       <summary>How to read this</summary>
       <p>Green marks the best values within tolerance; all-equal rows or columns have no highlight. There is no combined ranking.</p>
-      <p>Completed means the test finished, not that it met a frame-time target. Frame p99 shows slowdowns; delivery and connection problems stay in the notes.</p>
+      <p>Completed means the test finished, not that it met a frame-time target. Overloaded means it finished but the server could not hold the 60 fps budget (frame p99 past 33 ms or more than a sixth of frames dropped): its bandwidth and CPU describe a saturated server and can be lower than a healthy one's, so they are shown but never highlighted. Delivery and connection problems stay in the notes.</p>
       <p>Each category is reported separately. Missing or truncated tests prevent that category's averages and best-value highlights; completed categories remain usable after a later failure. Run errors stay in the notes. Idle and Static are baselines.</p>
       <p>Peak RSS is the process-lifetime maximum, not category-local memory. It remains available in the per-test view.</p>
     </details>
@@ -343,6 +343,13 @@ function runFailure(n, sc) {
   return categoryFailure(n, sc, SCORE_TESTS);
 }
 function unscored(n, sc, t) { return !!categoryFailure(n, sc, [t]); }
+// The server finished the test but could not hold the 60 fps budget: frame p99 past twice the
+// budget or more than a sixth of its frames dropped. Its numbers are shown, marked, never best.
+function overloaded(n, sc, t) {
+  const r = run(n, sc); const w = r && r.server[t]; if (!w) return false;
+  return w.p99FrameMs > 33.3 || (w.avgFps > 0 && w.avgFps < 54);
+}
+function overloadedTests(n, sc, tests) { return tests.filter(t => overloaded(n, sc, t)); }
 function categoryFailure(n, sc, tests) {
   const r = run(n, sc); if (!r) return "no datapoint";
   if (r.meta.process?.status === "host-oom") return "host memory exhausted";
@@ -369,6 +376,7 @@ function buildScorecard() {
     return {
       n,
       err: categoryFailure(n, sc, tests),
+      over: overloadedTests(n, sc, tests).length,
       bw: avg("srvDown"),
       cpu: avg("cpu"),
       alloc: avg("alloc"),
@@ -380,7 +388,7 @@ function buildScorecard() {
   const TOL = { bw: { rel: 0.02 }, cpu: { rel: 0.02 }, alloc: { rel: 0.02 }, gc: { abs: 0 }, p99: { abs: 0.2 } };
   const FMT = { bw: fmtKb, cpu: fmtPct, alloc: fmtKb, gc: String, p99: v => v.toFixed(1) };
   const bests = {};
-  Object.keys(TOL).forEach(k => { bests[k] = bestSet(rows.map(r => r.err ? null : r[k]), true, TOL[k], FMT[k]); });
+  Object.keys(TOL).forEach(k => { bests[k] = bestSet(rows.map(r => r.err || r.over ? null : r[k]), true, TOL[k], FMT[k]); });
   const cell = (r, i, key, f) => r[key] == null ? `<td class="na">–</td>` : `<td class="${bests[key].has(i) ? "best" : ""}">${f(r[key])}</td>`;
   const COLS = [
     ["Bandwidth", "bw", fmtKb], ["Server CPU", "cpu", fmtPct], ["GC alloc", "alloc", fmtKb], ["Collections", "gc", v => String(v)],
@@ -388,10 +396,10 @@ function buildScorecard() {
   ].filter(([, key]) => rows.some(r => r[key] != null));
   document.getElementById("scorecard").innerHTML =
     "<thead><tr><th>Netcode</th>" + COLS.map(([label]) => `<th>${label}</th>`).join("") + "</tr></thead><tbody>" +
-    rows.map((r, i) => `<tr><td class="name">${chip(r.n)}${r.conns != null && r.conns !== sc.size ? `<span class="sub">${r.conns} clients</span>` : ""}<span class="sub${r.err ? " stall" : ""}">${r.err ? "Did not complete" : "Completed"}</span></td>` +
+    rows.map((r, i) => `<tr><td class="name">${chip(r.n)}${r.conns != null && r.conns !== sc.size ? `<span class="sub">${r.conns} clients</span>` : ""}<span class="sub${r.err || r.over ? " stall" : ""}">${r.err ? "Did not complete" : r.over ? `Completed, server overloaded in ${r.over} of ${tests.length} tests` : "Completed"}</span></td>` +
       COLS.map(([, key, f]) => cell(r, i, key, f)).join("") + "</tr>").join("") + "</tbody>";
   document.getElementById("score-hint").textContent =
-    category.hint + ". Bandwidth, CPU and allocation: averages; collections: total; frame p99: maximum. Categories that did not complete have no averages.";
+    category.hint + ". Bandwidth, CPU and allocation: averages; collections: total; frame p99: maximum. Categories that did not complete have no averages. Overloaded servers keep their numbers but are never marked best.";
 }
 
 // ---- What one more costs: (cost at the larger session - cost at the smaller) / (units added), averaged
@@ -518,7 +526,7 @@ function refresh() {
     const data = netcodes.map(n => value(n, state.scenario, t));
     if (data.every(v => v == null)) empty++;
     ch.options = baseOptions(t);
-    ch.data.labels = netcodes.map(n => NAMES[n] + (categoryFailure(n, state.scenario, [t]) ? " (Did not complete)" : ""));
+    ch.data.labels = netcodes.map(n => NAMES[n] + (categoryFailure(n, state.scenario, [t]) ? " (Did not complete)" : overloaded(n, state.scenario, t) ? " (Overloaded)" : ""));
     ch.data.datasets = [{ data, backgroundColor: colors, borderColor: colors, borderWidth: 0, borderRadius: 3, barPercentage: 0.7, categoryPercentage: 0.8 }];
     ch.update("none");
   });
@@ -536,12 +544,12 @@ function buildTable() {
   let html = "<thead><tr><th>Session</th>" + netcodes.map(n => `<th>${NAMES[n]}</th>`).join("") + "</tr></thead><tbody>";
   scenarios.forEach(sc => {
     const vals = netcodes.map(n => value(n, sc, t));
-    const best = bestSet(vals.map((v, i) => unscored(netcodes[i], sc, t) ? null : v), m.lower, state.normalize ? { rel: 0.02 } : m.tol, v => fmt(v, m.unit));
+    const best = bestSet(vals.map((v, i) => unscored(netcodes[i], sc, t) || overloaded(netcodes[i], sc, t) ? null : v), m.lower, state.normalize ? { rel: 0.02 } : m.tol, v => fmt(v, m.unit));
     html += `<tr><td>${scLabel(sc)}</td>` + netcodes.map((n, i) => {
       const v = vals[i];
       if (v == null) return `<td class="na">–</td>`;
       const r = run(n, sc);
-      const note = unscored(n, sc, t) ? `<span class="sub stall">Did not complete</span>` : r && r.connections !== sc.size ? `<span class="rel" title="actual connections">${r.connections}c</span>` : "";
+      const note = unscored(n, sc, t) ? `<span class="sub stall">Did not complete</span>` : overloaded(n, sc, t) ? `<span class="sub stall" title="frame p99 past twice the budget or frames dropped">Overloaded</span>` : r && r.connections !== sc.size ? `<span class="rel" title="actual connections">${r.connections}c</span>` : "";
       return `<td class="${best.has(i) ? "best" : ""}">${fmt(v, m.unit)}${note}</td>`;
     }).join("") + "</tr>";
   });

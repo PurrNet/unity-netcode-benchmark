@@ -103,6 +103,15 @@ def mean(xs):
     return sum(xs) / len(xs) if xs else None
 
 
+def overloaded(r, t):
+    """Finished, but the server could not hold the 60 fps budget: p99 past twice the budget or a sixth of frames dropped."""
+    w = (r or {}).get("server", {}).get(t)
+    if not w:
+        return False
+    fps = w.get("avgFps") or 0
+    return (w.get("p99FrameMs") or 0) > 33.3 or 0 < fps < 54
+
+
 def scorecard(netcodes, by, sc, tests=None):
     """Rows of measurements and completion status, without a combined score."""
     selected = SCORE_TESTS if tests is None else tests
@@ -120,6 +129,7 @@ def scorecard(netcodes, by, sc, tests=None):
             "gc": sum(r["server"][t].get("gcCollections", 0) for t in have) if have else None,
             "p99": max(r["server"][t].get("p99FrameMs", 0) for t in have) if have else None,
             "error": run_failure(r) if tests is None else category_failure(r, tests),
+            "overloaded": sum(overloaded(r, t) for t in selected),
         }
     return rows
 
@@ -300,12 +310,16 @@ def main():
         for title, key, formatter, options in specs:
             if not any(rows[n][key] is not None for n in netcodes):
                 continue
-            cells = mark_best([(None if rows[n]["error"] else rows[n][key],
+            cells = mark_best([(None if rows[n]["error"] or rows[n]["overloaded"] else rows[n][key],
                                 "–" if rows[n][key] is None else formatter(rows[n][key]))
                                for n in netcodes], **options)
             columns.append((title, cells))
         def status(n):
-            return "Did not complete" if rows[n]["error"] else "Completed"
+            if rows[n]["error"]:
+                return "Did not complete"
+            if rows[n]["overloaded"]:
+                return f"Overloaded ({rows[n]['overloaded']}/{len(tests)})"
+            return "Completed"
         table_rows = [(NAMES[n], colors[n], [(status(n), False)] + [cells[i] for _, cells in columns])
                       for i, n in enumerate(netcodes)]
         blocks.append((category, f"{ref[0]} connections @ {ref[1]} Hz · " + ", ".join(tests),
@@ -347,7 +361,7 @@ def main():
     else:
         for title, note, cols, rows_ in blocks:
             lines += md_table(title, note, cols, rows_)
-    lines.append("Categories are reported separately, with no combined ranking. Bandwidth, CPU and allocation: averages; collections: total; frame p99: maximum. Categories that did not complete have no averages. Completed means the test finished; frame p99 shows slowdowns. Idle and Static remain baselines; scaling requires the full suite.")
+    lines.append("Categories are reported separately, with no combined ranking. Bandwidth, CPU and allocation: averages; collections: total; frame p99: maximum. Categories that did not complete have no averages. Completed means the test finished. Overloaded means it finished but the server could not hold the 60 fps budget in that many tests (frame p99 past 33 ms or a sixth of frames dropped); its numbers are shown but never marked best, since they describe a saturated server. Idle and Static remain baselines; scaling requires the full suite.")
     links = []
     if args.report_url:
         links.append(f"[interactive report]({args.report_url})")
