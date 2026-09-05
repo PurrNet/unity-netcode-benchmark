@@ -44,6 +44,7 @@ TEMPLATE = r"""<meta charset="utf-8">
     --best: #006300;
     --best-wash: rgba(12, 163, 12, 0.10);
     --warn: #b45309;
+    --warn-wash: rgba(180, 83, 9, 0.12);
     --s-purrnet: #eb6834;
     --s-fishnet: #2a78d6;
     --s-mirror: #1baf7a;
@@ -66,6 +67,7 @@ TEMPLATE = r"""<meta charset="utf-8">
       --best: #0ca30c;
       --best-wash: rgba(12, 163, 12, 0.16);
       --warn: #f0a24a;
+      --warn-wash: rgba(240, 162, 74, 0.14);
       --s-purrnet: #d95926;
       --s-fishnet: #3987e5;
       --s-mirror: #199e70;
@@ -88,6 +90,7 @@ TEMPLATE = r"""<meta charset="utf-8">
     --best: #0ca30c;
     --best-wash: rgba(12, 163, 12, 0.16);
     --warn: #f0a24a;
+    --warn-wash: rgba(240, 162, 74, 0.14);
     --s-purrnet: #d95926;
     --s-fishnet: #3987e5;
     --s-mirror: #199e70;
@@ -147,6 +150,8 @@ TEMPLATE = r"""<meta charset="utf-8">
   td.name .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: -1px; }
   td .sub { color: var(--muted); font-size: 11px; margin-left: 6px; font-weight: 400; }
   td .sub.stall { color: var(--warn); }
+  tr.overloaded td, td.overloaded { background: var(--warn-wash); }
+  .overload-note { color: var(--warn); }
 
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
   .card { background: var(--surface); border: 1px solid var(--ring); border-radius: 8px; padding: 12px 12px 8px; display: grid; gap: 6px; cursor: pointer; text-align: left; font: inherit; color: inherit; }
@@ -176,10 +181,11 @@ TEMPLATE = r"""<meta charset="utf-8">
     <div class="row"><span class="lbl">Category</span><div class="seg" id="categories" role="group" aria-label="Category"></div></div>
     <div class="tablewrap"><table id="scorecard"></table></div>
     <p id="score-hint"></p>
+    <p id="score-overload" class="overload-note" hidden></p>
     <details class="explanation">
       <summary>How to read this</summary>
       <p>Green marks the best values within tolerance; all-equal rows or columns have no highlight. There is no combined ranking.</p>
-      <p>Completed means the test finished, not that it met a frame-time target. Overloaded means it finished but the server could not hold the 60 fps budget (frame p99 past 33 ms or more than a sixth of frames dropped): its bandwidth and CPU describe a saturated server and can be lower than a healthy one's, so they are shown but never highlighted. Delivery and connection problems stay in the notes.</p>
+      <p>Completed means the test finished, not that it met a frame-time target. An amber row finished but the server could not hold the 60 fps budget (frame p99 past 33 ms or more than a sixth of frames dropped): its bandwidth and CPU describe a saturated server and can be lower than a healthy one's, so they are shown but never marked best. Delivery and connection problems stay in the notes.</p>
       <p>Each category is reported separately. Missing or truncated tests prevent that category's averages and best-value highlights; completed categories remain usable after a later failure. Run errors stay in the notes. Idle and Static are baselines.</p>
       <p>Peak RSS is the process-lifetime maximum, not category-local memory. It remains available in the per-test view.</p>
     </details>
@@ -210,6 +216,7 @@ TEMPLATE = r"""<meta charset="utf-8">
     <h2 id="table-title"></h2>
     <p id="table-hint"></p>
     <div class="tablewrap"><table id="table"></table></div>
+    <p id="table-overload" class="overload-note" hidden></p>
   </section>
 
   <section>
@@ -242,6 +249,7 @@ const CATEGORIES = [
   { id: "lifecycle", label: "Spawn / despawn", tests: ["SpawnChurn"], hint: "Spawn/despawn churn" }
 ];
 const kb = v => v == null ? null : v / 1024;
+const OVERLOAD_NOTE = "Amber: the server finished but could not hold the 60 fps frame budget (frame p99 past 33 ms, or more than a sixth of its frames dropped). The numbers are what it did, but they describe a saturated server, so it is not eligible for the green best-in-class mark.";
 // tol: values this close to the best count as tied ({rel: fraction of the best} or {abs: units}).
 // Cross-test comparison metrics only; single-test workload/delivery diagnostics stay in raw data and notes.
 const METRICS = [
@@ -396,10 +404,13 @@ function buildScorecard() {
   ].filter(([, key]) => rows.some(r => r[key] != null));
   document.getElementById("scorecard").innerHTML =
     "<thead><tr><th>Netcode</th>" + COLS.map(([label]) => `<th>${label}</th>`).join("") + "</tr></thead><tbody>" +
-    rows.map((r, i) => `<tr><td class="name">${chip(r.n)}${r.conns != null && r.conns !== sc.size ? `<span class="sub">${r.conns} clients</span>` : ""}<span class="sub${r.err || r.over ? " stall" : ""}">${r.err ? "Did not complete" : r.over ? `Completed, server overloaded in ${r.over} of ${tests.length} tests` : "Completed"}</span></td>` +
+    rows.map((r, i) => `<tr class="${!r.err && r.over ? "overloaded" : ""}"${!r.err && r.over ? ` title="server overloaded in ${r.over} of ${tests.length} tests"` : ""}><td class="name">${chip(r.n)}${r.conns != null && r.conns !== sc.size ? `<span class="sub">${r.conns} clients</span>` : ""}<span class="sub${r.err ? " stall" : ""}">${r.err ? "Did not complete" : "Completed"}</span></td>` +
       COLS.map(([, key, f]) => cell(r, i, key, f)).join("") + "</tr>").join("") + "</tbody>";
+  const overloadNote = document.getElementById("score-overload");
+  overloadNote.textContent = OVERLOAD_NOTE;
+  overloadNote.hidden = !rows.some(r => !r.err && r.over);
   document.getElementById("score-hint").textContent =
-    category.hint + ". Bandwidth, CPU and allocation: averages; collections: total; frame p99: maximum. Categories that did not complete have no averages. Overloaded servers keep their numbers but are never marked best.";
+    category.hint + ". Bandwidth, CPU and allocation: averages; collections: total; frame p99: maximum. Categories that did not complete have no averages.";
 }
 
 // ---- What one more costs: (cost at the larger session - cost at the smaller) / (units added), averaged
@@ -549,12 +560,16 @@ function buildTable() {
       const v = vals[i];
       if (v == null) return `<td class="na">–</td>`;
       const r = run(n, sc);
-      const note = unscored(n, sc, t) ? `<span class="sub stall">Did not complete</span>` : overloaded(n, sc, t) ? `<span class="sub stall" title="frame p99 past twice the budget or frames dropped">Overloaded</span>` : r && r.connections !== sc.size ? `<span class="rel" title="actual connections">${r.connections}c</span>` : "";
-      return `<td class="${best.has(i) ? "best" : ""}">${fmt(v, m.unit)}${note}</td>`;
+      const over = !unscored(n, sc, t) && overloaded(n, sc, t);
+      const note = unscored(n, sc, t) ? `<span class="sub stall">Did not complete</span>` : r && r.connections !== sc.size ? `<span class="rel" title="actual connections">${r.connections}c</span>` : "";
+      return `<td class="${best.has(i) ? "best" : over ? "overloaded" : ""}"${over ? ' title="server overloaded in this test"' : ""}>${fmt(v, m.unit)}${note}</td>`;
     }).join("") + "</tr>";
   });
   html += "</tbody>";
   document.getElementById("table").innerHTML = html;
+  const tableNote = document.getElementById("table-overload");
+  tableNote.textContent = OVERLOAD_NOTE;
+  tableNote.hidden = !scenarios.some(sc => netcodes.some(n => !unscored(n, sc, t) && overloaded(n, sc, t)));
 }
 
 function buildNotes() {
