@@ -6,12 +6,9 @@ Usage: render-report.py <scaling.json> <out.html> [--versions versions.json] [--
 scaling.json is the merged list of datapoints written by bench-aggregate.sh (dp-*.json); each is one
 netcode in one session (connections x tick rate). The page is built to be read top-down:
 
-  1. Scorecard: one row per netcode for the selected session. Bandwidth and CPU are shown as the
-     geometric mean over the load tests of "this netcode / best netcode in that test", so 1.0x is
-     the best everywhere and 2.0x means twice the best on average. GC, frame p99, peak RSS and a
-     win count sit next to them.
-  2. How it scales: per netcode, the cost multiplier from the smallest to the largest connection
-     count and from the lowest to the highest tick rate (only when both sessions exist).
+  1. Category summary: bandwidth, CPU and allocation averages, total GC collections and worst
+     frame p99 for the selected session and category. No combined ranking.
+  2. How it scales: added bandwidth and CPU cost per connection or Hz (when both sessions exist).
   3. Per-test bar charts for one metric in the selected session, with relative-to-PurrNet and log
      toggles, and a detail table (rows = sessions) for the clicked test.
   4. Run notes and warnings (missing clients, mismatched CPU models or tick rates).
@@ -174,16 +171,16 @@ TEMPLATE = r"""<meta charset="utf-8">
   </header>
 
   <section>
-    <h2>At a glance <span class="hint">&#xb7; lower costs, more wins</span></h2>
+    <h2>At a glance <span class="hint">&#xb7; lower is better</span></h2>
     <div class="row"><span class="lbl">Session</span><div class="seg scenarios" role="group" aria-label="Session"></div></div>
     <div class="row"><span class="lbl">Category</span><div class="seg" id="categories" role="group" aria-label="Category"></div></div>
     <div class="tablewrap"><table id="scorecard"></table></div>
     <p id="score-hint"></p>
     <details class="explanation">
-      <summary>Scoring rules</summary>
-      <p>Wins: lowest bandwidth, CPU or allocation per test. Ties share wins; CPU values within 0.5 percentage points tie. Green marks the best values within tolerance; all-equal rows or columns have no highlight.</p>
-      <p>Stalled: frame p99 &gt; 33.3 ms, 0 &lt; recorded FPS &lt; 54, or clients &lt; 90% of target. Stalled tests cannot win; any stall hides that category's averages.</p>
-      <p>Each category is scored separately. Missing or truncated tests prevent that category's averages and wins; completed categories remain usable after a later failure. Run errors stay in the notes. Idle and Static are unscored baselines.</p>
+      <summary>How to read this</summary>
+      <p>Green marks the best values within tolerance; all-equal rows or columns have no highlight. There is no combined ranking.</p>
+      <p>Stalled: frame p99 &gt; 33.3 ms, 0 &lt; recorded FPS &lt; 54, or clients &lt; 90% of target. Any stall hides that category's averages.</p>
+      <p>Each category is reported separately. Missing or truncated tests prevent that category's averages and best-value highlights; completed categories remain usable after a later failure. Run errors stay in the notes. Idle and Static are baselines.</p>
       <p>Peak RSS is the process-lifetime maximum, not category-local memory. It remains available in the per-test view.</p>
     </details>
   </section>
@@ -242,7 +239,7 @@ const SCORE_TESTS = ["MoveY", "MoveWander", "SyncVars", "SendRPC", "ClientInput"
 const CATEGORIES = [
   { id: "state", label: "State replication", tests: ["MoveY", "MoveWander", "SyncVars"], hint: "MoveY, MoveWander, SyncVars" },
   { id: "messaging", label: "Messaging", tests: ["SendRPC", "ClientInput"], hint: "Server broadcast and client-to-server RPCs" },
-  { id: "lifecycle", label: "Lifecycle", tests: ["SpawnChurn"], hint: "Spawn/despawn churn" }
+  { id: "lifecycle", label: "Spawn / despawn", tests: ["SpawnChurn"], hint: "Spawn/despawn churn" }
 ];
 const kb = v => v == null ? null : v / 1024;
 // tol: values this close to the best count as tied ({rel: fraction of the best} or {abs: units}).
@@ -339,13 +336,7 @@ function buildHeader() {
   f.innerHTML = (DATA.runUrl ? `<a href="${DATA.runUrl}">Source run</a> · ` : "") + `Rendered ${DATA.rendered}.`;
 }
 
-// ---- Scorecard: per netcode, how far from the best across the load tests, in one session.
-const GOALS = [
-  { id: "srvDown", label: "Bandwidth", tol: 0 },
-  { id: "cpu", label: "Server CPU", tol: 0.5 },
-  { id: "alloc", label: "GC alloc", tol: 0 }
-];
-const goalsInUse = GOALS.filter(g => AVAILABLE.some(m => m.id === g.id));
+// ---- Category measurements for each netcode in one session.
 // Only this window's timing and connection count can establish a stall. VmHWM is cumulative.
 function stalled(n, sc, t) {
   const r = run(n, sc); if (!r) return false;
@@ -370,27 +361,11 @@ function categoryFailure(n, sc, tests) {
   }).length;
   return complete < tests.length ? `incomplete (${complete}/${tests.length} tests)` : null;
 }
-function score(sc, tests = SCORE_TESTS) {
-  // rel[goal][netcode] = per-test ratios of value / best value in that test; wins = tests won.
-  const rel = {}, wins = {};
-  GOALS.forEach(g => { rel[g.id] = {}; wins[g.id] = {}; netcodes.forEach(n => { rel[g.id][n] = []; wins[g.id][n] = 0; }); });
-  tests.forEach(t => goalsInUse.forEach(g => {
-    const vals = netcodes.map(n => ({ n, v: ((tests === SCORE_TESTS ? runFailure(n, sc) : categoryFailure(n, sc, tests)) || stalled(n, sc, t)) ? null : rawM(g.id, n, sc, t) })).filter(x => x.v != null);
-    if (!vals.length) return;
-    const best = Math.min(...vals.map(x => x.v));
-    vals.forEach(x => {
-      if (x.v - best <= g.tol) wins[g.id][x.n]++;
-      if (best > 0) rel[g.id][x.n].push(x.v / best);
-    });
-  }));
-  return { rel, wins };
-}
 function buildScorecard() {
   const sc = state.scenario;
   const category = CATEGORIES.find(c => c.id === state.category);
   const tests = category.tests;
   document.getElementById("categories").innerHTML = CATEGORIES.map(c => `<button type="button" data-category="${c.id}" aria-pressed="${c.id === state.category}">${c.label}</button>`).join("");
-  const { rel, wins } = score(sc, tests);
   const rows = netcodes.map(n => {
     const r = run(n, sc);
     const have = r ? tests.filter(t => r.server[t]) : [];
@@ -409,18 +384,17 @@ function buildScorecard() {
       alloc: avg("alloc"),
       gc: have.length ? have.reduce((a, t) => a + r.server[t].gcCollections, 0) : null,
       p99: have.length ? Math.max(...have.map(t => r.server[t].p99FrameMs)) : null,
-      wins: goalsInUse.reduce((a, g) => a + wins[g.id][n], 0),
       conns: r ? r.connections : null
     };
   });
-  const TOL = { bw: { rel: 0.02 }, cpu: { rel: 0.02 }, alloc: { rel: 0.02 }, gc: { abs: 0 }, p99: { abs: 0.2 }, wins: { abs: 0 } };
-  const FMT = { bw: fmtKb, cpu: fmtPct, alloc: fmtKb, gc: String, p99: v => v.toFixed(1), wins: String };
+  const TOL = { bw: { rel: 0.02 }, cpu: { rel: 0.02 }, alloc: { rel: 0.02 }, gc: { abs: 0 }, p99: { abs: 0.2 } };
+  const FMT = { bw: fmtKb, cpu: fmtPct, alloc: fmtKb, gc: String, p99: v => v.toFixed(1) };
   const bests = {};
-  Object.keys(TOL).forEach(k => { bests[k] = bestSet(rows.map(r => r.err ? null : r[k]), k !== "wins", TOL[k], FMT[k]); });
+  Object.keys(TOL).forEach(k => { bests[k] = bestSet(rows.map(r => r.err ? null : r[k]), true, TOL[k], FMT[k]); });
   const cell = (r, i, key, f) => r[key] == null ? `<td class="na">–</td>` : `<td class="${bests[key].has(i) ? "best" : ""}">${f(r[key])}</td>`;
   const COLS = [
     ["Bandwidth", "bw", fmtKb], ["Server CPU", "cpu", fmtPct], ["GC alloc", "alloc", fmtKb], ["Collections", "gc", v => String(v)],
-    ["Frame p99", "p99", v => v.toFixed(1) + " ms"], ["Wins", "wins", v => v + " / " + (tests.length * goalsInUse.length)]
+    ["Frame p99", "p99", v => v.toFixed(1) + " ms"]
   ].filter(([, key]) => rows.some(r => r[key] != null));
   document.getElementById("scorecard").innerHTML =
     "<thead><tr><th>Netcode</th>" + COLS.map(([label]) => `<th>${label}</th>`).join("") + "</tr></thead><tbody>" +

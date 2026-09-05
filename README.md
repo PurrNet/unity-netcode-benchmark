@@ -191,9 +191,10 @@ send intervals are retained except for the documented FishNet SyncVar override.
 - **Frame cap.** Mirror (headless server) and FishNet override the frame rate on start; the
   harness re-applies 60 fps at every measurement window.
 - **Categories, not an overall verdict.** At a glance separates state replication (MoveY,
-  MoveWander, SyncVars), messaging (server broadcast and client-to-server RPCs), and lifecycle
+  MoveWander, SyncVars), messaging (server broadcast and client-to-server RPCs), and spawn / despawn
   (SpawnChurn). Idle and Static remain unscored baselines. A stall removes that category's averages;
-  missing or truncated tests remove its averages and wins. Completed categories remain usable after
+  missing or truncated tests remove its averages and best-value highlights. There is no combined ranking.
+  Completed categories remain usable after
   a later failure, with the run error still shown. Scaling still requires the full suite in both sessions.
 - **Resource limits.** Every netcode keeps the same tests, including NGO at 100 connections / 60 Hz
   and reliable RPCs. Each server case has an 8 GiB cgroup memory ceiling with no swap, the existing
@@ -202,7 +203,7 @@ send intervals are retained except for the documented FishNet SyncVar override.
   kernel memory; it is not an RSS threshold. Limits are enforced outside Unity, with no memory
   polling during measurement. A runner without cgroup v2 memory controls fails preparation.
   Limit hits show as **resource limit exceeded** and retain completed measurement windows. Incomplete
-  categories receive no averages, wins or best-value highlights; completed categories are kept.
+  categories receive no averages or best-value highlights; completed categories are kept.
   Missing later tests stay missing, not zero. A contained
   limit hit does not prevent publication; a host OOM or broken fleet barrier does.
   These guards apply to new fleet runs; older results are not retroactively capped.

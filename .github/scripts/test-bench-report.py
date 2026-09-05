@@ -43,6 +43,12 @@ def sample(name):
 
 
 class DeliveryReportChecks(unittest.TestCase):
+    def test_published_reports_have_no_win_counts(self):
+        for name in ('index.html', 'latest.md', 'latest-dark.svg', 'latest-light.svg'):
+            with self.subTest(report=name):
+                page = (SCRIPTS.parent.parent / 'docs' / name).read_text(encoding='utf-8')
+                self.assertNotRegex(page, r'\b[Ww][Ii][Nn][Ss]?\b')
+
     def test_resource_outcomes_survive_aggregation_without_inventing_windows(self):
         script = workflow_script('benchmark.yml', 'Render per-session datapoints')
         for case in ('partial', 'missing', 'invalid', 'time', 'harness_time', 'crash', 'host_oom'):
@@ -115,7 +121,7 @@ for (const n of netcodes) {
         state.category = c.id;
         buildScorecard();
         assert.equal(!!categoryFailure(n, sc, c.tests), c === failedCategory);
-        assert.equal(score(sc, c.tests).wins.cpu[n], c === failedCategory ? 0 : c.tests.length);
+        assert.ok(!elements.scorecard.innerHTML.includes('Wins'));
         assert.ok(elements['score-hint'].textContent.startsWith(c.hint));
         assert.ok(!elements.scorecard.innerHTML.includes('Peak RSS'));
       }
@@ -134,14 +140,14 @@ for (const n of netcodes) {
   assert.ok(!elements.scorecard.innerHTML.includes(r.meta.serverError));
   buildNotes();
   assert.ok(elements.warnings.innerHTML.includes(r.meta.serverError));
-  assert.equal(score(sc).wins.cpu[n], 0);
+  assert.ok(runFailure(n, sc));
   assert.equal(marginal(n, sc, sc, 'cpu', 1), null);
   assert.equal(stalledAnywhere(n, sc), false); // Failure is not "stalled 6/6".
   delete r.meta.serverError;
   const saved = r.server.SyncVars;
   delete r.server.SyncVars;
   assert.ok(runFailure(n, sc).startsWith('incomplete'));
-  assert.equal(score(sc).wins.cpu[n], 0);
+  assert.equal(marginal(n, sc, sc, 'cpu', 1), null);
   r.server.SyncVars = saved;
   r.server.SyncVars.truncated = true;
   assert.ok(runFailure(n, sc));
@@ -162,7 +168,7 @@ for (const n of netcodes) {
                     for _, tests in summary.CATEGORIES:
                         row = summary.scorecard([n], {(n, (100, 60)): item}, (100, 60), tests)[n]
                         self.assertEqual(row['cpu'] is None, tests == failed_tests)
-                        self.assertEqual(row['wins'], 0 if tests == failed_tests else len(tests) * 3)
+                        self.assertNotIn('wins', row)
                         self.assertEqual(bool(row['error']), tests == failed_tests)
             self.assertFalse(summary.stalled_anywhere(r))
             r['server']['SendRPC']['p99FrameMs'] = 9000
@@ -180,7 +186,7 @@ for (const n of netcodes) {
                 rows = summary.scorecard([n], {(n, (100, 60)): item}, (100, 60))
                 self.assertIsNone(rows[n]['bw'])
                 self.assertIsNone(rows[n]['cpu'])
-                self.assertEqual(rows[n]['wins'], 0)
+                self.assertNotIn('wins', rows[n])
                 self.assertEqual(rows[n]['stalls'], 0)
 
     def test_chart_selector_excludes_single_test_diagnostics_and_rtt(self):

@@ -3,14 +3,12 @@
 
 Usage: render-summary.py <scaling.json> [--versions versions.json] [--run-url URL] [--report-url URL] [--svg-out DIR]
 
-Prints Markdown: a header line with run date / versions, then the same two tables the report opens
-with, rendered as an SVG (light + dark) and as text in a <details>:
+Prints Markdown: a header line with run date / versions, then category and scaling tables,
+rendered as an SVG (light + dark) and as text in a <details>:
 
-  * Scorecard at the reference session (largest connection count, lowest tick rate): per netcode,
-    bandwidth and server CPU as the geometric mean over the load tests of "value / best value in that
-    test" (1.00x = best everywhere), GC collections, worst frame p99 and a win count.
-  * How it scales: the cost multiplier from the smallest to the largest connection count and from
-    the lowest to the highest tick rate, per netcode, for bandwidth and CPU.
+  * Category measurements at the reference session (largest connection count, lowest tick rate):
+    bandwidth, CPU and allocation averages, GC collections and worst frame p99. No combined ranking.
+  * How it scales: added bandwidth and CPU cost per connection or Hz.
 
 Everything else lives in the interactive report.
 """
@@ -28,9 +26,8 @@ SCORE_TESTS = ["MoveY", "MoveWander", "SyncVars", "SendRPC", "ClientInput", "Spa
 CATEGORIES = [
     ("State replication", ["MoveY", "MoveWander", "SyncVars"]),
     ("Messaging", ["SendRPC", "ClientInput"]),
-    ("Lifecycle", ["SpawnChurn"]),
+    ("Spawn / despawn", ["SpawnChurn"]),
 ]
-GOALS = [("srvDown", 0.0), ("cpu", 0.5), ("alloc", 0.0)]
 
 SERIES = {
     "light": {"purrnet": "#eb6834", "fishnet": "#2a78d6", "mirror": "#1baf7a", "ngo": "#eda100", "fusion": "#e87ba4"},
@@ -124,31 +121,9 @@ def mean(xs):
     return sum(xs) / len(xs) if xs else None
 
 
-def goals_in_use(netcodes, by, sc):
-    fields = {"srvDown": "txBytesPerSec", "cpu": "cpuPercent", "alloc": "gcAllocBytesPerSec"}
-    return [(g, tol) for g, tol in GOALS if any(
-        (by.get((n, sc), {}).get("server", {}).get(t, {}).get(fields[g])) is not None and
-        by[(n, sc)]["server"][t][fields[g]] >= 0
-        for n in netcodes for t in SCORE_TESTS)]
-
-
 def scorecard(netcodes, by, sc, tests=None):
-    """rows: netcode -> dict(bw, cpu, alloc, gc, p99, wins)."""
-    rel = {g: {n: [] for n in netcodes} for g, _ in GOALS}
-    wins = {n: 0 for n in netcodes}
+    """Rows of measurements and completion status, without a combined score."""
     selected = SCORE_TESTS if tests is None else tests
-    for t in selected:
-        for g, tol in goals_in_use(netcodes, by, sc):
-            vals = [(n, metric(by[(n, sc)], g, t, tests)) for n in netcodes if (n, sc) in by]
-            vals = [(n, v) for n, v in vals if v is not None]
-            if not vals:
-                continue
-            best = min(v for _, v in vals)
-            for n, v in vals:
-                if v - best <= tol:
-                    wins[n] += 1
-                if best > 0:
-                    rel[g][n].append(v / best)
     rows = {}
     for n in netcodes:
         r = by.get((n, sc))
@@ -163,7 +138,6 @@ def scorecard(netcodes, by, sc, tests=None):
             "alloc": average("alloc"),
             "gc": sum(r["server"][t].get("gcCollections", 0) for t in have) if have else None,
             "p99": max(r["server"][t].get("p99FrameMs", 0) for t in have) if have else None,
-            "wins": wins[n] if r else None,
             "stalls": len(stalls),
             "error": run_failure(r) if tests is None else category_failure(r, tests),
         }
@@ -336,14 +310,12 @@ def main():
     t1 = f"At a glance, {ref[0]} connections @ {ref[1]} Hz"
     for category, tests in CATEGORIES:
         rows = scorecard(netcodes, by, ref, tests)
-        n_goals = len(goals_in_use(netcodes, by, ref))
         specs = [
             ("Bandwidth", "bw", fmt_kbs, {}),
             ("Server CPU", "cpu", fmt_pct, {}),
             ("GC alloc", "alloc", fmt_kbs, {}),
             ("Collections", "gc", str, dict(abs_tol=0)),
             ("Frame p99", "p99", lambda v: f"{v:.1f} ms", dict(abs_tol=0.2)),
-            ("Wins", "wins", lambda v: f"{v} / {len(tests) * n_goals}", dict(lower=False, abs_tol=0)),
         ]
         columns = []
         for title, key, formatter, options in specs:
@@ -398,7 +370,7 @@ def main():
     else:
         for title, note, cols, rows_ in blocks:
             lines += md_table(title, note, cols, rows_)
-    lines.append("Categories are scored separately. Bandwidth, CPU and allocation: averages; collections: total; frame p99: maximum. Incomplete or stalled categories have no averages. Idle and Static remain unscored baselines; scaling requires the full suite.")
+    lines.append("Categories are reported separately, with no combined ranking. Bandwidth, CPU and allocation: averages; collections: total; frame p99: maximum. Incomplete or stalled categories have no averages. Idle and Static remain baselines; scaling requires the full suite.")
     links = []
     if args.report_url:
         links.append(f"[interactive report]({args.report_url})")
