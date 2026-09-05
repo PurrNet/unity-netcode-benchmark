@@ -25,6 +25,11 @@ ORDER = ["purrnet", "fishnet", "mirror", "ngo", "fusion"]
 NAMES = {"purrnet": "PurrNet", "fishnet": "FishNet", "mirror": "Mirror", "ngo": "NGO", "fusion": "Fusion"}
 # Tests that carry real load; Idle and Static sit at the noise floor.
 SCORE_TESTS = ["MoveY", "MoveWander", "SyncVars", "SendRPC", "ClientInput", "SpawnChurn"]
+CATEGORIES = [
+    ("State replication", ["MoveY", "MoveWander", "SyncVars"]),
+    ("Messaging", ["SendRPC", "ClientInput"]),
+    ("Lifecycle", ["SpawnChurn"]),
+]
 GOALS = [("srvDown", 0.0), ("cpu", 0.5), ("alloc", 0.0)]
 
 SERIES = {
@@ -68,9 +73,23 @@ def stalled_anywhere(r):
     return any(stalled(r, t) for t in SCORE_TESTS)
 
 
-def metric(r, mid, t):
+def category_failure(r, tests):
+    if not r:
+        return "no datapoint"
+    meta = r.get("meta") or {}
+    if (meta.get("process") or {}).get("status") == "host-oom":
+        return "host memory exhausted"
+    def complete(t):
+        w = r.get("server", {}).get(t)
+        return bool(w and not w.get("truncated") and not (
+            meta.get("serverError") and t in ("SendRPC", "SyncVars") and w.get("deliveryComplete") is not True))
+    have = sum(complete(t) for t in tests)
+    return f"incomplete ({have}/{len(tests)} tests)" if have < len(tests) else None
+
+
+def metric(r, mid, t, tests=None):
     s = r.get("server", {}).get(t) if r else None
-    if not s or run_failure(r) or stalled(r, t):
+    if not s or (run_failure(r) if tests is None else category_failure(r, tests)) or stalled(r, t):
         return None
     alloc = s.get("gcAllocBytesPerSec")
     return {"srvDown": s.get("txBytesPerSec"), "cpu": s.get("cpuPercent"), "gc": s.get("gcCollections"),
@@ -106,16 +125,21 @@ def mean(xs):
 
 
 def goals_in_use(netcodes, by, sc):
-    return [(g, tol) for g, tol in GOALS if any((n, sc) in by and metric(by[(n, sc)], g, t) is not None for n in netcodes for t in SCORE_TESTS)]
+    fields = {"srvDown": "txBytesPerSec", "cpu": "cpuPercent", "alloc": "gcAllocBytesPerSec"}
+    return [(g, tol) for g, tol in GOALS if any(
+        (by.get((n, sc), {}).get("server", {}).get(t, {}).get(fields[g])) is not None and
+        by[(n, sc)]["server"][t][fields[g]] >= 0
+        for n in netcodes for t in SCORE_TESTS)]
 
 
-def scorecard(netcodes, by, sc):
+def scorecard(netcodes, by, sc, tests=None):
     """rows: netcode -> dict(bw, cpu, alloc, gc, p99, wins)."""
     rel = {g: {n: [] for n in netcodes} for g, _ in GOALS}
     wins = {n: 0 for n in netcodes}
-    for t in SCORE_TESTS:
+    selected = SCORE_TESTS if tests is None else tests
+    for t in selected:
         for g, tol in goals_in_use(netcodes, by, sc):
-            vals = [(n, metric(by[(n, sc)], g, t)) for n in netcodes if (n, sc) in by]
+            vals = [(n, metric(by[(n, sc)], g, t, tests)) for n in netcodes if (n, sc) in by]
             vals = [(n, v) for n, v in vals if v is not None]
             if not vals:
                 continue
@@ -128,10 +152,10 @@ def scorecard(netcodes, by, sc):
     rows = {}
     for n in netcodes:
         r = by.get((n, sc))
-        have = [t for t in SCORE_TESTS if r and r.get("server", {}).get(t)]
-        stalls = [t for t in SCORE_TESTS if stalled(r, t)]
+        have = [t for t in selected if r and r.get("server", {}).get(t)]
+        stalls = [t for t in selected if stalled(r, t)]
         def average(mid):
-            vals = [metric(r, mid, t) for t in SCORE_TESTS]
+            vals = [metric(r, mid, t, tests) for t in selected]
             return mean(vals) if not stalls and all(v is not None for v in vals) else None
         rows[n] = {
             "bw": average("srvDown"),
@@ -141,7 +165,7 @@ def scorecard(netcodes, by, sc):
             "p99": max(r["server"][t].get("p99FrameMs", 0) for t in have) if have else None,
             "wins": wins[n] if r else None,
             "stalls": len(stalls),
-            "error": run_failure(r),
+            "error": run_failure(r) if tests is None else category_failure(r, tests),
         }
     return rows
 
@@ -296,6 +320,10 @@ def main():
         elif r.get("connections") != ref[0]:
             notes.append(f"{NAMES[n]} ran with {r.get('connections')} clients")
     for sc in scenarios:
+        for n in netcodes:
+            error = (by.get((n, sc), {}).get("meta") or {}).get("serverError")
+            if error:
+                notes.append(f"{NAMES[n]} at {sc[0]}c @ {sc[1]} Hz: {error}")
         models = {NAMES[n]: by[(n, sc)]["meta"].get("cpuModel") for n in netcodes if (n, sc) in by and by[(n, sc)]["meta"].get("cpuModel")}
         if len(set(models.values())) > 1:
             notes.append(f"at {sc[0]}c @ {sc[1]} Hz the servers ran on different CPU models (" + "; ".join(f"{n}: {m}" for n, m in models.items()) + "), so CPU is not comparable there")
@@ -303,37 +331,39 @@ def main():
         lines.append("_Note: " + "; ".join(notes) + "._")
         lines.append("")
 
-    # Block 1: scorecard at the reference session.
-    rows = scorecard(netcodes, by, ref)
+    # One scorecard per category; no overall pass/fail scorecard.
+    blocks = []
     t1 = f"At a glance, {ref[0]} connections @ {ref[1]} Hz"
-    bw = mark_best([(rows[n]["bw"], fmt_kbs(rows[n]["bw"])) for n in netcodes])
-    cpu = mark_best([(rows[n]["cpu"], fmt_pct(rows[n]["cpu"])) for n in netcodes])
-    alloc = mark_best([(rows[n]["alloc"], fmt_kbs(rows[n]["alloc"])) for n in netcodes])
-    gc = mark_best([(None if rows[n]["error"] else rows[n]["gc"], "–" if rows[n]["gc"] is None else str(rows[n]["gc"])) for n in netcodes], abs_tol=0)
-    p99 = mark_best([(None if rows[n]["error"] else rows[n]["p99"], "–" if rows[n]["p99"] is None else f"{rows[n]['p99']:.1f} ms") for n in netcodes], abs_tol=0.2)
-    n_goals = len(goals_in_use(netcodes, by, ref))
-    wins = mark_best([(None if rows[n]["error"] else rows[n]["wins"], "–" if rows[n]["wins"] is None else f"{rows[n]['wins']} / {len(SCORE_TESTS) * n_goals}") for n in netcodes], lower=False, abs_tol=0)
-    # Columns the dataset does not have (older runs lack allocation) are left out rather than shown as dashes.
-    columns = [("Bandwidth", "bw", bw), ("Server CPU", "cpu", cpu), ("GC alloc", "alloc", alloc), ("Collections", "gc", gc), ("Frame p99", "p99", p99), ("Wins", "wins", wins)]
-    columns = [c for c in columns if any(rows[n][c[1]] is not None for n in netcodes)]
-    cols1 = [c[0] for c in columns]
-    def label(n):
-        r = by.get((n, ref))
-        error = run_failure(r)
-        if error:
-            return NAMES[n] + (" (resource limit exceeded)" if error.startswith("resource limit exceeded") else " (incomplete)")
-        return NAMES[n] + (f" (stalled {rows[n]['stalls']}/{len(SCORE_TESTS)})" if rows[n]["stalls"] else "")
-    # Keep partial measurements visible, but never award them best-value highlights.
-    for _, _, cells in columns:
-        for i, n in enumerate(netcodes):
+    for category, tests in CATEGORIES:
+        rows = scorecard(netcodes, by, ref, tests)
+        n_goals = len(goals_in_use(netcodes, by, ref))
+        specs = [
+            ("Bandwidth", "bw", fmt_kbs, {}),
+            ("Server CPU", "cpu", fmt_pct, {}),
+            ("GC alloc", "alloc", fmt_kbs, {}),
+            ("Collections", "gc", str, dict(abs_tol=0)),
+            ("Frame p99", "p99", lambda v: f"{v:.1f} ms", dict(abs_tol=0.2)),
+            ("Wins", "wins", lambda v: f"{v} / {len(tests) * n_goals}", dict(lower=False, abs_tol=0)),
+        ]
+        columns = []
+        for title, key, formatter, options in specs:
+            if not any(rows[n][key] is not None for n in netcodes):
+                continue
+            cells = mark_best([(None if rows[n]["error"] else rows[n][key],
+                                "–" if rows[n][key] is None else formatter(rows[n][key]))
+                               for n in netcodes], **options)
+            columns.append((title, cells))
+        def status(n):
             if rows[n]["error"]:
-                cells[i] = (cells[i][0], False)
-    rows1 = [(label(n), colors[n], [c[2][i] for c in columns]) for i, n in enumerate(netcodes)]
-    note1 = "averages over the load tests; lower is better"
+                return rows[n]["error"].replace(" (", " ").replace(" tests)", "").replace("host memory exhausted", "host OOM")
+            return f"stalled {rows[n]['stalls']}/{len(tests)}" if rows[n]["stalls"] else "complete"
+        table_rows = [(NAMES[n], colors[n], [(status(n), False)] + [cells[i] for _, cells in columns])
+                      for i, n in enumerate(netcodes)]
+        blocks.append((category, f"{ref[0]} connections @ {ref[1]} Hz · " + ", ".join(tests),
+                       ["Status"] + [title for title, _ in columns], table_rows))
 
-    # Block 2: how it scales.
+    # Scaling still requires the complete, identical six-test suite in both sessions.
     axes = scaling_axes(scenarios)
-    blocks = [(t1, note1, cols1, rows1)]
     if axes:
         cols2 = [f"{g}\n{label}" for _, _, label, _, _ in axes for g in ("Bandwidth", "Server CPU")]
         cells2 = []
@@ -368,7 +398,7 @@ def main():
     else:
         for title, note, cols, rows_ in blocks:
             lines += md_table(title, note, cols, rows_)
-    lines.append(f"Across {len(SCORE_TESTS)} load tests: bandwidth, CPU and allocation are averages; collections are totals; frame p99 is the maximum. Wins count lowest bandwidth, CPU or allocation; ties share wins. Incomplete or stalled runs have no averages.")
+    lines.append("Categories are scored separately. Bandwidth, CPU and allocation: averages; collections: total; frame p99: maximum. Incomplete or stalled categories have no averages. Idle and Static remain unscored baselines; scaling requires the full suite.")
     links = []
     if args.report_url:
         links.append(f"[interactive report]({args.report_url})")

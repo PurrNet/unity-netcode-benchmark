@@ -190,17 +190,20 @@ send intervals are retained except for the documented FishNet SyncVar override.
   with a different `server_runner`.
 - **Frame cap.** Mirror (headless server) and FishNet override the frame rate on start; the
   harness re-applies 60 fps at every measurement window.
-- **Did not complete.** A netcode whose server dies mid-session shows as "did not complete" in
-  the report rather than being scored on the tests it survived; one whose server could not hold
-  the frame budget in a test is marked stalled there and wins nothing.
+- **Categories, not an overall verdict.** At a glance separates state replication (MoveY,
+  MoveWander, SyncVars), messaging (server broadcast and client-to-server RPCs), and lifecycle
+  (SpawnChurn). Idle and Static remain unscored baselines. A stall removes that category's averages;
+  missing or truncated tests remove its averages and wins. Completed categories remain usable after
+  a later failure, with the run error still shown. Scaling still requires the full suite in both sessions.
 - **Resource limits.** Every netcode keeps the same tests, including NGO at 100 connections / 60 Hz
   and reliable RPCs. Each server case has an 8 GiB cgroup memory ceiling with no swap, the existing
   780-second harness timeout and a 900-second external watchdog (10-second termination grace).
   The memory ceiling includes the server and its Xvfb wrapper, including charged file cache and
   kernel memory; it is not an RSS threshold. Limits are enforced outside Unity, with no memory
   polling during measurement. A runner without cgroup v2 memory controls fails preparation.
-  Limit hits show as **resource limit exceeded**, retain completed measurement windows and receive
-  no averages, wins or best-value highlights. Missing later tests stay missing, not zero. A contained
+  Limit hits show as **resource limit exceeded** and retain completed measurement windows. Incomplete
+  categories receive no averages, wins or best-value highlights; completed categories are kept.
+  Missing later tests stay missing, not zero. A contained
   limit hit does not prevent publication; a host OOM or broken fleet barrier does.
   These guards apply to new fleet runs; older results are not retroactively capped.
 - **Peak RSS is cumulative.** It is the process-lifetime high-water mark as of each test, not that

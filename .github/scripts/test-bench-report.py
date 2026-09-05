@@ -102,8 +102,28 @@ class DeliveryReportChecks(unittest.TestCase):
             context = "const assert = require('node:assert/strict'); const elements = {}; const document = {getElementById: id => elements[id] ||= {}};\n"
             checks = r'''
 const sc = scenarios[0];
+assert.deepEqual(CATEGORIES.map(c => c.tests), [['MoveY', 'MoveWander', 'SyncVars'], ['SendRPC', 'ClientInput'], ['SpawnChurn']]);
 for (const n of netcodes) {
   const r = run(n, sc);
+  // Every category is isolated, for every netcode, with and without a process-level error.
+  for (const failedCategory of CATEGORIES) {
+    const t = failedCategory.tests[0], saved = r.server[t];
+    delete r.server[t];
+    for (const processError of [null, 'resource limit exceeded (8 GiB memory)']) {
+      r.meta.serverError = processError;
+      for (const c of CATEGORIES) {
+        state.category = c.id;
+        buildScorecard();
+        assert.equal(!!categoryFailure(n, sc, c.tests), c === failedCategory);
+        assert.equal(score(sc, c.tests).wins.cpu[n], c === failedCategory ? 0 : c.tests.length);
+        assert.ok(elements['score-hint'].textContent.startsWith(c.hint));
+        assert.ok(!elements.scorecard.innerHTML.includes('Peak RSS'));
+      }
+    }
+    delete r.meta.serverError;
+    r.server[t] = saved;
+  }
+  state.category = 'state';
   assert.equal(stalledAnywhere(n, sc), false); // 52 GiB inherited VmHWM isn't a local stall.
   r.server.SendRPC.p99FrameMs = 9000;
   assert.equal(stalled(n, sc, 'SendRPC'), true);
@@ -111,7 +131,9 @@ for (const n of netcodes) {
   r.server.SendRPC.p99FrameMs = 16.7;
   r.meta.serverError = 'resource limit exceeded (8 GiB memory)';
   buildScorecard();
-  assert.ok(elements.scorecard.innerHTML.includes(r.meta.serverError));
+  assert.ok(!elements.scorecard.innerHTML.includes(r.meta.serverError));
+  buildNotes();
+  assert.ok(elements.warnings.innerHTML.includes(r.meta.serverError));
   assert.equal(score(sc).wins.cpu[n], 0);
   assert.equal(marginal(n, sc, sc, 'cpu', 1), null);
   assert.equal(stalledAnywhere(n, sc), false); // Failure is not "stalled 6/6".
@@ -132,6 +154,16 @@ for (const n of netcodes) {
         for r in runs:
             n = r['netcode']
             by = {(n, (100, 60)): r}
+            for _, failed_tests in summary.CATEGORIES:
+                for process_error in (None, 'resource limit exceeded (8 GiB memory)'):
+                    item = copy.deepcopy(r)
+                    del item['server'][failed_tests[0]]
+                    item['meta']['serverError'] = process_error
+                    for _, tests in summary.CATEGORIES:
+                        row = summary.scorecard([n], {(n, (100, 60)): item}, (100, 60), tests)[n]
+                        self.assertEqual(row['cpu'] is None, tests == failed_tests)
+                        self.assertEqual(row['wins'], 0 if tests == failed_tests else len(tests) * 3)
+                        self.assertEqual(bool(row['error']), tests == failed_tests)
             self.assertFalse(summary.stalled_anywhere(r))
             r['server']['SendRPC']['p99FrameMs'] = 9000
             self.assertTrue(summary.stalled(r, 'SendRPC'))
@@ -204,7 +236,7 @@ assert.ok(!elements.warnings.innerHTML.includes('state matched'));
 if (DATA.runs.length === 1) assert.equal(elements.warnings.hidden, true);
 buildScorecard();
 assert.ok(elements['score-hint'].textContent.split(/\s+/).length <= 35);
-assert.ok(elements['score-hint'].textContent.includes('Incomplete or stalled runs have no averages'));
+assert.ok(elements['score-hint'].textContent.includes('Incomplete or stalled categories have no averages'));
 assert.ok(METRICS.every(m => m.hint.split(/\s+/).length <= 15));
 '''
                     subprocess.run(['node'], input=context + js[:js.index('\nbuildHeader();')] + checks,

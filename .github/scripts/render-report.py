@@ -176,13 +176,15 @@ TEMPLATE = r"""<meta charset="utf-8">
   <section>
     <h2>At a glance <span class="hint">&#xb7; lower costs, more wins</span></h2>
     <div class="row"><span class="lbl">Session</span><div class="seg scenarios" role="group" aria-label="Session"></div></div>
+    <div class="row"><span class="lbl">Category</span><div class="seg" id="categories" role="group" aria-label="Category"></div></div>
     <div class="tablewrap"><table id="scorecard"></table></div>
     <p id="score-hint"></p>
     <details class="explanation">
       <summary>Scoring rules</summary>
       <p>Wins: lowest bandwidth, CPU or allocation per test. Ties share wins; CPU values within 0.5 percentage points tie. Green marks the best values within tolerance; all-equal rows or columns have no highlight.</p>
-      <p>Stalled: frame p99 &gt; 33.3 ms, 0 &lt; recorded FPS &lt; 54, or clients &lt; 90% of target. Stalled tests cannot win; any stall hides the run's averages.</p>
-      <p>Failed or incomplete runs have no averages or wins. Their recorded values remain visible without best-value highlights. Peak RSS is the process-lifetime maximum, not a per-test peak.</p>
+      <p>Stalled: frame p99 &gt; 33.3 ms, 0 &lt; recorded FPS &lt; 54, or clients &lt; 90% of target. Stalled tests cannot win; any stall hides that category's averages.</p>
+      <p>Each category is scored separately. Missing or truncated tests prevent that category's averages and wins; completed categories remain usable after a later failure. Run errors stay in the notes. Idle and Static are unscored baselines.</p>
+      <p>Peak RSS is the process-lifetime maximum, not category-local memory. It remains available in the per-test view.</p>
     </details>
   </section>
 
@@ -237,6 +239,11 @@ const TEST_DESC = {
 };
 // Tests that carry real load; Idle and Static sit at the noise floor and would only add noise to averages.
 const SCORE_TESTS = ["MoveY", "MoveWander", "SyncVars", "SendRPC", "ClientInput", "SpawnChurn"];
+const CATEGORIES = [
+  { id: "state", label: "State replication", tests: ["MoveY", "MoveWander", "SyncVars"], hint: "MoveY, MoveWander, SyncVars" },
+  { id: "messaging", label: "Messaging", tests: ["SendRPC", "ClientInput"], hint: "Server broadcast and client-to-server RPCs" },
+  { id: "lifecycle", label: "Lifecycle", tests: ["SpawnChurn"], hint: "Spawn/despawn churn" }
+];
 const kb = v => v == null ? null : v / 1024;
 // tol: values this close to the best count as tied ({rel: fraction of the best} or {abs: units}).
 // Cross-test comparison metrics only; single-test workload/delivery diagnostics stay in raw data and notes.
@@ -269,7 +276,7 @@ const reference = scenarios.filter(s => s.size === sizes[sizes.length - 1]).sort
 // Only offer metrics the dataset actually has (older runs lack allocation; some lack client bandwidth).
 const hasAny = m => runs.some(r => TESTS.some(t => { const v = m.get(r, t); return v != null && !Number.isNaN(v); }));
 const AVAILABLE = METRICS.filter(hasAny);
-const state = { scenario: reference, metric: AVAILABLE.some(m => m.id === "srvDown") ? "srvDown" : (AVAILABLE[0] || METRICS[0]).id, normalize: false, log: false, test: "MoveWander" };
+const state = { scenario: reference, category: "state", metric: AVAILABLE.some(m => m.id === "srvDown") ? "srvDown" : (AVAILABLE[0] || METRICS[0]).id, normalize: false, log: false, test: "MoveWander" };
 const charts = {};
 
 function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
@@ -353,13 +360,22 @@ function runFailure(n, sc) {
   const have = SCORE_TESTS.filter(t => r.server[t] && !r.server[t].truncated).length;
   return have < SCORE_TESTS.length ? `incomplete (${have}/${SCORE_TESTS.length} load tests)` : null;
 }
-function unscored(n, sc, t) { return !!runFailure(n, sc) || stalled(n, sc, t) || !!run(n, sc)?.server[t]?.truncated; }
-function score(sc) {
+function unscored(n, sc, t) { return !!categoryFailure(n, sc, [t]) || stalled(n, sc, t); }
+function categoryFailure(n, sc, tests) {
+  const r = run(n, sc); if (!r) return "no datapoint";
+  if (r.meta.process?.status === "host-oom") return "host memory exhausted";
+  const complete = tests.filter(t => {
+    const w = r.server[t];
+    return w && !w.truncated && !(r.meta.serverError && ["SendRPC", "SyncVars"].includes(t) && w.deliveryComplete !== true);
+  }).length;
+  return complete < tests.length ? `incomplete (${complete}/${tests.length} tests)` : null;
+}
+function score(sc, tests = SCORE_TESTS) {
   // rel[goal][netcode] = per-test ratios of value / best value in that test; wins = tests won.
   const rel = {}, wins = {};
   GOALS.forEach(g => { rel[g.id] = {}; wins[g.id] = {}; netcodes.forEach(n => { rel[g.id][n] = []; wins[g.id][n] = 0; }); });
-  SCORE_TESTS.forEach(t => goalsInUse.forEach(g => {
-    const vals = netcodes.map(n => ({ n, v: unscored(n, sc, t) ? null : rawM(g.id, n, sc, t) })).filter(x => x.v != null);
+  tests.forEach(t => goalsInUse.forEach(g => {
+    const vals = netcodes.map(n => ({ n, v: ((tests === SCORE_TESTS ? runFailure(n, sc) : categoryFailure(n, sc, tests)) || stalled(n, sc, t)) ? null : rawM(g.id, n, sc, t) })).filter(x => x.v != null);
     if (!vals.length) return;
     const best = Math.min(...vals.map(x => x.v));
     vals.forEach(x => {
@@ -371,45 +387,47 @@ function score(sc) {
 }
 function buildScorecard() {
   const sc = state.scenario;
-  const { rel, wins } = score(sc);
+  const category = CATEGORIES.find(c => c.id === state.category);
+  const tests = category.tests;
+  document.getElementById("categories").innerHTML = CATEGORIES.map(c => `<button type="button" data-category="${c.id}" aria-pressed="${c.id === state.category}">${c.label}</button>`).join("");
+  const { rel, wins } = score(sc, tests);
   const rows = netcodes.map(n => {
     const r = run(n, sc);
-    const have = r ? SCORE_TESTS.filter(t => r.server[t]) : [];
+    const have = r ? tests.filter(t => r.server[t]) : [];
     // Plain averages over the load tests, in the metric's own unit. A netcode that stalled in any of
     // them gets no average: one over the tests it survived would not compare with the others'.
     const avg = mid => {
-      const vals = SCORE_TESTS.map(t => rawM(mid, n, sc, t));
-      return runFailure(n, sc) || stalledAnywhere(n, sc) || vals.some(v => v == null) ? null : mean(vals);
+      const vals = tests.map(t => rawM(mid, n, sc, t));
+      return categoryFailure(n, sc, tests) || tests.some(t => stalled(n, sc, t)) || vals.some(v => v == null) ? null : mean(vals);
     };
     return {
       n,
-      stalls: r ? SCORE_TESTS.filter(t => stalled(n, sc, t)).length : 0,
-      err: runFailure(n, sc),
+      stalls: r ? tests.filter(t => stalled(n, sc, t)).length : 0,
+      err: categoryFailure(n, sc, tests),
       bw: avg("srvDown"),
       cpu: avg("cpu"),
       alloc: avg("alloc"),
       gc: have.length ? have.reduce((a, t) => a + r.server[t].gcCollections, 0) : null,
       p99: have.length ? Math.max(...have.map(t => r.server[t].p99FrameMs)) : null,
-      rss: have.length ? Math.max(...have.map(t => r.server[t].peakRssBytes / 1048576)) : null,
       wins: goalsInUse.reduce((a, g) => a + wins[g.id][n], 0),
       conns: r ? r.connections : null
     };
   });
-  const TOL = { bw: { rel: 0.02 }, cpu: { rel: 0.02 }, alloc: { rel: 0.02 }, gc: { abs: 0 }, p99: { abs: 0.2 }, rss: { rel: 0.02 }, wins: { abs: 0 } };
-  const FMT = { bw: fmtKb, cpu: fmtPct, alloc: fmtKb, gc: String, p99: v => v.toFixed(1), rss: v => v.toFixed(0), wins: String };
+  const TOL = { bw: { rel: 0.02 }, cpu: { rel: 0.02 }, alloc: { rel: 0.02 }, gc: { abs: 0 }, p99: { abs: 0.2 }, wins: { abs: 0 } };
+  const FMT = { bw: fmtKb, cpu: fmtPct, alloc: fmtKb, gc: String, p99: v => v.toFixed(1), wins: String };
   const bests = {};
   Object.keys(TOL).forEach(k => { bests[k] = bestSet(rows.map(r => r.err ? null : r[k]), k !== "wins", TOL[k], FMT[k]); });
   const cell = (r, i, key, f) => r[key] == null ? `<td class="na">–</td>` : `<td class="${bests[key].has(i) ? "best" : ""}">${f(r[key])}</td>`;
   const COLS = [
     ["Bandwidth", "bw", fmtKb], ["Server CPU", "cpu", fmtPct], ["GC alloc", "alloc", fmtKb], ["Collections", "gc", v => String(v)],
-    ["Frame p99", "p99", v => v.toFixed(1) + " ms"], ["Peak RSS", "rss", v => v.toFixed(0) + " MB"], ["Wins", "wins", v => v + " / " + (SCORE_TESTS.length * goalsInUse.length)]
+    ["Frame p99", "p99", v => v.toFixed(1) + " ms"], ["Wins", "wins", v => v + " / " + (tests.length * goalsInUse.length)]
   ].filter(([, key]) => rows.some(r => r[key] != null));
   document.getElementById("scorecard").innerHTML =
     "<thead><tr><th>Netcode</th>" + COLS.map(([label]) => `<th>${label}</th>`).join("") + "</tr></thead><tbody>" +
-    rows.map((r, i) => `<tr><td class="name">${chip(r.n)}${r.conns != null && r.conns !== sc.size ? `<span class="sub">${r.conns} clients</span>` : ""}${r.err ? `<span class="sub stall">${r.err}</span>` : r.stalls ? `<span class="sub stall">stalled in ${r.stalls} of ${SCORE_TESTS.length} tests</span>` : ""}</td>` +
+    rows.map((r, i) => `<tr><td class="name">${chip(r.n)}${r.conns != null && r.conns !== sc.size ? `<span class="sub">${r.conns} clients</span>` : ""}${r.err ? `<span class="sub stall">${r.err}</span>` : r.stalls ? `<span class="sub stall">stalled in ${r.stalls} of ${tests.length} tests</span>` : ""}</td>` +
       COLS.map(([, key, f]) => cell(r, i, key, f)).join("") + "</tr>").join("") + "</tbody>";
   document.getElementById("score-hint").textContent =
-    "Across " + SCORE_TESTS.length + " load tests: bandwidth, CPU and allocation are averages; collections are totals; frame p99 and memory are maxima. Incomplete or stalled runs have no averages.";
+    category.hint + ". Bandwidth, CPU and allocation: averages; collections: total; frame p99: maximum. Incomplete or stalled categories have no averages.";
 }
 
 // ---- What one more costs: (cost at the larger session - cost at the smaller) / (units added), averaged
@@ -450,6 +468,11 @@ function buildScaling() {
 
 // ---- Per-test bar charts for the selected metric and session.
 function buildControls() {
+  document.getElementById("categories").addEventListener("click", e => {
+    const button = e.target.closest("button[data-category]"); if (!button) return;
+    state.category = button.dataset.category;
+    buildScorecard();
+  });
   // The session drives the scorecard, the charts and the table, so the selector appears above each.
   const groups = [...document.querySelectorAll(".scenarios")];
   groups.forEach(g => {
@@ -532,7 +555,7 @@ function refresh() {
     const data = netcodes.map(n => value(n, state.scenario, t));
     if (data.every(v => v == null)) empty++;
     ch.options = baseOptions(t);
-    ch.data.labels = netcodes.map(n => NAMES[n] + (runFailure(n, state.scenario) ? " (incomplete)" : stalled(n, state.scenario, t) ? " (stalled)" : ""));
+    ch.data.labels = netcodes.map(n => NAMES[n] + (categoryFailure(n, state.scenario, [t]) ? " (incomplete)" : stalled(n, state.scenario, t) ? " (stalled)" : ""));
     ch.data.datasets = [{ data, backgroundColor: colors, borderColor: colors, borderWidth: 0, borderRadius: 3, barPercentage: 0.7, categoryPercentage: 0.8 }];
     ch.update("none");
   });
@@ -555,7 +578,7 @@ function buildTable() {
       const v = vals[i];
       if (v == null) return `<td class="na">–</td>`;
       const r = run(n, sc);
-      const note = unscored(n, sc, t) ? `<span class="sub stall">${runFailure(n, sc) ? "incomplete" : "stalled"}</span>` : r && r.connections !== sc.size ? `<span class="rel" title="actual connections">${r.connections}c</span>` : "";
+      const note = unscored(n, sc, t) ? `<span class="sub stall">${categoryFailure(n, sc, [t]) ? "incomplete" : "stalled"}</span>` : r && r.connections !== sc.size ? `<span class="rel" title="actual connections">${r.connections}c</span>` : "";
       return `<td class="${best.has(i) ? "best" : ""}">${fmt(v, m.unit)}${note}</td>`;
     }).join("") + "</tr>";
   });
