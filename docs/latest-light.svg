@@ -1,242 +1,264 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="856" height="862" viewBox="0 0 856 862" role="img" aria-label="Benchmark summary tables">
+<svg xmlns="http://www.w3.org/2000/svg" width="856" height="1025" viewBox="0 0 856 1025" role="img" aria-label="Benchmark summary tables">
 <style>text{font-family:-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif;font-size:13px;font-variant-numeric:tabular-nums}</style>
-<text x="8" y="25" font-weight="600" fill="#1f2328">State replication</text>
-<text x="848" y="25" text-anchor="end" fill="#656d76" font-size="12">100 connections @ 20 Hz · MoveY, MoveWander, SyncVars</text>
-<text x="8" y="55" fill="#656d76" font-size="11" letter-spacing="0.5">NETCODE</text>
-<text x="222" y="55" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">STATUS</text>
-<text x="346" y="55" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">BANDWIDTH</text>
-<text x="470" y="55" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">SERVER CPU</text>
-<text x="594" y="55" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">GC ALLOC</text>
-<text x="718" y="55" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">COLLECTIONS</text>
-<text x="842" y="55" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">FRAME P99</text>
+<text x="8" y="25" font-weight="600" fill="#1f2328">Who's ahead, 100 connections @ 20 Hz</text>
+<text x="848" y="25" text-anchor="end" fill="#656d76" font-size="12">best per category; no averaging across categories</text>
+<text x="8" y="55" fill="#656d76" font-size="11" letter-spacing="0.5">CATEGORY</text>
+<text x="222" y="55" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">BANDWIDTH</text>
+<text x="346" y="55" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">SERVER CPU</text>
+<text x="470" y="55" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">GC ALLOC</text>
 <line x1="8" y1="68" x2="848" y2="68" stroke="#d0d7de" stroke-width="1"/>
-<rect x="8" y="77" width="9" height="9" rx="2" fill="#eb6834"/>
-<text x="23" y="86" fill="#1f2328" font-weight="600">PurrNet</text>
-<text x="222" y="86" text-anchor="end" fill="#1f2328" font-weight="400">Completed</text>
-<rect x="236" y="71" width="112" height="21" rx="5" fill="#dafbe1"/>
-<text x="346" y="86" text-anchor="end" fill="#1a7f37" font-weight="600">1.82 MB/s</text>
-<text x="470" y="86" text-anchor="end" fill="#1f2328" font-weight="400">7.5%</text>
-<rect x="484" y="71" width="112" height="21" rx="5" fill="#dafbe1"/>
-<text x="594" y="86" text-anchor="end" fill="#1a7f37" font-weight="600">398 KB/s</text>
-<rect x="608" y="71" width="112" height="21" rx="5" fill="#dafbe1"/>
-<text x="718" y="86" text-anchor="end" fill="#1a7f37" font-weight="600">1</text>
-<rect x="732" y="71" width="112" height="21" rx="5" fill="#dafbe1"/>
-<text x="842" y="86" text-anchor="end" fill="#1a7f37" font-weight="600">16.7 ms</text>
+<text x="8" y="86" fill="#1f2328" font-weight="600">State replication</text>
+<text x="222" y="86" text-anchor="end" fill="#1f2328" font-weight="400">PurrNet</text>
+<text x="346" y="86" text-anchor="end" fill="#1f2328" font-weight="400">FishNet</text>
+<text x="470" y="86" text-anchor="end" fill="#1f2328" font-weight="400">PurrNet</text>
 <line x1="8" y1="95" x2="848" y2="95" stroke="#d0d7de" stroke-width="0.5"/>
-<rect x="8" y="104" width="9" height="9" rx="2" fill="#2a78d6"/>
-<text x="23" y="113" fill="#1f2328" font-weight="600">FishNet</text>
-<text x="222" y="113" text-anchor="end" fill="#1f2328" font-weight="400">Completed</text>
-<text x="346" y="113" text-anchor="end" fill="#1f2328" font-weight="400">2.52 MB/s</text>
-<rect x="360" y="98" width="112" height="21" rx="5" fill="#dafbe1"/>
-<text x="470" y="113" text-anchor="end" fill="#1a7f37" font-weight="600">6.3%</text>
-<text x="594" y="113" text-anchor="end" fill="#1f2328" font-weight="400">742 KB/s</text>
-<text x="718" y="113" text-anchor="end" fill="#1f2328" font-weight="400">29</text>
-<text x="842" y="113" text-anchor="end" fill="#1f2328" font-weight="400">17.4 ms</text>
+<text x="8" y="113" fill="#1f2328" font-weight="600">Messaging</text>
+<text x="222" y="113" text-anchor="end" fill="#1f2328" font-weight="400">FishNet</text>
+<text x="346" y="113" text-anchor="end" fill="#1f2328" font-weight="400">PurrNet</text>
+<text x="470" y="113" text-anchor="end" fill="#1f2328" font-weight="400">PurrNet</text>
 <line x1="8" y1="122" x2="848" y2="122" stroke="#d0d7de" stroke-width="0.5"/>
-<rect x="8" y="131" width="9" height="9" rx="2" fill="#1baf7a"/>
-<text x="23" y="140" fill="#1f2328" font-weight="600">Mirror</text>
-<text x="222" y="140" text-anchor="end" fill="#1f2328" font-weight="400">Completed</text>
-<text x="346" y="140" text-anchor="end" fill="#1f2328" font-weight="400">4.12 MB/s</text>
-<text x="470" y="140" text-anchor="end" fill="#1f2328" font-weight="400">12.6%</text>
-<text x="594" y="140" text-anchor="end" fill="#1f2328" font-weight="400">3.03 MB/s</text>
-<text x="718" y="140" text-anchor="end" fill="#1f2328" font-weight="400">24</text>
-<rect x="732" y="125" width="112" height="21" rx="5" fill="#dafbe1"/>
-<text x="842" y="140" text-anchor="end" fill="#1a7f37" font-weight="600">16.7 ms</text>
+<text x="8" y="140" fill="#1f2328" font-weight="600">Spawn / despawn</text>
+<text x="222" y="140" text-anchor="end" fill="#1f2328" font-weight="400">FishNet, Fusion</text>
+<text x="346" y="140" text-anchor="end" fill="#1f2328" font-weight="400">FishNet</text>
+<text x="470" y="140" text-anchor="end" fill="#1f2328" font-weight="400">Fusion</text>
 <line x1="8" y1="149" x2="848" y2="149" stroke="#d0d7de" stroke-width="0.5"/>
-<rect x="8" y="158" width="9" height="9" rx="2" fill="#eda100"/>
-<text x="23" y="167" fill="#1f2328" font-weight="600">NGO</text>
-<text x="222" y="167" text-anchor="end" fill="#1f2328" font-weight="400">Overloaded (3/3)</text>
-<text x="346" y="167" text-anchor="end" fill="#1f2328" font-weight="400">4.94 MB/s</text>
-<text x="470" y="167" text-anchor="end" fill="#1f2328" font-weight="400">75.1%</text>
-<text x="594" y="167" text-anchor="end" fill="#1f2328" font-weight="400">1.3 KB/s</text>
-<text x="718" y="167" text-anchor="end" fill="#1f2328" font-weight="400">0</text>
-<text x="842" y="167" text-anchor="end" fill="#1f2328" font-weight="400">47.3 ms</text>
-<line x1="8" y1="176" x2="848" y2="176" stroke="#d0d7de" stroke-width="0.5"/>
-<rect x="8" y="185" width="9" height="9" rx="2" fill="#e87ba4"/>
-<text x="23" y="194" fill="#1f2328" font-weight="600">Fusion</text>
-<text x="222" y="194" text-anchor="end" fill="#1f2328" font-weight="400">Completed</text>
-<text x="346" y="194" text-anchor="end" fill="#1f2328" font-weight="400">3.51 MB/s</text>
-<text x="470" y="194" text-anchor="end" fill="#1f2328" font-weight="400">21.4%</text>
-<text x="594" y="194" text-anchor="end" fill="#1f2328" font-weight="400">1.01 MB/s</text>
-<text x="718" y="194" text-anchor="end" fill="#1f2328" font-weight="400">16</text>
-<rect x="732" y="179" width="112" height="21" rx="5" fill="#dafbe1"/>
-<text x="842" y="194" text-anchor="end" fill="#1a7f37" font-weight="600">16.7 ms</text>
-<line x1="8" y1="203" x2="848" y2="203" stroke="#d0d7de" stroke-width="0.5"/>
-<text x="8" y="242" font-weight="600" fill="#1f2328">Messaging</text>
-<text x="848" y="242" text-anchor="end" fill="#656d76" font-size="12">100 connections @ 20 Hz · SendRPC, ClientInput</text>
-<text x="8" y="272" fill="#656d76" font-size="11" letter-spacing="0.5">NETCODE</text>
-<text x="222" y="272" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">STATUS</text>
-<text x="346" y="272" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">BANDWIDTH</text>
-<text x="470" y="272" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">SERVER CPU</text>
-<text x="594" y="272" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">GC ALLOC</text>
-<text x="718" y="272" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">COLLECTIONS</text>
-<text x="842" y="272" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">FRAME P99</text>
-<line x1="8" y1="285" x2="848" y2="285" stroke="#d0d7de" stroke-width="1"/>
-<rect x="8" y="294" width="9" height="9" rx="2" fill="#eb6834"/>
-<text x="23" y="303" fill="#1f2328" font-weight="600">PurrNet</text>
+<text x="8" y="188" font-weight="600" fill="#1f2328">State replication</text>
+<text x="848" y="188" text-anchor="end" fill="#656d76" font-size="12">100 connections @ 20 Hz · MoveY, MoveWander, SyncVars</text>
+<text x="8" y="218" fill="#656d76" font-size="11" letter-spacing="0.5">NETCODE</text>
+<text x="222" y="218" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">STATUS</text>
+<text x="346" y="218" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">BANDWIDTH</text>
+<text x="470" y="218" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">SERVER CPU</text>
+<text x="594" y="218" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">GC ALLOC</text>
+<text x="718" y="218" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">COLLECTIONS</text>
+<text x="842" y="218" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">FRAME P99</text>
+<line x1="8" y1="231" x2="848" y2="231" stroke="#d0d7de" stroke-width="1"/>
+<rect x="8" y="240" width="9" height="9" rx="2" fill="#eb6834"/>
+<text x="23" y="249" fill="#1f2328" font-weight="600">PurrNet</text>
+<text x="222" y="249" text-anchor="end" fill="#1f2328" font-weight="400">Completed</text>
+<rect x="236" y="234" width="112" height="21" rx="5" fill="#dafbe1"/>
+<text x="346" y="249" text-anchor="end" fill="#1a7f37" font-weight="600">1.81 MB/s</text>
+<text x="470" y="249" text-anchor="end" fill="#1f2328" font-weight="400">7.6%</text>
+<rect x="484" y="234" width="112" height="21" rx="5" fill="#dafbe1"/>
+<text x="594" y="249" text-anchor="end" fill="#1a7f37" font-weight="600">568 KB/s</text>
+<rect x="608" y="234" width="112" height="21" rx="5" fill="#dafbe1"/>
+<text x="718" y="249" text-anchor="end" fill="#1a7f37" font-weight="600">1</text>
+<rect x="732" y="234" width="112" height="21" rx="5" fill="#dafbe1"/>
+<text x="842" y="249" text-anchor="end" fill="#1a7f37" font-weight="600">16.7 ms</text>
+<line x1="8" y1="258" x2="848" y2="258" stroke="#d0d7de" stroke-width="0.5"/>
+<rect x="8" y="267" width="9" height="9" rx="2" fill="#2a78d6"/>
+<text x="23" y="276" fill="#1f2328" font-weight="600">FishNet</text>
+<text x="222" y="276" text-anchor="end" fill="#1f2328" font-weight="400">Completed</text>
+<text x="346" y="276" text-anchor="end" fill="#1f2328" font-weight="400">2.53 MB/s</text>
+<rect x="360" y="261" width="112" height="21" rx="5" fill="#dafbe1"/>
+<text x="470" y="276" text-anchor="end" fill="#1a7f37" font-weight="600">6.4%</text>
+<text x="594" y="276" text-anchor="end" fill="#1f2328" font-weight="400">760 KB/s</text>
+<text x="718" y="276" text-anchor="end" fill="#1f2328" font-weight="400">30</text>
+<text x="842" y="276" text-anchor="end" fill="#1f2328" font-weight="400">17.4 ms</text>
+<line x1="8" y1="285" x2="848" y2="285" stroke="#d0d7de" stroke-width="0.5"/>
+<rect x="8" y="294" width="9" height="9" rx="2" fill="#1baf7a"/>
+<text x="23" y="303" fill="#1f2328" font-weight="600">Mirror</text>
 <text x="222" y="303" text-anchor="end" fill="#1f2328" font-weight="400">Completed</text>
-<text x="346" y="303" text-anchor="end" fill="#1f2328" font-weight="400">935 KB/s</text>
-<rect x="360" y="288" width="112" height="21" rx="5" fill="#dafbe1"/>
-<text x="470" y="303" text-anchor="end" fill="#1a7f37" font-weight="600">6.0%</text>
-<rect x="484" y="288" width="112" height="21" rx="5" fill="#dafbe1"/>
-<text x="594" y="303" text-anchor="end" fill="#1a7f37" font-weight="600">718 KB/s</text>
-<rect x="608" y="288" width="112" height="21" rx="5" fill="#dafbe1"/>
-<text x="718" y="303" text-anchor="end" fill="#1a7f37" font-weight="600">1</text>
+<text x="346" y="303" text-anchor="end" fill="#1f2328" font-weight="400">4.13 MB/s</text>
+<text x="470" y="303" text-anchor="end" fill="#1f2328" font-weight="400">12.9%</text>
+<text x="594" y="303" text-anchor="end" fill="#1f2328" font-weight="400">3.11 MB/s</text>
+<text x="718" y="303" text-anchor="end" fill="#1f2328" font-weight="400">23</text>
 <rect x="732" y="288" width="112" height="21" rx="5" fill="#dafbe1"/>
 <text x="842" y="303" text-anchor="end" fill="#1a7f37" font-weight="600">16.7 ms</text>
 <line x1="8" y1="312" x2="848" y2="312" stroke="#d0d7de" stroke-width="0.5"/>
-<rect x="8" y="321" width="9" height="9" rx="2" fill="#2a78d6"/>
-<text x="23" y="330" fill="#1f2328" font-weight="600">FishNet</text>
-<text x="222" y="330" text-anchor="end" fill="#1f2328" font-weight="400">Completed</text>
-<rect x="236" y="315" width="112" height="21" rx="5" fill="#dafbe1"/>
-<text x="346" y="330" text-anchor="end" fill="#1a7f37" font-weight="600">773 KB/s</text>
-<text x="470" y="330" text-anchor="end" fill="#1f2328" font-weight="400">7.3%</text>
-<text x="594" y="330" text-anchor="end" fill="#1f2328" font-weight="400">846 KB/s</text>
-<text x="718" y="330" text-anchor="end" fill="#1f2328" font-weight="400">29</text>
-<text x="842" y="330" text-anchor="end" fill="#1f2328" font-weight="400">17.6 ms</text>
+<rect x="8" y="321" width="9" height="9" rx="2" fill="#eda100"/>
+<text x="23" y="330" fill="#1f2328" font-weight="600">NGO</text>
+<text x="222" y="330" text-anchor="end" fill="#1f2328" font-weight="400">Overloaded (3/3)</text>
+<text x="346" y="330" text-anchor="end" fill="#1f2328" font-weight="400">4.98 MB/s</text>
+<text x="470" y="330" text-anchor="end" fill="#1f2328" font-weight="400">74.7%</text>
+<text x="594" y="330" text-anchor="end" fill="#1f2328" font-weight="400">1.3 KB/s</text>
+<text x="718" y="330" text-anchor="end" fill="#1f2328" font-weight="400">0</text>
+<text x="842" y="330" text-anchor="end" fill="#1f2328" font-weight="400">47.3 ms</text>
 <line x1="8" y1="339" x2="848" y2="339" stroke="#d0d7de" stroke-width="0.5"/>
-<rect x="8" y="348" width="9" height="9" rx="2" fill="#1baf7a"/>
-<text x="23" y="357" fill="#1f2328" font-weight="600">Mirror</text>
+<rect x="8" y="348" width="9" height="9" rx="2" fill="#e87ba4"/>
+<text x="23" y="357" fill="#1f2328" font-weight="600">Fusion</text>
 <text x="222" y="357" text-anchor="end" fill="#1f2328" font-weight="400">Completed</text>
-<text x="346" y="357" text-anchor="end" fill="#1f2328" font-weight="400">1.63 MB/s</text>
-<text x="470" y="357" text-anchor="end" fill="#1f2328" font-weight="400">11.8%</text>
-<text x="594" y="357" text-anchor="end" fill="#1f2328" font-weight="400">3.50 MB/s</text>
-<text x="718" y="357" text-anchor="end" fill="#1f2328" font-weight="400">19</text>
+<text x="346" y="357" text-anchor="end" fill="#1f2328" font-weight="400">3.48 MB/s</text>
+<text x="470" y="357" text-anchor="end" fill="#1f2328" font-weight="400">21.1%</text>
+<text x="594" y="357" text-anchor="end" fill="#1f2328" font-weight="400">1021 KB/s</text>
+<text x="718" y="357" text-anchor="end" fill="#1f2328" font-weight="400">17</text>
 <rect x="732" y="342" width="112" height="21" rx="5" fill="#dafbe1"/>
 <text x="842" y="357" text-anchor="end" fill="#1a7f37" font-weight="600">16.7 ms</text>
 <line x1="8" y1="366" x2="848" y2="366" stroke="#d0d7de" stroke-width="0.5"/>
-<rect x="8" y="375" width="9" height="9" rx="2" fill="#eda100"/>
-<text x="23" y="384" fill="#1f2328" font-weight="600">NGO</text>
-<text x="222" y="384" text-anchor="end" fill="#1f2328" font-weight="400">Overloaded (1/2)</text>
-<text x="346" y="384" text-anchor="end" fill="#1f2328" font-weight="400">1.76 MB/s</text>
-<text x="470" y="384" text-anchor="end" fill="#1f2328" font-weight="400">38.2%</text>
-<text x="594" y="384" text-anchor="end" fill="#1f2328" font-weight="400">48.6 KB/s</text>
-<text x="718" y="384" text-anchor="end" fill="#1f2328" font-weight="400">1</text>
-<text x="842" y="384" text-anchor="end" fill="#1f2328" font-weight="400">41.4 ms</text>
-<line x1="8" y1="393" x2="848" y2="393" stroke="#d0d7de" stroke-width="0.5"/>
-<rect x="8" y="402" width="9" height="9" rx="2" fill="#e87ba4"/>
-<text x="23" y="411" fill="#1f2328" font-weight="600">Fusion</text>
-<text x="222" y="411" text-anchor="end" fill="#1f2328" font-weight="400">Completed</text>
-<text x="346" y="411" text-anchor="end" fill="#1f2328" font-weight="400">1.98 MB/s</text>
-<text x="470" y="411" text-anchor="end" fill="#1f2328" font-weight="400">13.3%</text>
-<text x="594" y="411" text-anchor="end" fill="#1f2328" font-weight="400">906 KB/s</text>
-<text x="718" y="411" text-anchor="end" fill="#1f2328" font-weight="400">3</text>
-<rect x="732" y="396" width="112" height="21" rx="5" fill="#dafbe1"/>
-<text x="842" y="411" text-anchor="end" fill="#1a7f37" font-weight="600">16.7 ms</text>
-<line x1="8" y1="420" x2="848" y2="420" stroke="#d0d7de" stroke-width="0.5"/>
-<text x="8" y="459" font-weight="600" fill="#1f2328">Spawn / despawn</text>
-<text x="848" y="459" text-anchor="end" fill="#656d76" font-size="12">100 connections @ 20 Hz · SpawnChurn</text>
-<text x="8" y="489" fill="#656d76" font-size="11" letter-spacing="0.5">NETCODE</text>
-<text x="222" y="489" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">STATUS</text>
-<text x="346" y="489" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">BANDWIDTH</text>
-<text x="470" y="489" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">SERVER CPU</text>
-<text x="594" y="489" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">GC ALLOC</text>
-<text x="718" y="489" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">COLLECTIONS</text>
-<text x="842" y="489" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">FRAME P99</text>
-<line x1="8" y1="502" x2="848" y2="502" stroke="#d0d7de" stroke-width="1"/>
-<rect x="8" y="511" width="9" height="9" rx="2" fill="#eb6834"/>
-<text x="23" y="520" fill="#1f2328" font-weight="600">PurrNet</text>
+<text x="8" y="405" font-weight="600" fill="#1f2328">Messaging</text>
+<text x="848" y="405" text-anchor="end" fill="#656d76" font-size="12">100 connections @ 20 Hz · SendRPC, ClientInput</text>
+<text x="8" y="435" fill="#656d76" font-size="11" letter-spacing="0.5">NETCODE</text>
+<text x="222" y="435" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">STATUS</text>
+<text x="346" y="435" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">BANDWIDTH</text>
+<text x="470" y="435" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">SERVER CPU</text>
+<text x="594" y="435" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">GC ALLOC</text>
+<text x="718" y="435" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">COLLECTIONS</text>
+<text x="842" y="435" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">FRAME P99</text>
+<line x1="8" y1="448" x2="848" y2="448" stroke="#d0d7de" stroke-width="1"/>
+<rect x="8" y="457" width="9" height="9" rx="2" fill="#eb6834"/>
+<text x="23" y="466" fill="#1f2328" font-weight="600">PurrNet</text>
+<text x="222" y="466" text-anchor="end" fill="#1f2328" font-weight="400">Completed</text>
+<text x="346" y="466" text-anchor="end" fill="#1f2328" font-weight="400">935 KB/s</text>
+<rect x="360" y="451" width="112" height="21" rx="5" fill="#dafbe1"/>
+<text x="470" y="466" text-anchor="end" fill="#1a7f37" font-weight="600">5.9%</text>
+<rect x="484" y="451" width="112" height="21" rx="5" fill="#dafbe1"/>
+<text x="594" y="466" text-anchor="end" fill="#1a7f37" font-weight="600">734 KB/s</text>
+<rect x="608" y="451" width="112" height="21" rx="5" fill="#dafbe1"/>
+<text x="718" y="466" text-anchor="end" fill="#1a7f37" font-weight="600">1</text>
+<rect x="732" y="451" width="112" height="21" rx="5" fill="#dafbe1"/>
+<text x="842" y="466" text-anchor="end" fill="#1a7f37" font-weight="600">16.7 ms</text>
+<line x1="8" y1="475" x2="848" y2="475" stroke="#d0d7de" stroke-width="0.5"/>
+<rect x="8" y="484" width="9" height="9" rx="2" fill="#2a78d6"/>
+<text x="23" y="493" fill="#1f2328" font-weight="600">FishNet</text>
+<text x="222" y="493" text-anchor="end" fill="#1f2328" font-weight="400">Completed</text>
+<rect x="236" y="478" width="112" height="21" rx="5" fill="#dafbe1"/>
+<text x="346" y="493" text-anchor="end" fill="#1a7f37" font-weight="600">773 KB/s</text>
+<text x="470" y="493" text-anchor="end" fill="#1f2328" font-weight="400">7.3%</text>
+<text x="594" y="493" text-anchor="end" fill="#1f2328" font-weight="400">909 KB/s</text>
+<text x="718" y="493" text-anchor="end" fill="#1f2328" font-weight="400">30</text>
+<text x="842" y="493" text-anchor="end" fill="#1f2328" font-weight="400">17.6 ms</text>
+<line x1="8" y1="502" x2="848" y2="502" stroke="#d0d7de" stroke-width="0.5"/>
+<rect x="8" y="511" width="9" height="9" rx="2" fill="#1baf7a"/>
+<text x="23" y="520" fill="#1f2328" font-weight="600">Mirror</text>
 <text x="222" y="520" text-anchor="end" fill="#1f2328" font-weight="400">Completed</text>
-<text x="346" y="520" text-anchor="end" fill="#1f2328" font-weight="400">775 KB/s</text>
-<text x="470" y="520" text-anchor="end" fill="#1f2328" font-weight="400">14.1%</text>
-<text x="594" y="520" text-anchor="end" fill="#1f2328" font-weight="400">3.21 MB/s</text>
-<text x="718" y="520" text-anchor="end" fill="#1f2328" font-weight="400">3</text>
+<text x="346" y="520" text-anchor="end" fill="#1f2328" font-weight="400">1.63 MB/s</text>
+<text x="470" y="520" text-anchor="end" fill="#1f2328" font-weight="400">11.8%</text>
+<text x="594" y="520" text-anchor="end" fill="#1f2328" font-weight="400">3.52 MB/s</text>
+<text x="718" y="520" text-anchor="end" fill="#1f2328" font-weight="400">19</text>
 <rect x="732" y="505" width="112" height="21" rx="5" fill="#dafbe1"/>
 <text x="842" y="520" text-anchor="end" fill="#1a7f37" font-weight="600">16.7 ms</text>
 <line x1="8" y1="529" x2="848" y2="529" stroke="#d0d7de" stroke-width="0.5"/>
-<rect x="8" y="538" width="9" height="9" rx="2" fill="#2a78d6"/>
-<text x="23" y="547" fill="#1f2328" font-weight="600">FishNet</text>
-<text x="222" y="547" text-anchor="end" fill="#1f2328" font-weight="400">Completed</text>
-<rect x="236" y="532" width="112" height="21" rx="5" fill="#dafbe1"/>
-<text x="346" y="547" text-anchor="end" fill="#1a7f37" font-weight="600">643 KB/s</text>
-<rect x="360" y="532" width="112" height="21" rx="5" fill="#dafbe1"/>
-<text x="470" y="547" text-anchor="end" fill="#1a7f37" font-weight="600">8.0%</text>
-<text x="594" y="547" text-anchor="end" fill="#1f2328" font-weight="400">1.47 MB/s</text>
-<text x="718" y="547" text-anchor="end" fill="#1f2328" font-weight="400">22</text>
-<text x="842" y="547" text-anchor="end" fill="#1f2328" font-weight="400">17.6 ms</text>
+<rect x="8" y="538" width="9" height="9" rx="2" fill="#eda100"/>
+<text x="23" y="547" fill="#1f2328" font-weight="600">NGO</text>
+<text x="222" y="547" text-anchor="end" fill="#1f2328" font-weight="400">Overloaded (1/2)</text>
+<text x="346" y="547" text-anchor="end" fill="#1f2328" font-weight="400">1.73 MB/s</text>
+<text x="470" y="547" text-anchor="end" fill="#1f2328" font-weight="400">38.2%</text>
+<text x="594" y="547" text-anchor="end" fill="#1f2328" font-weight="400">48.5 KB/s</text>
+<text x="718" y="547" text-anchor="end" fill="#1f2328" font-weight="400">1</text>
+<text x="842" y="547" text-anchor="end" fill="#1f2328" font-weight="400">41.1 ms</text>
 <line x1="8" y1="556" x2="848" y2="556" stroke="#d0d7de" stroke-width="0.5"/>
-<rect x="8" y="565" width="9" height="9" rx="2" fill="#1baf7a"/>
-<text x="23" y="574" fill="#1f2328" font-weight="600">Mirror</text>
+<rect x="8" y="565" width="9" height="9" rx="2" fill="#e87ba4"/>
+<text x="23" y="574" fill="#1f2328" font-weight="600">Fusion</text>
 <text x="222" y="574" text-anchor="end" fill="#1f2328" font-weight="400">Completed</text>
-<text x="346" y="574" text-anchor="end" fill="#1f2328" font-weight="400">858 KB/s</text>
-<text x="470" y="574" text-anchor="end" fill="#1f2328" font-weight="400">9.5%</text>
-<text x="594" y="574" text-anchor="end" fill="#1f2328" font-weight="400">4.46 MB/s</text>
-<text x="718" y="574" text-anchor="end" fill="#1f2328" font-weight="400">12</text>
+<text x="346" y="574" text-anchor="end" fill="#1f2328" font-weight="400">1.97 MB/s</text>
+<text x="470" y="574" text-anchor="end" fill="#1f2328" font-weight="400">12.7%</text>
+<text x="594" y="574" text-anchor="end" fill="#1f2328" font-weight="400">972 KB/s</text>
+<text x="718" y="574" text-anchor="end" fill="#1f2328" font-weight="400">3</text>
 <rect x="732" y="559" width="112" height="21" rx="5" fill="#dafbe1"/>
 <text x="842" y="574" text-anchor="end" fill="#1a7f37" font-weight="600">16.7 ms</text>
 <line x1="8" y1="583" x2="848" y2="583" stroke="#d0d7de" stroke-width="0.5"/>
-<rect x="8" y="592" width="9" height="9" rx="2" fill="#eda100"/>
-<text x="23" y="601" fill="#1f2328" font-weight="600">NGO</text>
-<text x="222" y="601" text-anchor="end" fill="#1f2328" font-weight="400">Completed</text>
-<text x="346" y="601" text-anchor="end" fill="#1f2328" font-weight="400">2.16 MB/s</text>
-<text x="470" y="601" text-anchor="end" fill="#1f2328" font-weight="400">11.2%</text>
-<text x="594" y="601" text-anchor="end" fill="#1f2328" font-weight="400">1.03 MB/s</text>
-<text x="718" y="601" text-anchor="end" fill="#1f2328" font-weight="400">11</text>
-<rect x="732" y="586" width="112" height="21" rx="5" fill="#dafbe1"/>
-<text x="842" y="601" text-anchor="end" fill="#1a7f37" font-weight="600">16.7 ms</text>
-<line x1="8" y1="610" x2="848" y2="610" stroke="#d0d7de" stroke-width="0.5"/>
-<rect x="8" y="619" width="9" height="9" rx="2" fill="#e87ba4"/>
-<text x="23" y="628" fill="#1f2328" font-weight="600">Fusion</text>
-<text x="222" y="628" text-anchor="end" fill="#1f2328" font-weight="400">Completed</text>
-<rect x="236" y="613" width="112" height="21" rx="5" fill="#dafbe1"/>
-<text x="346" y="628" text-anchor="end" fill="#1a7f37" font-weight="600">641 KB/s</text>
-<text x="470" y="628" text-anchor="end" fill="#1f2328" font-weight="400">11.7%</text>
-<rect x="484" y="613" width="112" height="21" rx="5" fill="#dafbe1"/>
-<text x="594" y="628" text-anchor="end" fill="#1a7f37" font-weight="600">396 KB/s</text>
-<rect x="608" y="613" width="112" height="21" rx="5" fill="#dafbe1"/>
-<text x="718" y="628" text-anchor="end" fill="#1a7f37" font-weight="600">2</text>
-<rect x="732" y="613" width="112" height="21" rx="5" fill="#dafbe1"/>
-<text x="842" y="628" text-anchor="end" fill="#1a7f37" font-weight="600">16.7 ms</text>
-<line x1="8" y1="637" x2="848" y2="637" stroke="#d0d7de" stroke-width="0.5"/>
-<text x="8" y="676" font-weight="600" fill="#1f2328">What one more costs</text>
-<text x="848" y="676" text-anchor="end" fill="#656d76" font-size="12">marginal server cost; 10 → 100 connections at 20 Hz; 20 → 60 Hz at 100 connections</text>
-<text x="8" y="706" fill="#656d76" font-size="11" letter-spacing="0.5">NETCODE</text>
-<text x="222" y="694" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">BANDWIDTH</text>
-<text x="222" y="706" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">PER CONN</text>
-<text x="346" y="694" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">SERVER CPU</text>
-<text x="346" y="706" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">PER CONN</text>
-<text x="470" y="694" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">BANDWIDTH</text>
-<text x="470" y="706" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">PER HZ</text>
-<text x="594" y="694" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">SERVER CPU</text>
-<text x="594" y="706" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">PER HZ</text>
-<line x1="8" y1="719" x2="848" y2="719" stroke="#d0d7de" stroke-width="1"/>
-<rect x="8" y="728" width="9" height="9" rx="2" fill="#eb6834"/>
-<text x="23" y="737" fill="#1f2328" font-weight="600">PurrNet</text>
-<rect x="112" y="722" width="112" height="21" rx="5" fill="#dafbe1"/>
-<text x="222" y="737" text-anchor="end" fill="#1a7f37" font-weight="600">13.7 KB/s</text>
-<text x="346" y="737" text-anchor="end" fill="#1f2328" font-weight="400">0.065 pts</text>
-<rect x="360" y="722" width="112" height="21" rx="5" fill="#dafbe1"/>
-<text x="470" y="737" text-anchor="end" fill="#1a7f37" font-weight="600">65.7 KB/s</text>
-<text x="594" y="737" text-anchor="end" fill="#1f2328" font-weight="400">0.351 pts</text>
+<text x="8" y="622" font-weight="600" fill="#1f2328">Spawn / despawn</text>
+<text x="848" y="622" text-anchor="end" fill="#656d76" font-size="12">100 connections @ 20 Hz · SpawnChurn</text>
+<text x="8" y="652" fill="#656d76" font-size="11" letter-spacing="0.5">NETCODE</text>
+<text x="222" y="652" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">STATUS</text>
+<text x="346" y="652" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">BANDWIDTH</text>
+<text x="470" y="652" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">SERVER CPU</text>
+<text x="594" y="652" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">GC ALLOC</text>
+<text x="718" y="652" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">COLLECTIONS</text>
+<text x="842" y="652" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">FRAME P99</text>
+<line x1="8" y1="665" x2="848" y2="665" stroke="#d0d7de" stroke-width="1"/>
+<rect x="8" y="674" width="9" height="9" rx="2" fill="#eb6834"/>
+<text x="23" y="683" fill="#1f2328" font-weight="600">PurrNet</text>
+<text x="222" y="683" text-anchor="end" fill="#1f2328" font-weight="400">Completed</text>
+<text x="346" y="683" text-anchor="end" fill="#1f2328" font-weight="400">773 KB/s</text>
+<text x="470" y="683" text-anchor="end" fill="#1f2328" font-weight="400">13.7%</text>
+<text x="594" y="683" text-anchor="end" fill="#1f2328" font-weight="400">3.17 MB/s</text>
+<text x="718" y="683" text-anchor="end" fill="#1f2328" font-weight="400">3</text>
+<rect x="732" y="668" width="112" height="21" rx="5" fill="#dafbe1"/>
+<text x="842" y="683" text-anchor="end" fill="#1a7f37" font-weight="600">16.7 ms</text>
+<line x1="8" y1="692" x2="848" y2="692" stroke="#d0d7de" stroke-width="0.5"/>
+<rect x="8" y="701" width="9" height="9" rx="2" fill="#2a78d6"/>
+<text x="23" y="710" fill="#1f2328" font-weight="600">FishNet</text>
+<text x="222" y="710" text-anchor="end" fill="#1f2328" font-weight="400">Completed</text>
+<rect x="236" y="695" width="112" height="21" rx="5" fill="#dafbe1"/>
+<text x="346" y="710" text-anchor="end" fill="#1a7f37" font-weight="600">643 KB/s</text>
+<rect x="360" y="695" width="112" height="21" rx="5" fill="#dafbe1"/>
+<text x="470" y="710" text-anchor="end" fill="#1a7f37" font-weight="600">7.8%</text>
+<text x="594" y="710" text-anchor="end" fill="#1f2328" font-weight="400">1.52 MB/s</text>
+<text x="718" y="710" text-anchor="end" fill="#1f2328" font-weight="400">22</text>
+<text x="842" y="710" text-anchor="end" fill="#1f2328" font-weight="400">17.5 ms</text>
+<line x1="8" y1="719" x2="848" y2="719" stroke="#d0d7de" stroke-width="0.5"/>
+<rect x="8" y="728" width="9" height="9" rx="2" fill="#1baf7a"/>
+<text x="23" y="737" fill="#1f2328" font-weight="600">Mirror</text>
+<text x="222" y="737" text-anchor="end" fill="#1f2328" font-weight="400">Completed</text>
+<text x="346" y="737" text-anchor="end" fill="#1f2328" font-weight="400">852 KB/s</text>
+<text x="470" y="737" text-anchor="end" fill="#1f2328" font-weight="400">9.4%</text>
+<text x="594" y="737" text-anchor="end" fill="#1f2328" font-weight="400">4.49 MB/s</text>
+<text x="718" y="737" text-anchor="end" fill="#1f2328" font-weight="400">12</text>
+<rect x="732" y="722" width="112" height="21" rx="5" fill="#dafbe1"/>
+<text x="842" y="737" text-anchor="end" fill="#1a7f37" font-weight="600">16.7 ms</text>
 <line x1="8" y1="746" x2="848" y2="746" stroke="#d0d7de" stroke-width="0.5"/>
-<rect x="8" y="755" width="9" height="9" rx="2" fill="#2a78d6"/>
-<text x="23" y="764" fill="#1f2328" font-weight="600">FishNet</text>
-<text x="222" y="764" text-anchor="end" fill="#1f2328" font-weight="400">16.6 KB/s</text>
-<rect x="236" y="749" width="112" height="21" rx="5" fill="#dafbe1"/>
-<text x="346" y="764" text-anchor="end" fill="#1a7f37" font-weight="600">0.053 pts</text>
-<text x="470" y="764" text-anchor="end" fill="#1f2328" font-weight="400">82.0 KB/s</text>
-<rect x="484" y="749" width="112" height="21" rx="5" fill="#dafbe1"/>
-<text x="594" y="764" text-anchor="end" fill="#1a7f37" font-weight="600">0.255 pts</text>
+<rect x="8" y="755" width="9" height="9" rx="2" fill="#eda100"/>
+<text x="23" y="764" fill="#1f2328" font-weight="600">NGO</text>
+<text x="222" y="764" text-anchor="end" fill="#1f2328" font-weight="400">Completed</text>
+<text x="346" y="764" text-anchor="end" fill="#1f2328" font-weight="400">2.13 MB/s</text>
+<text x="470" y="764" text-anchor="end" fill="#1f2328" font-weight="400">11.1%</text>
+<text x="594" y="764" text-anchor="end" fill="#1f2328" font-weight="400">1.03 MB/s</text>
+<text x="718" y="764" text-anchor="end" fill="#1f2328" font-weight="400">11</text>
+<rect x="732" y="749" width="112" height="21" rx="5" fill="#dafbe1"/>
+<text x="842" y="764" text-anchor="end" fill="#1a7f37" font-weight="600">16.7 ms</text>
 <line x1="8" y1="773" x2="848" y2="773" stroke="#d0d7de" stroke-width="0.5"/>
-<rect x="8" y="782" width="9" height="9" rx="2" fill="#1baf7a"/>
-<text x="23" y="791" fill="#1f2328" font-weight="600">Mirror</text>
-<text x="222" y="791" text-anchor="end" fill="#1f2328" font-weight="400">28.2 KB/s</text>
-<text x="346" y="791" text-anchor="end" fill="#1f2328" font-weight="400">0.103 pts</text>
-<text x="470" y="791" text-anchor="end" fill="#1f2328" font-weight="400">123 KB/s</text>
-<text x="594" y="791" text-anchor="end" fill="#1f2328" font-weight="400">0.411 pts</text>
+<rect x="8" y="782" width="9" height="9" rx="2" fill="#e87ba4"/>
+<text x="23" y="791" fill="#1f2328" font-weight="600">Fusion</text>
+<text x="222" y="791" text-anchor="end" fill="#1f2328" font-weight="400">Completed</text>
+<rect x="236" y="776" width="112" height="21" rx="5" fill="#dafbe1"/>
+<text x="346" y="791" text-anchor="end" fill="#1a7f37" font-weight="600">638 KB/s</text>
+<text x="470" y="791" text-anchor="end" fill="#1f2328" font-weight="400">11.7%</text>
+<rect x="484" y="776" width="112" height="21" rx="5" fill="#dafbe1"/>
+<text x="594" y="791" text-anchor="end" fill="#1a7f37" font-weight="600">386 KB/s</text>
+<rect x="608" y="776" width="112" height="21" rx="5" fill="#dafbe1"/>
+<text x="718" y="791" text-anchor="end" fill="#1a7f37" font-weight="600">2</text>
+<rect x="732" y="776" width="112" height="21" rx="5" fill="#dafbe1"/>
+<text x="842" y="791" text-anchor="end" fill="#1a7f37" font-weight="600">16.7 ms</text>
 <line x1="8" y1="800" x2="848" y2="800" stroke="#d0d7de" stroke-width="0.5"/>
-<rect x="8" y="809" width="9" height="9" rx="2" fill="#eda100"/>
-<text x="23" y="818" fill="#1f2328" font-weight="600">NGO</text>
-<text x="222" y="818" text-anchor="end" fill="#1f2328" font-weight="400">33.7 KB/s</text>
-<text x="346" y="818" text-anchor="end" fill="#1f2328" font-weight="400">0.526 pts</text>
-<text x="470" y="818" text-anchor="end" fill="#1f2328" font-weight="400">–</text>
-<text x="594" y="818" text-anchor="end" fill="#1f2328" font-weight="400">–</text>
-<line x1="8" y1="827" x2="848" y2="827" stroke="#d0d7de" stroke-width="0.5"/>
-<rect x="8" y="836" width="9" height="9" rx="2" fill="#e87ba4"/>
-<text x="23" y="845" fill="#1f2328" font-weight="600">Fusion</text>
-<text x="222" y="845" text-anchor="end" fill="#1f2328" font-weight="400">25.8 KB/s</text>
-<text x="346" y="845" text-anchor="end" fill="#1f2328" font-weight="400">0.137 pts</text>
-<text x="470" y="845" text-anchor="end" fill="#1f2328" font-weight="400">165 KB/s</text>
-<text x="594" y="845" text-anchor="end" fill="#1f2328" font-weight="400">0.902 pts</text>
-<line x1="8" y1="854" x2="848" y2="854" stroke="#d0d7de" stroke-width="0.5"/>
+<text x="8" y="839" font-weight="600" fill="#1f2328">What one more costs</text>
+<text x="848" y="839" text-anchor="end" fill="#656d76" font-size="12">marginal server cost; 10 → 100 connections at 20 Hz; 20 → 60 Hz at 100 connections</text>
+<text x="8" y="869" fill="#656d76" font-size="11" letter-spacing="0.5">NETCODE</text>
+<text x="222" y="857" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">BANDWIDTH</text>
+<text x="222" y="869" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">PER CONN</text>
+<text x="346" y="857" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">SERVER CPU</text>
+<text x="346" y="869" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">PER CONN</text>
+<text x="470" y="857" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">BANDWIDTH</text>
+<text x="470" y="869" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">PER HZ</text>
+<text x="594" y="857" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">SERVER CPU</text>
+<text x="594" y="869" text-anchor="end" fill="#656d76" font-size="11" letter-spacing="0.5">PER HZ</text>
+<line x1="8" y1="882" x2="848" y2="882" stroke="#d0d7de" stroke-width="1"/>
+<rect x="8" y="891" width="9" height="9" rx="2" fill="#eb6834"/>
+<text x="23" y="900" fill="#1f2328" font-weight="600">PurrNet</text>
+<rect x="112" y="885" width="112" height="21" rx="5" fill="#dafbe1"/>
+<text x="222" y="900" text-anchor="end" fill="#1a7f37" font-weight="600">13.7 KB/s</text>
+<text x="346" y="900" text-anchor="end" fill="#1f2328" font-weight="400">0.064 pts</text>
+<rect x="360" y="885" width="112" height="21" rx="5" fill="#dafbe1"/>
+<text x="470" y="900" text-anchor="end" fill="#1a7f37" font-weight="600">66.3 KB/s</text>
+<text x="594" y="900" text-anchor="end" fill="#1f2328" font-weight="400">0.354 pts</text>
+<line x1="8" y1="909" x2="848" y2="909" stroke="#d0d7de" stroke-width="0.5"/>
+<rect x="8" y="918" width="9" height="9" rx="2" fill="#2a78d6"/>
+<text x="23" y="927" fill="#1f2328" font-weight="600">FishNet</text>
+<text x="222" y="927" text-anchor="end" fill="#1f2328" font-weight="400">16.6 KB/s</text>
+<rect x="236" y="912" width="112" height="21" rx="5" fill="#dafbe1"/>
+<text x="346" y="927" text-anchor="end" fill="#1a7f37" font-weight="600">0.054 pts</text>
+<text x="470" y="927" text-anchor="end" fill="#1f2328" font-weight="400">81.8 KB/s</text>
+<rect x="484" y="912" width="112" height="21" rx="5" fill="#dafbe1"/>
+<text x="594" y="927" text-anchor="end" fill="#1a7f37" font-weight="600">0.256 pts</text>
+<line x1="8" y1="936" x2="848" y2="936" stroke="#d0d7de" stroke-width="0.5"/>
+<rect x="8" y="945" width="9" height="9" rx="2" fill="#1baf7a"/>
+<text x="23" y="954" fill="#1f2328" font-weight="600">Mirror</text>
+<text x="222" y="954" text-anchor="end" fill="#1f2328" font-weight="400">28.2 KB/s</text>
+<text x="346" y="954" text-anchor="end" fill="#1f2328" font-weight="400">0.105 pts</text>
+<text x="470" y="954" text-anchor="end" fill="#1f2328" font-weight="400">124 KB/s</text>
+<text x="594" y="954" text-anchor="end" fill="#1f2328" font-weight="400">0.408 pts</text>
+<line x1="8" y1="963" x2="848" y2="963" stroke="#d0d7de" stroke-width="0.5"/>
+<rect x="8" y="972" width="9" height="9" rx="2" fill="#eda100"/>
+<text x="23" y="981" fill="#1f2328" font-weight="600">NGO</text>
+<text x="222" y="981" text-anchor="end" fill="#1f2328" font-weight="400">33.7 KB/s</text>
+<text x="346" y="981" text-anchor="end" fill="#1f2328" font-weight="400">0.523 pts</text>
+<text x="470" y="981" text-anchor="end" fill="#1f2328" font-weight="400">–</text>
+<text x="594" y="981" text-anchor="end" fill="#1f2328" font-weight="400">–</text>
+<line x1="8" y1="990" x2="848" y2="990" stroke="#d0d7de" stroke-width="0.5"/>
+<rect x="8" y="999" width="9" height="9" rx="2" fill="#e87ba4"/>
+<text x="23" y="1008" fill="#1f2328" font-weight="600">Fusion</text>
+<text x="222" y="1008" text-anchor="end" fill="#1f2328" font-weight="400">25.6 KB/s</text>
+<text x="346" y="1008" text-anchor="end" fill="#1f2328" font-weight="400">0.133 pts</text>
+<text x="470" y="1008" text-anchor="end" fill="#1f2328" font-weight="400">147 KB/s</text>
+<text x="594" y="1008" text-anchor="end" fill="#1f2328" font-weight="400">0.897 pts</text>
+<line x1="8" y1="1017" x2="848" y2="1017" stroke="#d0d7de" stroke-width="0.5"/>
 </svg>
