@@ -18,7 +18,7 @@
 <text x="470" y="113" text-anchor="end" fill="#e6edf3" font-weight="400">PurrNet</text>
 <line x1="8" y1="122" x2="848" y2="122" stroke="#30363d" stroke-width="0.5"/>
 <text x="8" y="140" fill="#e6edf3" font-weight="600">Spawn / despawn</text>
-<text x="222" y="140" text-anchor="end" fill="#e6edf3" font-weight="400">FishNet</text>
+<text x="222" y="140" text-anchor="end" fill="#e6edf3" font-weight="400">FishNet, Fusion</text>
 <text x="346" y="140" text-anchor="end" fill="#e6edf3" font-weight="400">FishNet</text>
 <text x="470" y="140" text-anchor="end" fill="#e6edf3" font-weight="400">Fusion</text>
 <line x1="8" y1="149" x2="848" y2="149" stroke="#30363d" stroke-width="0.5"/>
@@ -36,13 +36,13 @@
 <text x="23" y="249" fill="#e6edf3" font-weight="600">PurrNet</text>
 <text x="222" y="249" text-anchor="end" fill="#e6edf3" font-weight="400">Completed</text>
 <rect x="236" y="234" width="112" height="21" rx="5" fill="#12351d"/>
-<text x="346" y="249" text-anchor="end" fill="#3fb950" font-weight="600">1.66 MB/s</text>
+<text x="346" y="249" text-anchor="end" fill="#3fb950" font-weight="600">1.71 MB/s</text>
 <rect x="360" y="234" width="112" height="21" rx="5" fill="#12351d"/>
-<text x="470" y="249" text-anchor="end" fill="#3fb950" font-weight="600">6.0%</text>
+<text x="470" y="249" text-anchor="end" fill="#3fb950" font-weight="600">5.9%</text>
 <rect x="484" y="234" width="112" height="21" rx="5" fill="#12351d"/>
-<text x="594" y="249" text-anchor="end" fill="#3fb950" font-weight="600">134 KB/s</text>
+<text x="594" y="249" text-anchor="end" fill="#3fb950" font-weight="600">51.5 KB/s</text>
 <rect x="608" y="234" width="112" height="21" rx="5" fill="#12351d"/>
-<text x="718" y="249" text-anchor="end" fill="#3fb950" font-weight="600">0</text>
+<text x="718" y="249" text-anchor="end" fill="#3fb950" font-weight="600">1</text>
 <rect x="732" y="234" width="112" height="21" rx="5" fill="#12351d"/>
 <text x="842" y="249" text-anchor="end" fill="#3fb950" font-weight="600">16.7 ms</text>
 <line x1="8" y1="258" x2="848" y2="258" stroke="#30363d" stroke-width="0.5"/>
@@ -51,16 +51,16 @@
 <text x="222" y="276" text-anchor="end" fill="#e6edf3" font-weight="400">Completed</text>
 <text x="346" y="276" text-anchor="end" fill="#e6edf3" font-weight="400">2.52 MB/s</text>
 <text x="470" y="276" text-anchor="end" fill="#e6edf3" font-weight="400">6.3%</text>
-<text x="594" y="276" text-anchor="end" fill="#e6edf3" font-weight="400">733 KB/s</text>
-<text x="718" y="276" text-anchor="end" fill="#e6edf3" font-weight="400">30</text>
+<text x="594" y="276" text-anchor="end" fill="#e6edf3" font-weight="400">765 KB/s</text>
+<text x="718" y="276" text-anchor="end" fill="#e6edf3" font-weight="400">29</text>
 <text x="842" y="276" text-anchor="end" fill="#e6edf3" font-weight="400">17.4 ms</text>
 <line x1="8" y1="285" x2="848" y2="285" stroke="#30363d" stroke-width="0.5"/>
 <rect x="8" y="294" width="9" height="9" rx="2" fill="#199e70"/>
 <text x="23" y="303" fill="#e6edf3" font-weight="600">Mirror</text>
 <text x="222" y="303" text-anchor="end" fill="#e6edf3" font-weight="400">Completed</text>
 <text x="346" y="303" text-anchor="end" fill="#e6edf3" font-weight="400">4.13 MB/s</text>
-<text x="470" y="303" text-anchor="end" fill="#e6edf3" font-weight="400">12.7%</text>
-<text x="594" y="303" text-anchor="end" fill="#e6edf3" font-weight="400">3.06 MB/s</text>
+<text x="470" y="303" text-anchor="end" fill="#e6edf3" font-weight="400">12.8%</text>
+<text x="594" y="303" text-anchor="end" fill="#e6edf3" font-weight="400">3.15 MB/s</text>
 <text x="718" y="303" text-anchor="end" fill="#e6edf3" font-weight="400">23</text>
 <rect x="732" y="288" width="112" height="21" rx="5" fill="#12351d"/>
 <text x="842" y="303" text-anchor="end" fill="#3fb950" font-weight="600">16.7 ms</text>
@@ -68,19 +68,19 @@
 <rect x="8" y="321" width="9" height="9" rx="2" fill="#c98500"/>
 <text x="23" y="330" fill="#e6edf3" font-weight="600">NGO</text>
 <text x="222" y="330" text-anchor="end" fill="#e6edf3" font-weight="400">Overloaded (3/3)</text>
-<text x="346" y="330" text-anchor="end" fill="#e6edf3" font-weight="400">4.80 MB/s</text>
-<text x="470" y="330" text-anchor="end" fill="#e6edf3" font-weight="400">79.0%</text>
-<text x="594" y="330" text-anchor="end" fill="#e6edf3" font-weight="400">1.6 KB/s</text>
+<text x="346" y="330" text-anchor="end" fill="#e6edf3" font-weight="400">4.99 MB/s</text>
+<text x="470" y="330" text-anchor="end" fill="#e6edf3" font-weight="400">75.0%</text>
+<text x="594" y="330" text-anchor="end" fill="#e6edf3" font-weight="400">1.5 KB/s</text>
 <text x="718" y="330" text-anchor="end" fill="#e6edf3" font-weight="400">0</text>
-<text x="842" y="330" text-anchor="end" fill="#e6edf3" font-weight="400">51.5 ms</text>
+<text x="842" y="330" text-anchor="end" fill="#e6edf3" font-weight="400">47.5 ms</text>
 <line x1="8" y1="339" x2="848" y2="339" stroke="#30363d" stroke-width="0.5"/>
 <rect x="8" y="348" width="9" height="9" rx="2" fill="#d55181"/>
 <text x="23" y="357" fill="#e6edf3" font-weight="600">Fusion</text>
 <text x="222" y="357" text-anchor="end" fill="#e6edf3" font-weight="400">Completed</text>
-<text x="346" y="357" text-anchor="end" fill="#e6edf3" font-weight="400">3.50 MB/s</text>
-<text x="470" y="357" text-anchor="end" fill="#e6edf3" font-weight="400">21.3%</text>
-<text x="594" y="357" text-anchor="end" fill="#e6edf3" font-weight="400">1.06 MB/s</text>
-<text x="718" y="357" text-anchor="end" fill="#e6edf3" font-weight="400">17</text>
+<text x="346" y="357" text-anchor="end" fill="#e6edf3" font-weight="400">3.49 MB/s</text>
+<text x="470" y="357" text-anchor="end" fill="#e6edf3" font-weight="400">21.2%</text>
+<text x="594" y="357" text-anchor="end" fill="#e6edf3" font-weight="400">1.01 MB/s</text>
+<text x="718" y="357" text-anchor="end" fill="#e6edf3" font-weight="400">16</text>
 <rect x="732" y="342" width="112" height="21" rx="5" fill="#12351d"/>
 <text x="842" y="357" text-anchor="end" fill="#3fb950" font-weight="600">16.7 ms</text>
 <line x1="8" y1="366" x2="848" y2="366" stroke="#30363d" stroke-width="0.5"/>
@@ -102,7 +102,7 @@
 <rect x="360" y="451" width="112" height="21" rx="5" fill="#12351d"/>
 <text x="470" y="466" text-anchor="end" fill="#3fb950" font-weight="600">5.6%</text>
 <rect x="484" y="451" width="112" height="21" rx="5" fill="#12351d"/>
-<text x="594" y="466" text-anchor="end" fill="#3fb950" font-weight="600">62.0 KB/s</text>
+<text x="594" y="466" text-anchor="end" fill="#3fb950" font-weight="600">66.2 KB/s</text>
 <rect x="608" y="451" width="112" height="21" rx="5" fill="#12351d"/>
 <text x="718" y="466" text-anchor="end" fill="#3fb950" font-weight="600">0</text>
 <rect x="732" y="451" width="112" height="21" rx="5" fill="#12351d"/>
@@ -112,36 +112,36 @@
 <text x="23" y="493" fill="#e6edf3" font-weight="600">FishNet</text>
 <text x="222" y="493" text-anchor="end" fill="#e6edf3" font-weight="400">Completed</text>
 <text x="346" y="493" text-anchor="end" fill="#e6edf3" font-weight="400">770 KB/s</text>
-<text x="470" y="493" text-anchor="end" fill="#e6edf3" font-weight="400">7.5%</text>
-<text x="594" y="493" text-anchor="end" fill="#e6edf3" font-weight="400">872 KB/s</text>
-<text x="718" y="493" text-anchor="end" fill="#e6edf3" font-weight="400">30</text>
-<text x="842" y="493" text-anchor="end" fill="#e6edf3" font-weight="400">17.1 ms</text>
+<text x="470" y="493" text-anchor="end" fill="#e6edf3" font-weight="400">7.3%</text>
+<text x="594" y="493" text-anchor="end" fill="#e6edf3" font-weight="400">886 KB/s</text>
+<text x="718" y="493" text-anchor="end" fill="#e6edf3" font-weight="400">29</text>
+<text x="842" y="493" text-anchor="end" fill="#e6edf3" font-weight="400">17.5 ms</text>
 <line x1="8" y1="502" x2="848" y2="502" stroke="#30363d" stroke-width="0.5"/>
 <rect x="8" y="511" width="9" height="9" rx="2" fill="#199e70"/>
 <text x="23" y="520" fill="#e6edf3" font-weight="600">Mirror</text>
 <text x="222" y="520" text-anchor="end" fill="#e6edf3" font-weight="400">Completed</text>
-<text x="346" y="520" text-anchor="end" fill="#e6edf3" font-weight="400">1.64 MB/s</text>
-<text x="470" y="520" text-anchor="end" fill="#e6edf3" font-weight="400">11.9%</text>
-<text x="594" y="520" text-anchor="end" fill="#e6edf3" font-weight="400">3.50 MB/s</text>
-<text x="718" y="520" text-anchor="end" fill="#e6edf3" font-weight="400">21</text>
+<text x="346" y="520" text-anchor="end" fill="#e6edf3" font-weight="400">1.63 MB/s</text>
+<text x="470" y="520" text-anchor="end" fill="#e6edf3" font-weight="400">11.8%</text>
+<text x="594" y="520" text-anchor="end" fill="#e6edf3" font-weight="400">3.64 MB/s</text>
+<text x="718" y="520" text-anchor="end" fill="#e6edf3" font-weight="400">18</text>
 <rect x="732" y="505" width="112" height="21" rx="5" fill="#12351d"/>
 <text x="842" y="520" text-anchor="end" fill="#3fb950" font-weight="600">16.7 ms</text>
 <line x1="8" y1="529" x2="848" y2="529" stroke="#30363d" stroke-width="0.5"/>
 <rect x="8" y="538" width="9" height="9" rx="2" fill="#c98500"/>
 <text x="23" y="547" fill="#e6edf3" font-weight="600">NGO</text>
 <text x="222" y="547" text-anchor="end" fill="#e6edf3" font-weight="400">Overloaded (1/2)</text>
-<text x="346" y="547" text-anchor="end" fill="#e6edf3" font-weight="400">1.68 MB/s</text>
-<text x="470" y="547" text-anchor="end" fill="#e6edf3" font-weight="400">38.5%</text>
-<text x="594" y="547" text-anchor="end" fill="#e6edf3" font-weight="400">48.8 KB/s</text>
+<text x="346" y="547" text-anchor="end" fill="#e6edf3" font-weight="400">1.76 MB/s</text>
+<text x="470" y="547" text-anchor="end" fill="#e6edf3" font-weight="400">38.2%</text>
+<text x="594" y="547" text-anchor="end" fill="#e6edf3" font-weight="400">48.5 KB/s</text>
 <text x="718" y="547" text-anchor="end" fill="#e6edf3" font-weight="400">1</text>
-<text x="842" y="547" text-anchor="end" fill="#e6edf3" font-weight="400">44.9 ms</text>
+<text x="842" y="547" text-anchor="end" fill="#e6edf3" font-weight="400">41.1 ms</text>
 <line x1="8" y1="556" x2="848" y2="556" stroke="#30363d" stroke-width="0.5"/>
 <rect x="8" y="565" width="9" height="9" rx="2" fill="#d55181"/>
 <text x="23" y="574" fill="#e6edf3" font-weight="600">Fusion</text>
 <text x="222" y="574" text-anchor="end" fill="#e6edf3" font-weight="400">Completed</text>
 <text x="346" y="574" text-anchor="end" fill="#e6edf3" font-weight="400">1.98 MB/s</text>
-<text x="470" y="574" text-anchor="end" fill="#e6edf3" font-weight="400">12.9%</text>
-<text x="594" y="574" text-anchor="end" fill="#e6edf3" font-weight="400">981 KB/s</text>
+<text x="470" y="574" text-anchor="end" fill="#e6edf3" font-weight="400">13.0%</text>
+<text x="594" y="574" text-anchor="end" fill="#e6edf3" font-weight="400">781 KB/s</text>
 <text x="718" y="574" text-anchor="end" fill="#e6edf3" font-weight="400">3</text>
 <rect x="732" y="559" width="112" height="21" rx="5" fill="#12351d"/>
 <text x="842" y="574" text-anchor="end" fill="#3fb950" font-weight="600">16.7 ms</text>
@@ -159,9 +159,9 @@
 <rect x="8" y="674" width="9" height="9" rx="2" fill="#d95926"/>
 <text x="23" y="683" fill="#e6edf3" font-weight="600">PurrNet</text>
 <text x="222" y="683" text-anchor="end" fill="#e6edf3" font-weight="400">Completed</text>
-<text x="346" y="683" text-anchor="end" fill="#e6edf3" font-weight="400">741 KB/s</text>
-<text x="470" y="683" text-anchor="end" fill="#e6edf3" font-weight="400">9.8%</text>
-<text x="594" y="683" text-anchor="end" fill="#e6edf3" font-weight="400">1.04 MB/s</text>
+<text x="346" y="683" text-anchor="end" fill="#e6edf3" font-weight="400">738 KB/s</text>
+<text x="470" y="683" text-anchor="end" fill="#e6edf3" font-weight="400">9.5%</text>
+<text x="594" y="683" text-anchor="end" fill="#e6edf3" font-weight="400">699 KB/s</text>
 <rect x="608" y="668" width="112" height="21" rx="5" fill="#12351d"/>
 <text x="718" y="683" text-anchor="end" fill="#3fb950" font-weight="600">2</text>
 <rect x="732" y="668" width="112" height="21" rx="5" fill="#12351d"/>
@@ -171,10 +171,10 @@
 <text x="23" y="710" fill="#e6edf3" font-weight="600">FishNet</text>
 <text x="222" y="710" text-anchor="end" fill="#e6edf3" font-weight="400">Completed</text>
 <rect x="236" y="695" width="112" height="21" rx="5" fill="#12351d"/>
-<text x="346" y="710" text-anchor="end" fill="#3fb950" font-weight="600">643 KB/s</text>
+<text x="346" y="710" text-anchor="end" fill="#3fb950" font-weight="600">640 KB/s</text>
 <rect x="360" y="695" width="112" height="21" rx="5" fill="#12351d"/>
-<text x="470" y="710" text-anchor="end" fill="#3fb950" font-weight="600">7.9%</text>
-<text x="594" y="710" text-anchor="end" fill="#e6edf3" font-weight="400">1.47 MB/s</text>
+<text x="470" y="710" text-anchor="end" fill="#3fb950" font-weight="600">7.8%</text>
+<text x="594" y="710" text-anchor="end" fill="#e6edf3" font-weight="400">1.50 MB/s</text>
 <text x="718" y="710" text-anchor="end" fill="#e6edf3" font-weight="400">22</text>
 <text x="842" y="710" text-anchor="end" fill="#e6edf3" font-weight="400">17.5 ms</text>
 <line x1="8" y1="719" x2="848" y2="719" stroke="#30363d" stroke-width="0.5"/>
@@ -183,7 +183,7 @@
 <text x="222" y="737" text-anchor="end" fill="#e6edf3" font-weight="400">Completed</text>
 <text x="346" y="737" text-anchor="end" fill="#e6edf3" font-weight="400">855 KB/s</text>
 <text x="470" y="737" text-anchor="end" fill="#e6edf3" font-weight="400">9.5%</text>
-<text x="594" y="737" text-anchor="end" fill="#e6edf3" font-weight="400">4.45 MB/s</text>
+<text x="594" y="737" text-anchor="end" fill="#e6edf3" font-weight="400">4.59 MB/s</text>
 <text x="718" y="737" text-anchor="end" fill="#e6edf3" font-weight="400">12</text>
 <rect x="732" y="722" width="112" height="21" rx="5" fill="#12351d"/>
 <text x="842" y="737" text-anchor="end" fill="#3fb950" font-weight="600">16.7 ms</text>
@@ -191,8 +191,8 @@
 <rect x="8" y="755" width="9" height="9" rx="2" fill="#c98500"/>
 <text x="23" y="764" fill="#e6edf3" font-weight="600">NGO</text>
 <text x="222" y="764" text-anchor="end" fill="#e6edf3" font-weight="400">Completed</text>
-<text x="346" y="764" text-anchor="end" fill="#e6edf3" font-weight="400">1.85 MB/s</text>
-<text x="470" y="764" text-anchor="end" fill="#e6edf3" font-weight="400">8.5%</text>
+<text x="346" y="764" text-anchor="end" fill="#e6edf3" font-weight="400">2.14 MB/s</text>
+<text x="470" y="764" text-anchor="end" fill="#e6edf3" font-weight="400">11.2%</text>
 <text x="594" y="764" text-anchor="end" fill="#e6edf3" font-weight="400">1.04 MB/s</text>
 <text x="718" y="764" text-anchor="end" fill="#e6edf3" font-weight="400">11</text>
 <rect x="732" y="749" width="112" height="21" rx="5" fill="#12351d"/>
@@ -201,10 +201,11 @@
 <rect x="8" y="782" width="9" height="9" rx="2" fill="#d55181"/>
 <text x="23" y="791" fill="#e6edf3" font-weight="600">Fusion</text>
 <text x="222" y="791" text-anchor="end" fill="#e6edf3" font-weight="400">Completed</text>
-<text x="346" y="791" text-anchor="end" fill="#e6edf3" font-weight="400">667 KB/s</text>
+<rect x="236" y="776" width="112" height="21" rx="5" fill="#12351d"/>
+<text x="346" y="791" text-anchor="end" fill="#3fb950" font-weight="600">646 KB/s</text>
 <text x="470" y="791" text-anchor="end" fill="#e6edf3" font-weight="400">11.8%</text>
 <rect x="484" y="776" width="112" height="21" rx="5" fill="#12351d"/>
-<text x="594" y="791" text-anchor="end" fill="#3fb950" font-weight="600">396 KB/s</text>
+<text x="594" y="791" text-anchor="end" fill="#3fb950" font-weight="600">584 KB/s</text>
 <rect x="608" y="776" width="112" height="21" rx="5" fill="#12351d"/>
 <text x="718" y="791" text-anchor="end" fill="#3fb950" font-weight="600">2</text>
 <rect x="732" y="776" width="112" height="21" rx="5" fill="#12351d"/>
@@ -225,40 +226,40 @@
 <rect x="8" y="891" width="9" height="9" rx="2" fill="#d95926"/>
 <text x="23" y="900" fill="#e6edf3" font-weight="600">PurrNet</text>
 <rect x="112" y="885" width="112" height="21" rx="5" fill="#12351d"/>
-<text x="222" y="900" text-anchor="end" fill="#3fb950" font-weight="600">12.1 KB/s</text>
+<text x="222" y="900" text-anchor="end" fill="#3fb950" font-weight="600">12.4 KB/s</text>
 <rect x="236" y="885" width="112" height="21" rx="5" fill="#12351d"/>
-<text x="346" y="900" text-anchor="end" fill="#3fb950" font-weight="600">0.049 pts</text>
+<text x="346" y="900" text-anchor="end" fill="#3fb950" font-weight="600">0.047 pts</text>
 <rect x="360" y="885" width="112" height="21" rx="5" fill="#12351d"/>
-<text x="470" y="900" text-anchor="end" fill="#3fb950" font-weight="600">59.7 KB/s</text>
-<text x="594" y="900" text-anchor="end" fill="#e6edf3" font-weight="400">0.277 pts</text>
+<text x="470" y="900" text-anchor="end" fill="#3fb950" font-weight="600">58.6 KB/s</text>
+<text x="594" y="900" text-anchor="end" fill="#e6edf3" font-weight="400">0.281 pts</text>
 <line x1="8" y1="909" x2="848" y2="909" stroke="#30363d" stroke-width="0.5"/>
 <rect x="8" y="918" width="9" height="9" rx="2" fill="#3987e5"/>
 <text x="23" y="927" fill="#e6edf3" font-weight="600">FishNet</text>
 <text x="222" y="927" text-anchor="end" fill="#e6edf3" font-weight="400">16.5 KB/s</text>
-<text x="346" y="927" text-anchor="end" fill="#e6edf3" font-weight="400">0.054 pts</text>
-<text x="470" y="927" text-anchor="end" fill="#e6edf3" font-weight="400">82.1 KB/s</text>
+<text x="346" y="927" text-anchor="end" fill="#e6edf3" font-weight="400">0.052 pts</text>
+<text x="470" y="927" text-anchor="end" fill="#e6edf3" font-weight="400">82.0 KB/s</text>
 <rect x="484" y="912" width="112" height="21" rx="5" fill="#12351d"/>
-<text x="594" y="927" text-anchor="end" fill="#3fb950" font-weight="600">0.256 pts</text>
+<text x="594" y="927" text-anchor="end" fill="#3fb950" font-weight="600">0.254 pts</text>
 <line x1="8" y1="936" x2="848" y2="936" stroke="#30363d" stroke-width="0.5"/>
 <rect x="8" y="945" width="9" height="9" rx="2" fill="#199e70"/>
 <text x="23" y="954" fill="#e6edf3" font-weight="600">Mirror</text>
 <text x="222" y="954" text-anchor="end" fill="#e6edf3" font-weight="400">28.2 KB/s</text>
 <text x="346" y="954" text-anchor="end" fill="#e6edf3" font-weight="400">0.104 pts</text>
 <text x="470" y="954" text-anchor="end" fill="#e6edf3" font-weight="400">123 KB/s</text>
-<text x="594" y="954" text-anchor="end" fill="#e6edf3" font-weight="400">0.406 pts</text>
+<text x="594" y="954" text-anchor="end" fill="#e6edf3" font-weight="400">0.403 pts</text>
 <line x1="8" y1="963" x2="848" y2="963" stroke="#30363d" stroke-width="0.5"/>
 <rect x="8" y="972" width="9" height="9" rx="2" fill="#c98500"/>
 <text x="23" y="981" fill="#e6edf3" font-weight="600">NGO</text>
-<text x="222" y="981" text-anchor="end" fill="#e6edf3" font-weight="400">31.9 KB/s</text>
-<text x="346" y="981" text-anchor="end" fill="#e6edf3" font-weight="400">0.543 pts</text>
+<text x="222" y="981" text-anchor="end" fill="#e6edf3" font-weight="400">33.9 KB/s</text>
+<text x="346" y="981" text-anchor="end" fill="#e6edf3" font-weight="400">0.525 pts</text>
 <text x="470" y="981" text-anchor="end" fill="#e6edf3" font-weight="400">–</text>
 <text x="594" y="981" text-anchor="end" fill="#e6edf3" font-weight="400">–</text>
 <line x1="8" y1="990" x2="848" y2="990" stroke="#30363d" stroke-width="0.5"/>
 <rect x="8" y="999" width="9" height="9" rx="2" fill="#d55181"/>
 <text x="23" y="1008" fill="#e6edf3" font-weight="600">Fusion</text>
-<text x="222" y="1008" text-anchor="end" fill="#e6edf3" font-weight="400">25.8 KB/s</text>
-<text x="346" y="1008" text-anchor="end" fill="#e6edf3" font-weight="400">0.135 pts</text>
-<text x="470" y="1008" text-anchor="end" fill="#e6edf3" font-weight="400">130 KB/s</text>
-<text x="594" y="1008" text-anchor="end" fill="#e6edf3" font-weight="400">1.25 pts</text>
+<text x="222" y="1008" text-anchor="end" fill="#e6edf3" font-weight="400">25.6 KB/s</text>
+<text x="346" y="1008" text-anchor="end" fill="#e6edf3" font-weight="400">0.134 pts</text>
+<text x="470" y="1008" text-anchor="end" fill="#e6edf3" font-weight="400">152 KB/s</text>
+<text x="594" y="1008" text-anchor="end" fill="#e6edf3" font-weight="400">1.20 pts</text>
 <line x1="8" y1="1017" x2="848" y2="1017" stroke="#30363d" stroke-width="0.5"/>
 </svg>
