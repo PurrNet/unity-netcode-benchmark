@@ -1,4 +1,4 @@
-_Last run 2026-09-07: PurrNet 1.23.0-beta.40 · FishNet 4.7.3 · Mirror 96.0.1 · NGO 2.13.2 · Fusion 2.1.2 Stable 2279 · Unity 6000.5.4f1 · 100 objects per test · 10 s windows · sessions 10c @ 20 Hz / 100c @ 20 Hz / 100c @ 60 Hz._
+_Last run 2026-09-09: PurrNet 1.23.0-beta.42 · FishNet 4.7.3 · Mirror 96.0.1 · NGO 2.13.2 · Fusion 2.1.2 Stable 2279 · Unity 6000.5.4f1 · 100 objects per test · 10 s windows · sessions 10c @ 20 Hz / 100c @ 20 Hz / 100c @ 60 Hz._
 
 _Note: NGO at 100c @ 60 Hz: resource limit exceeded (8 GiB memory)._
 
@@ -21,43 +21,43 @@ _Note: NGO at 100c @ 60 Hz: resource limit exceeded (8 GiB memory)._
 
 | Netcode | Status | Bandwidth | Server CPU | GC alloc | Collections | Frame p99 |
 |---|---:|---:|---:|---:|---:|---:|
-| PurrNet | Completed | **1.67 MB/s** | **6.1%** | **362 KB/s** | **3** | **16.7 ms** |
-| FishNet | Completed | 2.52 MB/s | 6.4% | 758 KB/s | 28 | 17.4 ms |
-| Mirror | Completed | 4.13 MB/s | 12.7% | 3.04 MB/s | 23 | **16.7 ms** |
-| NGO | Overloaded (3/3) | 4.91 MB/s | 75.4% | 1.3 KB/s | 0 | 47.7 ms |
-| Fusion | Completed | 3.50 MB/s | 21.2% | 1.01 MB/s | 16 | **16.7 ms** |
+| PurrNet | Completed | **1.70 MB/s** | **6.0%** | **49.9 KB/s** | **1** | **16.7 ms** |
+| FishNet | Completed | 2.53 MB/s | 6.4% | 762 KB/s | 29 | 17.4 ms |
+| Mirror | Completed | 4.11 MB/s | 12.7% | 3.05 MB/s | 23 | **16.7 ms** |
+| NGO | Overloaded (3/3) | 4.86 MB/s | 74.8% | 1.3 KB/s | 0 | 47.2 ms |
+| Fusion | Completed | 3.50 MB/s | 21.3% | 1.02 MB/s | 17 | **16.7 ms** |
 
 **Messaging** (100 connections @ 20 Hz · SendRPC, ClientInput)
 
 | Netcode | Status | Bandwidth | Server CPU | GC alloc | Collections | Frame p99 |
 |---|---:|---:|---:|---:|---:|---:|
-| PurrNet | Completed | **719 KB/s** | **5.6%** | **58.7 KB/s** | **1** | **16.7 ms** |
-| FishNet | Completed | 769 KB/s | 7.4% | 891 KB/s | 30 | 17.6 ms |
-| Mirror | Completed | 1.63 MB/s | 11.9% | 3.56 MB/s | 19 | **16.7 ms** |
-| NGO | Overloaded (1/2) | 1.71 MB/s | 38.1% | 48.3 KB/s | 1 | 41.5 ms |
-| Fusion | Completed | 1.98 MB/s | 12.8% | 977 KB/s | 4 | **16.7 ms** |
+| PurrNet | Completed | **719 KB/s** | **5.6%** | **63.2 KB/s** | **0** | **16.7 ms** |
+| FishNet | Completed | 769 KB/s | 7.3% | 880 KB/s | 30 | 17.5 ms |
+| Mirror | Completed | 1.63 MB/s | 11.8% | 3.56 MB/s | 19 | **16.7 ms** |
+| NGO | Overloaded (1/2) | 1.74 MB/s | 38.3% | 48.4 KB/s | 1 | 40.9 ms |
+| Fusion | Completed | 1.98 MB/s | 13.5% | 1.29 MB/s | 4 | **16.7 ms** |
 
 **Spawn / despawn** (100 connections @ 20 Hz · SpawnChurn)
 
 | Netcode | Status | Bandwidth | Server CPU | GC alloc | Collections | Frame p99 |
 |---|---:|---:|---:|---:|---:|---:|
-| PurrNet | Completed | 736 KB/s | 9.3% | **518 KB/s** | **1** | **16.7 ms** |
-| FishNet | Completed | **643 KB/s** | **8.1%** | 1.51 MB/s | 22 | 17.6 ms |
-| Mirror | Completed | 854 KB/s | 9.5% | 4.49 MB/s | 12 | **16.7 ms** |
-| NGO | Completed | 2.12 MB/s | 11.1% | 1.04 MB/s | 11 | **16.7 ms** |
-| Fusion | Completed | **635 KB/s** | 11.7% | 603 KB/s | 2 | **16.7 ms** |
+| PurrNet | Completed | 739 KB/s | 9.3% | **504 KB/s** | **1** | **16.7 ms** |
+| FishNet | Completed | **643 KB/s** | **7.9%** | 1.50 MB/s | 22 | 17.6 ms |
+| Mirror | Completed | 859 KB/s | 9.4% | 4.51 MB/s | 12 | **16.7 ms** |
+| NGO | Completed | 1.84 MB/s | 8.6% | 1.04 MB/s | 11 | **16.7 ms** |
+| Fusion | Completed | **639 KB/s** | 11.8% | 584 KB/s | **1** | **16.7 ms** |
 
 **What one more costs** (marginal server cost; 10 → 100 connections at 20 Hz; 20 → 60 Hz at 100 connections)
 
 | Netcode | Bandwidth per conn | Server CPU per conn | Bandwidth per Hz | Server CPU per Hz |
 |---|---:|---:|---:|---:|
-| PurrNet | **12.2 KB/s** | **0.048 pts** | **59.6 KB/s** | 0.279 pts |
-| FishNet | 16.6 KB/s | 0.054 pts | 81.9 KB/s | **0.253 pts** |
-| Mirror | 28.2 KB/s | 0.104 pts | 124 KB/s | 0.409 pts |
-| NGO | 33.3 KB/s | 0.526 pts | – | – |
-| Fusion | 25.7 KB/s | 0.134 pts | 139 KB/s | 1.21 pts |
+| PurrNet | **12.3 KB/s** | **0.048 pts** | **59.6 KB/s** | 0.272 pts |
+| FishNet | 16.6 KB/s | 0.054 pts | 81.8 KB/s | **0.251 pts** |
+| Mirror | 28.1 KB/s | 0.104 pts | 124 KB/s | 0.418 pts |
+| NGO | 32.5 KB/s | 0.520 pts | – | – |
+| Fusion | 25.7 KB/s | 0.138 pts | 131 KB/s | 1.21 pts |
 
 </details>
 
 Categories are reported separately, with no combined ranking. Bandwidth, CPU and allocation: averages; collections: total; frame p99: maximum. Categories that did not complete have no averages. Completed means the test finished. Overloaded means it finished but the server could not hold the 60 fps budget in that many tests (frame p99 past 33 ms or a sixth of frames dropped); its numbers are shown but never marked best, since they describe a saturated server. Idle and Static remain baselines; scaling requires the full suite.
-Full results: [interactive report](https://purrnet.github.io/unity-netcode-benchmark/) · [workflow run](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/34112779065) · [raw datapoints](latest.json).
+Full results: [interactive report](https://purrnet.github.io/unity-netcode-benchmark/) · [workflow run](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/34364138644) · [raw datapoints](latest.json).
