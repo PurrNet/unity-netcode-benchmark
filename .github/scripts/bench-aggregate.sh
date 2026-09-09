@@ -147,6 +147,7 @@ jq -n \
       tag: $tag,
       meta: {
         cpuModel: $server.cpuModel, cpuCount: $server.cpuCount, devBuild: $server.devBuild,
+        targetFps: $server.targetFps, benchObjects: $server.benchObjects, benchSeconds: $server.benchSeconds,
         tickRate: $server.tickRate, requestedTickRate: ($server.requestedTickRate // 0), unityVersion: $server.unityVersion,
         connectedAtStart: $server.connectedAtStart, expectedClients: ($server.expectedClients // $connections),
         process: $process,

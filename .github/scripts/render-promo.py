@@ -3,13 +3,17 @@
 
 Requires Matplotlib and Pillow. Example, from the repository root:
   python .github/scripts/render-promo.py
+Render only the GC chart with --chart 03-general-gc.
 The default dated output directory is derived from docs/latest.md.
 """
 import argparse
 import hashlib
 import importlib.util
 import json
+import math
+import os
 import re
+import tempfile
 from pathlib import Path
 
 import matplotlib
@@ -32,23 +36,31 @@ GRID = "#343d45"
 ORANGE = "#ff854c"
 OTHER = "#8b9298"
 W, H = 1920, 1080
+CHART_SLUGS = ("01-state-bandwidth", "02-messaging-cpu", "03-general-gc", "04-connection-scaling")
 
 
-def setup_fonts():
+def setup_fonts(family=None):
     # Use the OS font when available; Matplotlib's bundled font is the fallback.
     for name in ("segoeui.ttf", "segoeuib.ttf", "seguisb.ttf"):
         path = Path("C:/Windows/Fonts") / name
         if path.exists():
             font_manager.fontManager.addfont(str(path))
-    family = "Segoe UI" if Path("C:/Windows/Fonts/segoeui.ttf").exists() else "DejaVu Sans"
+    family = family or ("Segoe UI" if Path("C:/Windows/Fonts/segoeui.ttf").exists() else "DejaVu Sans")
     plt.rcParams.update({"font.family": family, "font.size": 14, "text.color": INK,
                          "axes.labelcolor": MUTED, "xtick.color": MUTED,
                          "svg.fonttype": "path", "svg.hashsalt": "purrnet-promo"})
 
 
 def text(fig, x, y, s, size=16, color=INK, weight="normal", **kwargs):
-    return fig.text(x / W, 1 - y / H, s, fontsize=size, color=color,
+    item = fig.text(x / W, 1 - y / H, s, fontsize=size, color=color,
                     weight=weight, va="top", **kwargs)
+    # CI uses Matplotlib's bundled font, which is wider than Segoe UI.
+    if kwargs.get("ha") != "right":
+        width = item.get_window_extent(fig.canvas.get_renderer()).width
+        available = 1816 - x
+        if width > available:
+            item.set_fontsize(size * available / width)
+    return item
 
 
 def line(fig, x1, y1, x2, y2, color=GRID):
@@ -96,9 +108,12 @@ def draw_card(card, metadata, out):
                 edgecolor=color if row["overloaded"] else "none", linewidth=0)
         label = (summary.NAMES[row["netcode"]] + " " + metadata["netcode_versions"][row["netcode"]]
                  + ("*" if row["overloaded"] else ""))
-        ax.text((104 - plot_left) / plot_width * card["axis_max"], i, label, ha="left", va="center",
+        label_item = ax.text((104 - plot_left) / plot_width * card["axis_max"], i, label, ha="left", va="center",
                 color=color if row["netcode"] == "purrnet" else INK,
                 fontsize=16, weight="bold" if row["netcode"] == "purrnet" else "normal")
+        label_width = label_item.get_window_extent(fig.canvas.get_renderer()).width
+        if label_width > plot_left - 128:
+            label_item.set_fontsize(16 * (plot_left - 128) / label_width)
         ax.text(row["value"] + 0.014 * card["axis_max"], i, card["value_format"].format(row["value"]),
                 va="center", fontsize=16, color=color if row["netcode"] == "purrnet" else INK,
                 weight="bold" if row["netcode"] == "purrnet" else "normal", clip_on=False,
@@ -106,7 +121,7 @@ def draw_card(card, metadata, out):
     text(fig, 104, 861, card["chart_note"], 12, color=MUTED)
     text(fig, 104, 900, card["figure_method"], 12, color=MUTED)
     line(fig, 104, 950, 1816, 950)
-    text(fig, 104, 975, "Dedicated Ryzen 5 3600 server, Unity " + metadata["unity_version"] + ", 60 fps cap", 12, color=MUTED)
+    text(fig, 104, 975, card["footer"], 12, color=MUTED)
     fig.savefig(out / f'{card["slug"]}.png', dpi=120, facecolor=BG,
                 metadata={"Title": card["alt"], "Description": card["method"] + " " + card["caveat"]})
     fig.savefig(out / f'{card["slug"]}.svg', facecolor=BG,
@@ -114,122 +129,300 @@ def draw_card(card, metadata, out):
     plt.close(fig)
 
 
-def build_cards(data):
-    by = {(r["netcode"], (r["connections"], r["tick"])): r for r in data}
-    ref = (100, 20)
-    def category_rows(tests, metric, divisor=1):
-        scores = summary.scorecard(summary.ORDER, by, ref, tests)
-        rows = []
-        for n in summary.ORDER:
-            row = scores[n]
-            if row["error"] or row[metric] is None:
-                raise ValueError(f"{n}: {tests}: cannot chart missing/incomplete metric")
-            rows.append({"netcode": n, "value": row[metric] / divisor,
-                         "overloaded": row["overloaded"], "tests": tests})
-        return rows
-    state = category_rows(["MoveY", "MoveWander", "SyncVars"], "bw", 1024**2)
-    messaging = category_rows(["SendRPC", "ClientInput"], "cpu")
-    general_gc = category_rows(summary.SCORE_TESTS, "alloc", 1024)
-    for n in summary.ORDER:
-        for test in summary.SCORE_TESTS:
-            if by[n, ref]["server"][test].get("gcAllocEstimated") is not True:
-                raise ValueError("Update the allocation chart's method note for this dataset")
-    scaling = []
-    for n in summary.ORDER:
-        value = summary.marginal(by, n, (10, 20), ref, "srvDown", 90)
-        if value is None:
-            raise ValueError(f"{n}: scaling requires two complete suites")
-        scaling.append({"netcode": n, "value": value / 1024,
-                        "overloaded": sum(summary.overloaded(by[n, sc], t)
-                                          for sc in ((10, 20), ref) for t in summary.SCORE_TESTS),
-                        "tests": summary.SCORE_TESTS})
-    cards = [
-        dict(slug="01-state-bandwidth", kicker="NetworkTransform + SyncVars, 100 connections, 20 Hz",
-             takeaway="PurrNet used {reduction}% less downstream bandwidth than FishNet across the state replication tests.",
-             figure_method="Mean of three transform and synced-variable workloads. 100 objects, 10 s windows. On-wire server downstream.",
-             figure_caveat="Single run; variability not measured. Fusion used Photon relay; replication behavior differs between netcodes.",
-             chart_title="State replication bandwidth", chart_subtitle="Server downstream, MiB/s, lower is better",
-             rows=state, baseline="fishnet", axis_max=5.2, tick_step=1, value_format="{:.2f}",
-             chart_note="* NGO completed all 3 tests with server overload.",
-             method="Arithmetic mean: MoveY, MoveWander, SyncVars. 100 objects · 10 s per test · on-wire server downstream · 1 MiB = 1,048,576 bytes.",
-             caveat="One benchmark run; no repeat variability measured. Native replication behavior differs. Fusion uses Photon relay. Full methodology at the link below."),
-        dict(slug="02-messaging-cpu", kicker="RPCs: server broadcasts + client inputs, 100 connections, 20 Hz",
-             takeaway="PurrNet used {reduction}% less server CPU than Mirror and {fishnet_reduction}% less than FishNet in the messaging tests.",
-             figure_method="Mean of two RPC workloads: server broadcasts + client inputs. 10 s windows. Whole-process CPU, no idle subtraction.",
-             figure_caveat="Benchmark + OS only. Observed CPU variation around ±1% (operator measurements). Fusion used Photon relay.",
-             chart_title="Messaging server CPU", chart_subtitle="Whole-process CPU, % of one core, lower is better",
-             rows=messaging, baseline="mirror", axis_max=40, tick_step=10, value_format="{:.1f}%",
-             chart_note="* NGO completed both workloads; server-broadcast RPCs were overloaded.",
-             method="Arithmetic mean: SendRPC and ClientInput. 100 connections · 20 Hz · 10 s per test · CPU includes all process threads, with no idle subtraction.",
-             caveat="The benchmark operator reports CPU variation of around ±1% on a server running only the benchmark and OS. This is a separate operator observation, not a per-netcode error bound calculated from this snapshot. Same Ryzen 5 3600 server; 60 fps cap. Fusion uses Photon relay."),
-        dict(slug="03-general-gc", kicker="NetworkTransform + SyncVars + RPCs + spawn/despawn, 100 connections, 20 Hz",
-             takeaway="PurrNet’s estimated GC allocation rate was {reduction}% lower than FishNet’s across the active workloads.",
-             figure_method="Mean allocation rate across six active workloads, 10 s windows. Idle connections and static objects excluded.",
-             figure_caveat="Estimated from positive managed-heap growth between frames. Single run; variability not measured.",
-             chart_title="GC allocation across workloads", chart_subtitle="Estimated server GC allocation, KiB/s, lower is better",
-             rows=general_gc, baseline="fishnet", axis_max=4000, tick_step=1000, value_format="{:,.0f}",
-             chart_note="* NGO completed all six workloads; " + str(next(row["overloaded"] for row in general_gc if row["netcode"] == "ngo")) + " were overloaded.",
-             method="Arithmetic mean of server gcAllocBytesPerSec across MoveY, MoveWander, SyncVars, SendRPC, ClientInput and SpawnChurn at 100 connections and 20 Hz. 10 s windows; Idle and Static excluded. 1 KiB = 1,024 bytes.",
-             caveat="Allocation is estimated from positive managed-heap growth between frames, not a precise allocation count. NGO includes overloaded workloads and is not eligible for a best-value claim. One run; no repeat variability measured."),
-        dict(slug="04-connection-scaling", kicker="NetworkTransform + SyncVars + RPCs + spawn/despawn, 10 → 100 connections, 20 Hz",
-             takeaway="PurrNet used {reduction}% less additional downstream bandwidth per connection than FishNet, from 10 to 100 connections.",
-             figure_method="Average added bandwidth: (downstream at 100 connections − at 10) / 90 across six active workloads. 10 s windows.",
-             figure_caveat="Observed cost over this interval, not a projection. Single run; variability not measured. Fusion used Photon relay.",
-             chart_title="Bandwidth per added connection", chart_subtitle="Added server downstream, KiB/s per connection, lower is better",
-             rows=scaling, baseline="fishnet", axis_max=36, tick_step=10, value_format="{:.1f}",
-             chart_note="* NGO completed both suites; the 100-connection suite includes overload.",
-             method="Mean across six load tests of (server downstream at 100 connections − at 10) / 90, at 20 Hz. 1 KiB = 1,024 bytes.",
-             caveat="Observed marginal cost over this interval; not a per-player total or a projection. One run; no repeat variability measured. Fusion uses Photon relay."),
-    ]
-    for i, card in enumerate(cards, 1):
-        values = {r["netcode"]: r["value"] for r in card["rows"]}
-        if any(not 0 <= v <= card["axis_max"] for v in values.values()):
-            raise ValueError("Update the chart axis: a value would be clipped")
-        if next(r for r in card["rows"] if r["netcode"] == "purrnet")["overloaded"]:
-            raise ValueError("PurrNet is overloaded; revisit the promotional claims")
-        if next(r for r in card["rows"] if r["netcode"] == card["baseline"])["overloaded"]:
-            raise ValueError("The named comparison is overloaded; revisit the promotional claim")
-        reduction = (1 - values["purrnet"] / values[card["baseline"]]) * 100
-        if reduction <= 0:
-            raise ValueError("Headline no longer describes an advantage")
-        card.update(number=i, reduction_percent=reduction, reduction_percent_rounded=round(reduction))
-        card["takeaway"] = card["takeaway"].format(reduction=round(reduction),
-                              fishnet_reduction=round((1 - values["purrnet"] / values["fishnet"]) * 100))
-        card["alt"] = card["chart_title"] + ". " + card["takeaway"] + " " + card["kicker"] + "."
+class ChartUnavailable(ValueError):
+    """The run cannot support this comparison; CI records why and skips it."""
+
+
+def number(value, label, *, positive=False):
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise ChartUnavailable(f"{label}: missing or non-finite measurement")
+    if value < 0 or (positive and value == 0):
+        raise ChartUnavailable(f"{label}: invalid negative or zero measurement")
+    return value
+
+
+def run_index(data):
+    if not isinstance(data, list):
+        raise ValueError("Expected a list of benchmark datapoints")
+    by = {}
+    for run in data:
+        key = (run["netcode"], (run.get("size", run.get("connections")), run.get("tick")))
+        if key in by:
+            raise ValueError(f"Duplicate benchmark datapoint: {key}")
+        by[key] = run
+    return by
+
+
+def required_runs(by, sessions, tests, field, *, full_suite=False):
+    runs = []
+    for session in sessions:
+        for netcode in summary.ORDER:
+            label = f"{summary.NAMES[netcode]} at {session[0]} connections / {session[1]} Hz"
+            run = by.get((netcode, session))
+            failure = summary.run_failure(run) if full_suite else summary.category_failure(run, tests)
+            if failure:
+                raise ChartUnavailable(f"{label}: {failure}")
+            meta = run.get("meta") or {}
+            if any(v != session[0] for v in (run.get("connections"), meta.get("connectedAtStart"), meta.get("expectedClients"))):
+                raise ChartUnavailable(f"{label}: actual connection count does not match the session")
+            if meta.get("tickRate") != session[1]:
+                raise ChartUnavailable(f"{label}: actual tick rate does not match the session")
+            for test in tests:
+                window = run["server"][test]
+                if window.get("connections") != session[0]:
+                    raise ChartUnavailable(f"{label}: connections changed during {test}")
+                number(window.get(field), f"{label} / {test} / {field}")
+                number(window.get("windowSeconds"), f"{label} / {test} / duration", positive=True)
+                number(window.get("p99FrameMs"), f"{label} / {test} / frame p99")
+                number(window.get("avgFps"), f"{label} / {test} / FPS", positive=True)
+                number(window.get("objects"), f"{label} / {test} / objects", positive=True)
+            runs.append(run)
+    return runs
+
+
+def conditions(runs, tests, *, cpu=False):
+    build_modes = [r["meta"].get("devBuild") for r in runs]
+    modes = set(build_modes)
+    if any(type(mode) is not bool for mode in build_modes) or len(modes) != 1:
+        raise ChartUnavailable("Build mode is missing or differs between netcodes")
+    unity = {r["meta"].get("unityVersion") for r in runs}
+    if len(unity) != 1 or not next(iter(unity)):
+        raise ChartUnavailable("Unity version is missing or differs between netcodes")
+    cpus = {r["meta"].get("cpuModel") for r in runs}
+    if cpu and (len(cpus) != 1 or not next(iter(cpus))):
+        raise ChartUnavailable("Server CPU model is missing or differs between netcodes")
+    # Churn can be sampled between despawn and respawn. Its instantaneous object
+    # count is not the configured object target. Client input uses a single hub.
+    objects = {r["server"][t]["objects"] for r in runs for t in tests if t not in ("SpawnChurn", "ClientInput")}
+    if len(objects) != 1:
+        raise ChartUnavailable("Replicated object count differs between the compared workloads")
+    for r in runs:
+        if "ClientInput" in tests and r["server"]["ClientInput"]["objects"] != 1:
+            raise ChartUnavailable("Client-input workload does not use the expected single hub")
+    durations = [r["server"][t]["windowSeconds"] for r in runs for t in tests]
+    lo, hi = round(min(durations), 1), round(max(durations), 1)
+    window_text = f"{lo:g} s windows" if lo == hi else f"{lo:g}–{hi:g} s windows"
+    model = next(iter(cpus)) if len(cpus) == 1 else "Multiple server CPUs"
+    model = re.sub(r"\s+\d+-Core Processor$", "", model or "Server CPU unknown")
+    footer = f"{model}, Unity {next(iter(unity))}, {'development' if next(iter(modes)) else 'release'} build"
+    fps = {r["meta"].get("targetFps") for r in runs}
+    # The report's overload thresholds assume 60 fps. Older aggregates omitted
+    # this field; explicit settings must match that assumption across the run.
+    if fps != {None}:
+        if len(fps) != 1:
+            raise ChartUnavailable("Frame cap is missing or differs between netcodes")
+        cap = number(next(iter(fps)), "Frame cap", positive=True)
+        if cap != 60:
+            raise ChartUnavailable("Overload comparisons require the benchmark's 60 fps frame cap")
+        footer += f", {cap:g} fps cap"
+    return dict(objects=next(iter(objects)), windows=window_text, footer=footer)
+
+
+def axis_range(values, minimum, step):
+    largest = max(values)
+    if largest <= minimum:
+        return minimum, step
+    rough = largest / 4
+    scale = 10 ** math.floor(math.log10(rough))
+    step = next(x for x in (1, 2, 2.5, 5, 10) if x * scale >= rough) * scale
+    return math.ceil(largest * 1.1 / step) * step, step
+
+
+def comparison(value, baseline, name):
+    if baseline == 0:
+        return f"the same as {name}" if value == 0 else None
+    change = (value / baseline - 1) * 100
+    rounded = round(abs(change))
+    if rounded == 0:
+        return f"approximately the same as {name}"
+    return f"{rounded}% {'lower' if change < 0 else 'higher'} than {name}"
+
+
+def build_cards(data, selected=None, *, ci=False, skipped=None):
+    by = run_index(data)
+    skipped = skipped if skipped is not None else {}
+    configs = {
+        "01-state-bandwidth": dict(tests=["MoveY", "MoveWander", "SyncVars"], field="txBytesPerSec",
+            divisor=1024**2, title="State replication bandwidth", noun="downstream bandwidth",
+            units="Server downstream, MiB/s", scope="across the state replication workloads",
+            baseline="fishnet", axis=5.2, step=1, value_format="{:.2f}",
+            workload="NetworkTransform + SyncVars"),
+        "02-messaging-cpu": dict(tests=["SendRPC", "ClientInput"], field="cpuPercent",
+            divisor=1, title="Messaging server CPU", noun="server CPU usage",
+            units="Whole-process CPU, % of one core", scope="in the messaging workloads",
+            baseline="mirror", axis=40, step=10, value_format="{:.1f}%",
+            workload="RPCs: server broadcasts + client inputs"),
+        "03-general-gc": dict(tests=summary.SCORE_TESTS, field="gcAllocBytesPerSec",
+            divisor=1024, title="GC allocation across workloads", noun="GC allocation rate",
+            units="Server GC allocation, KiB/s", scope="across the active workloads",
+            baseline="fishnet", axis=4000, step=1000, value_format="{:,.0f}",
+            workload="NetworkTransform + SyncVars + RPCs + spawn/despawn"),
+        "04-connection-scaling": dict(tests=summary.SCORE_TESTS, field="txBytesPerSec",
+            divisor=1024, title="Bandwidth per added connection", noun="additional downstream bandwidth per connection",
+            units="Added server downstream, KiB/s per connection", scope="from 10 to 100 connections",
+            baseline="fishnet", axis=36, step=10, value_format="{:.1f}",
+            workload="NetworkTransform + SyncVars + RPCs + spawn/despawn"),
+    }
+    if selected is not None and selected not in configs:
+        raise ValueError(f"Unknown chart: {selected}")
+    cards = []
+    for index, (slug, config) in enumerate(configs.items(), 1):
+        if selected and selected != slug:
+            continue
+        try:
+            scaling = slug == "04-connection-scaling"
+            sessions = [(10, 20), (100, 20)] if scaling else [(100, 20)]
+            tests = config["tests"]
+            runs = required_runs(by, sessions, tests, config["field"], full_suite=scaling)
+            context = conditions(runs, tests, cpu=slug == "02-messaging-cpu")
+            allocation_estimated = None
+            if slug == "03-general-gc":
+                modes = [r["server"][t].get("gcAllocEstimated") for r in runs for t in tests]
+                if any(type(mode) is not bool for mode in modes) or len(set(modes)) != 1:
+                    raise ChartUnavailable("GC allocation methods are missing or mixed between heap estimates and profiler counters")
+                allocation_estimated = modes[0]
+            rows = []
+            for netcode in summary.ORDER:
+                cases = [r for r in runs if r["netcode"] == netcode]
+                if scaling:
+                    # Same arithmetic mean as the report, without inspecting unrelated metrics.
+                    value = summary.mean([(cases[1]["server"][t][config["field"]] - cases[0]["server"][t][config["field"]]) / 90
+                                          for t in tests]) / config["divisor"]
+                else:
+                    value = summary.mean([cases[0]["server"][t][config["field"]] for t in tests]) / config["divisor"]
+                number(value, f"{summary.NAMES[netcode]} / {slug}")
+                rows.append(dict(netcode=netcode, value=value,
+                    overloaded=sum(summary.overloaded(r, t) for r in cases for t in tests), tests=list(tests)))
+            indexed = {row["netcode"]: row for row in rows}
+            purr, baseline = indexed["purrnet"], indexed[config["baseline"]]
+            claim_allowed = not purr["overloaded"] and not baseline["overloaded"]
+            reduction = (1 - purr["value"] / baseline["value"]) * 100 if baseline["value"] > 0 and claim_allowed else None
+            phrase = comparison(purr["value"], baseline["value"], summary.NAMES[config["baseline"]]) if claim_allowed else None
+            noun = ("estimated " if allocation_estimated else "") + config["noun"]
+            if phrase:
+                if slug == "02-messaging-cpu" and not indexed["fishnet"]["overloaded"]:
+                    secondary = comparison(purr["value"], indexed["fishnet"]["value"], "FishNet")
+                    if secondary:
+                        phrase += " and " + secondary
+                takeaway = f"PurrNet’s {noun} was {phrase} {config['scope']}."
+            else:
+                takeaway = f"Measured {noun} {config['scope']}."
+            total_tests = len(tests) * len(sessions)
+            overloaded = [f"{summary.NAMES[row['netcode']]}: {row['overloaded']}/{total_tests} workloads overloaded"
+                          for row in rows if row["overloaded"]]
+            chart_note = "* " + "; ".join(overloaded) + "." if overloaded else ""
+            axis_max, tick_step = axis_range([row["value"] for row in rows], config["axis"], config["step"])
+            if slug == "01-state-bandwidth":
+                figure_method = f"Mean of three transform and synced-variable workloads. {context['objects']:g} objects, {context['windows']}."
+            elif slug == "02-messaging-cpu":
+                figure_method = f"Mean of two RPC workloads: broadcasts on {context['objects']:g} objects + client inputs. {context['windows']}. No idle subtraction."
+            elif slug == "03-general-gc":
+                figure_method = f"Mean allocation rate across six active workloads, {context['windows']}. Idle connections and static objects excluded."
+            else:
+                figure_method = f"Mean of six active workload deltas: (downstream at 100 connections − at 10) / 90. {context['windows']}."
+            session_label = "10 → 100 connections, 20 Hz" if scaling else "100 connections, 20 Hz"
+            units = config["units"]
+            if allocation_estimated:
+                units = "Estimated " + units.lower()
+            method = ("Mean of per-test (100-connection − 10-connection) server downstream / 90."
+                      if scaling else f"Arithmetic mean of server {config['field']}.")
+            method += f" Tests: {', '.join(tests)}. Sessions: {session_label}. {context['windows']}. "
+            method += "No idle subtraction. Binary byte units (1 KiB = 1,024 bytes)."
+            caveat = "One published run. Overloaded rows describe saturated servers and are not used for comparative claims."
+            if slug == "03-general-gc":
+                caveat += (" Allocation is estimated from frame-to-frame managed-heap growth, using a running average when collection shrinks the heap."
+                           if allocation_estimated else " Allocation is measured by the profiler allocation counter.")
+            card = dict(slug=slug, number=index, chart_title=config["title"], takeaway=takeaway,
+                kicker=config["workload"] + ", " + session_label, chart_subtitle=units + ", lower is better",
+                rows=rows, baseline=config["baseline"], axis_max=axis_max, tick_step=tick_step,
+                value_format=config["value_format"], chart_note=chart_note, figure_method=figure_method,
+                method=method, caveat=caveat, footer=context["footer"],
+                allocation_estimated=allocation_estimated, reduction_percent=reduction,
+                reduction_percent_rounded=round(reduction) if reduction is not None else None)
+            card["alt"] = card["chart_title"] + ". " + takeaway + " " + card["kicker"] + "."
+            cards.append(card)
+        except ChartUnavailable as error:
+            if not ci:
+                raise
+            skipped[slug] = str(error)
     return cards
 
 
-def write_readme(metadata, cards, out):
+def parse_metadata(raw, markdown, revision):
+    header = re.search(r"_Last run (\d{4}-\d{2}-\d{2}): (.+?) · Unity ([^ ·]+)", markdown)
+    run = re.search(r"https://github.com/[^)\s]+/actions/runs/\d+", markdown)
+    if not header or not run:
+        raise ValueError("Summary must contain a run date, versions, Unity version and workflow URL")
+    date, versions, unity = header.groups()
+    version_parts = versions.split(" · ")
+    netcode_versions = {netcode: next((part[len(name) + 1:] for part in version_parts if part.startswith(name + " ")), "version unknown")
+                        for netcode, name in summary.NAMES.items()}
+    return dict(date=date, run_url=run.group(), run_id=run.group().rsplit("/", 1)[1],
+        versions=versions, netcode_versions=netcode_versions, unity_version=unity,
+        source_revision=revision, source_sha256=hashlib.sha256(raw).hexdigest(),
+        source_data="source-data.json", source_summary="source-summary.md", size=[W, H],
+        note="One published run. Selected resource comparisons, no overall ranking.")
+
+
+def write_readme(metadata, cards, out, skipped=None):
+    skipped = skipped or {}
     lines = ["# PurrNet promotional benchmark charts", "",
-             f'Four 1920 × 1080 PNG images and matching scalable SVGs, based on the **{metadata["date"]}** published run.', "",
-             f'[{metadata["versions"]}]({metadata["run_url"]})', "",
-             "These are selected resource comparisons, not an overall netcode ranking. All five netcodes are shown on linear scales starting at zero. Overloaded rows remain visible and are marked. Percent reductions use unrounded raw values, rounded to the nearest whole percent.", ""]
-    original = out.with_name(out.name + "-original")
-    if original.is_dir():
-        lines += [f'[First design pass, kept for comparison](../{original.name}/README.md)', ""]
+        f'{len(cards)} {"chart" if len(cards) == 1 else "charts"}, with 1920 × 1080 PNG and matching SVG exports, from **{metadata["date"]}**.', "",
+        f'[{metadata["versions"]}]({metadata["run_url"]})', "",
+        "These are selected resource comparisons, not an overall netcode ranking. Each chart includes all five netcodes on a linear scale starting at zero. Asterisks and hatching mark overload. Relative percentages use unrounded values and round to the nearest whole percent.", ""]
+    if skipped:
+        lines += ["## Charts unavailable for this run", ""]
+        lines += [f"- {slug}: {reason}" for slug, reason in skipped.items()]
+        lines += ["", "Unavailable charts are omitted from this bundle; images from earlier runs are not retained here.", ""]
     for card in cards:
         lines += [f'## {card["chart_title"]}', "", card["alt"], "",
-                  f'![{card["alt"]}]({card["slug"]}.png)', "",
-                  f'[PNG]({card["slug"]}.png) · [SVG]({card["slug"]}.svg)', "",
-                  card["method"], "", card["caveat"], ""]
-    lines += ["## Provenance and calculation", "",
-              f'- [Source workflow run]({metadata["run_url"]})',
-              '- [Full methodology and live report](https://purrnet.github.io/unity-netcode-benchmark/)',
-              f'- [Raw source at the pulled revision](https://github.com/PurrNet/unity-netcode-benchmark/blob/{metadata["source_revision"]}/docs/latest.json)',
-              f'- Source JSON SHA-256: `{metadata["source_sha256"]}`',
-              '- [Exact plotted values and claims](chart-data.json)',
-              '- [Supplied PurrNet logo](../assets/purrnet-logo-orange.png), embedded in every PNG and SVG header.',
-              '- Reduction formula: `100 × (1 − PurrNet / named competitor)`.',
-              '- Category values use the existing report’s arithmetic means and completion/overload rules.',
-              '- Scaling averages six per-test deltas: MoveY, MoveWander, SyncVars, SendRPC, ClientInput, SpawnChurn.',
-              '- General GC averages allocation rates across the same six active workloads at 100 connections and 20 Hz; Idle and Static are excluded.',
-              '- State, messaging, general GC and scaling NGO rows include overload. This can make resource use lower than equivalent unsaturated service; they are not eligible for best-value claims.',
-              '- Allocation is a positive heap-growth estimate, not the profiler allocation counter or process memory usage.',
-              '- Individual versions, transport differences, replication behavior, and benchmark overrides are documented in the full methodology.', "",
-              "## Regenerate", "", "Install `matplotlib` and `pillow`, then run from the repository root:", "", "```sh",
-              "python .github/scripts/render-promo.py", "```", "",
-              "This reads `docs/latest.json` and the run metadata in `docs/latest.md`, and writes a dated folder under `docs/promo/`. To reproduce an older run, pass its matching `--data` and `--summary` files, plus `--source-revision` and `--output`. The renderer stops when required data are missing or the highlighted result is overloaded.", ""]
+            f'![{card["alt"]}]({card["slug"]}.png)', "",
+            f'[PNG]({card["slug"]}.png) / [SVG]({card["slug"]}.svg)', "",
+            card["method"], "", card["caveat"], ""]
+    lines += ["## Source and calculation", "",
+        f'- [Workflow run]({metadata["run_url"]})',
+        '- [Exact raw data used for these images](source-data.json)',
+        '- [Run metadata and original summary](source-summary.md)',
+        '- [Plotted values, claims and skipped charts](chart-data.json)',
+        f'- Raw data SHA-256: \x60{metadata["source_sha256"]}\x60',
+        f'- Renderer checkout revision: \x60{metadata["source_revision"]}\x60. This identifies the code checkout, not the data snapshot.',
+        '- Lower/higher comparisons use \x60100 × (PurrNet / named competitor − 1)\x60. Zero baselines and overloaded comparators receive neutral text.',
+        '- Bandwidth and CPU categories use arithmetic means. General GC uses the six active workloads. Scaling averages their per-test \x60(100 connections − 10 connections) / 90\x60 bandwidth deltas.',
+        '- Idle and Static are excluded. Missing or incomplete workloads are not treated as zero.',
+        '- GC labels distinguish heap-growth estimates from profiler counters. A mixture of those methods makes the GC chart unavailable.',
+        '- Source, units and full workload names are retained in the bundled data; the images use short workload descriptions.', "",
+        "## Regenerate", "",
+        "Install the pinned dependencies with \x60python -m pip install -r .github/scripts/requirements-promo.txt\x60, then run from the repository root:", "", "\x60\x60\x60sh",
+        "python .github/scripts/render-promo.py --ci --output docs/promo/latest",
+        "\x60\x60\x60", "",
+        "Use \x60--chart 03-general-gc\x60 to select one chart. To reproduce this particular bundle, supply its \x60source-data.json\x60 with \x60--data\x60 and \x60source-summary.md\x60 with \x60--summary\x60. A render replaces the generated chart bundle in its output directory, including removing skipped or unselected images.", "",
+        "\x60--ci\x60 skips unsupported comparisons with reasons in this README and \x60chart-data.json\x60; unexpected errors still fail the job. Without \x60--ci\x60, an unavailable comparison raises an error.", ""]
     (out / "README.md").write_text("\n".join(lines), encoding="utf-8")
+
+
+def write_bundle(cards, metadata, skipped, raw, markdown, output):
+    """Render completely before changing managed output files; never touch archives/assets."""
+    output = Path(output).resolve()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    managed = {slug + suffix for slug in CHART_SLUGS for suffix in (".png", ".svg")}
+    managed.update(("README.md", "chart-data.json", "source-data.json", "source-summary.md"))
+    with tempfile.TemporaryDirectory(prefix=".promo-", dir=output.parent) as temporary:
+        staging = Path(temporary).resolve()
+        if staging.parent != output.parent:
+            raise ValueError("Temporary render directory is outside the intended output parent")
+        for card in cards:
+            draw_card(card, metadata, staging)
+        (staging / "chart-data.json").write_text(json.dumps(dict(metadata=metadata, charts=cards, skipped=skipped),
+            indent=2, ensure_ascii=False, allow_nan=False) + "\n", encoding="utf-8")
+        (staging / "source-data.json").write_bytes(raw)
+        (staging / "source-summary.md").write_text(markdown, encoding="utf-8")
+        write_readme(metadata, cards, staging, skipped)
+        output.mkdir(parents=True, exist_ok=True)
+        staged = {path.name for path in staging.iterdir()}
+        for name in sorted(managed - staged):
+            (output / name).unlink(missing_ok=True)
+        for name in sorted(staged):
+            os.replace(staging / name, output / name)
 
 
 def main():
@@ -237,37 +430,32 @@ def main():
     parser.add_argument("--data", type=Path, default=ROOT / "docs/latest.json")
     parser.add_argument("--summary", type=Path, default=ROOT / "docs/latest.md")
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--source-revision", default=None)
+    parser.add_argument("--source-revision", default=None, help="Code checkout revision, not the data revision.")
+    parser.add_argument("--chart", choices=CHART_SLUGS, help="Render just one chart (default: all four).")
+    parser.add_argument("--ci", action="store_true", help="Skip unsupported comparisons with recorded reasons.")
+    parser.add_argument("--font-family", help="Override the font; CI defaults to Matplotlib's bundled DejaVu Sans.")
     args = parser.parse_args()
     raw = args.data.read_bytes()
-    md = args.summary.read_text(encoding="utf-8")
-    date = re.search(r"Last run (\d{4}-\d{2}-\d{2})", md).group(1)
-    run_url = re.search(r"https://github.com/[^)]+/actions/runs/\d+", md).group(0)
-    versions = md.split(": ", 1)[1].split(" · Unity", 1)[0]
-    version_parts = versions.split(" · ")
-    netcode_versions = {
-        netcode: next(part[len(name) + 1:] for part in version_parts if part.startswith(name + " "))
-        for netcode, name in summary.NAMES.items()
-    }
-    unity_version = re.search(r" · Unity ([^ ·]+)", md).group(1)
+    markdown = args.summary.read_text(encoding="utf-8")
     if args.source_revision is None:
         import subprocess
         args.source_revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-    metadata = dict(date=date, run_url=run_url, run_id=run_url.rsplit("/", 1)[1],
-                    versions=versions, netcode_versions=netcode_versions, unity_version=unity_version, source_revision=args.source_revision,
-                    source_sha256=hashlib.sha256(raw).hexdigest(),
-                    source_data="docs/latest.json", size=[W, H],
-                    note="One published run. CPU stability observation supplied separately by the benchmark operator. Selected categories, no overall ranking.")
-    cards = build_cards(json.loads(raw))
-    out = args.output or ROOT / "docs/promo" / date
-    out.mkdir(parents=True, exist_ok=True)
-    setup_fonts()
+    metadata = parse_metadata(raw, markdown, args.source_revision)
+    skipped = {}
+    cards = build_cards(json.loads(raw), args.chart, ci=args.ci, skipped=skipped)
+    output = args.output or ROOT / "docs/promo" / metadata["date"]
+    setup_fonts(args.font_family)
+    write_bundle(cards, metadata, skipped, raw, markdown, output)
     for card in cards:
-        draw_card(card, metadata, out)
-        print(f'{card["slug"]}: {card["reduction_percent"]:.9f}% reduction vs {card["baseline"]}')
-    (out / "chart-data.json").write_text(json.dumps(dict(metadata=metadata, charts=cards), indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    write_readme(metadata, cards, out)
-    print(f"Wrote {len(cards)} PNGs + SVGs to {out}")
+        print(f'{card["slug"]}: {card["takeaway"]}')
+    for slug, reason in skipped.items():
+        print(f"Skipped {slug}: {reason}")
+    print(f"Wrote {len(cards)} PNG/SVG pairs to {output}")
+    if os.environ.get("GITHUB_STEP_SUMMARY"):
+        with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary_file:
+            summary_file.write(f"\n### Promotional charts\n\nGenerated {len(cards)} PNG/SVG pairs; {len(skipped)} unavailable. Included in the benchmark-results artifact.\n")
+            for slug, reason in skipped.items():
+                summary_file.write(f"\n- {slug}: {reason}\n")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,113 @@
+{
+  "metadata": {
+    "date": "2026-09-09",
+    "run_url": "https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/34364138644",
+    "run_id": "34364138644",
+    "versions": "PurrNet 1.23.0-beta.42 · FishNet 4.7.3 · Mirror 96.0.1 · NGO 2.13.2 · Fusion 2.1.2 Stable 2279",
+    "netcode_versions": {
+      "purrnet": "1.23.0-beta.42",
+      "fishnet": "4.7.3",
+      "mirror": "96.0.1",
+      "ngo": "2.13.2",
+      "fusion": "2.1.2 Stable 2279"
+    },
+    "unity_version": "6000.5.4f1",
+    "source_revision": "8a50dd332178e9ed70b9215721cbb2543a920363",
+    "source_sha256": "13d99fafb30f9109e8eff58f9463e0c6df49e66dfda8749058422cc0ce1bc373",
+    "source_data": "docs/latest.json",
+    "size": [
+      1920,
+      1080
+    ],
+    "note": "One published run. CPU stability observation supplied separately by the benchmark operator. Selected categories, no overall ranking."
+  },
+  "charts": [
+    {
+      "slug": "03-general-gc",
+      "kicker": "NetworkTransform + SyncVars + RPCs + spawn/despawn, 100 connections, 20 Hz",
+      "takeaway": "PurrNet’s estimated GC allocation rate was 86% lower than FishNet’s across the active workloads.",
+      "figure_method": "Mean allocation rate across six active workloads, 10 s windows. Idle connections and static objects excluded.",
+      "figure_caveat": "Estimated from positive managed-heap growth between frames. Single run; variability not measured.",
+      "chart_title": "GC allocation across workloads",
+      "chart_subtitle": "Estimated server GC allocation, KiB/s, lower is better",
+      "rows": [
+        {
+          "netcode": "purrnet",
+          "value": 129.97174116220745,
+          "overloaded": 0,
+          "tests": [
+            "MoveY",
+            "MoveWander",
+            "SyncVars",
+            "SendRPC",
+            "ClientInput",
+            "SpawnChurn"
+          ]
+        },
+        {
+          "netcode": "fishnet",
+          "value": 930.0535229496812,
+          "overloaded": 0,
+          "tests": [
+            "MoveY",
+            "MoveWander",
+            "SyncVars",
+            "SendRPC",
+            "ClientInput",
+            "SpawnChurn"
+          ]
+        },
+        {
+          "netcode": "mirror",
+          "value": 3549.0261567104694,
+          "overloaded": 0,
+          "tests": [
+            "MoveY",
+            "MoveWander",
+            "SyncVars",
+            "SendRPC",
+            "ClientInput",
+            "SpawnChurn"
+          ]
+        },
+        {
+          "netcode": "ngo",
+          "value": 193.48868478876236,
+          "overloaded": 4,
+          "tests": [
+            "MoveY",
+            "MoveWander",
+            "SyncVars",
+            "SendRPC",
+            "ClientInput",
+            "SpawnChurn"
+          ]
+        },
+        {
+          "netcode": "fusion",
+          "value": 1060.8644697755485,
+          "overloaded": 0,
+          "tests": [
+            "MoveY",
+            "MoveWander",
+            "SyncVars",
+            "SendRPC",
+            "ClientInput",
+            "SpawnChurn"
+          ]
+        }
+      ],
+      "baseline": "fishnet",
+      "axis_max": 4000,
+      "tick_step": 1000,
+      "value_format": "{:,.0f}",
+      "chart_note": "* NGO completed all six workloads; 4 were overloaded.",
+      "method": "Arithmetic mean of server gcAllocBytesPerSec across MoveY, MoveWander, SyncVars, SendRPC, ClientInput and SpawnChurn at 100 connections and 20 Hz. 10 s windows; Idle and Static excluded. 1 KiB = 1,024 bytes.",
+      "caveat": "Allocation is estimated from positive managed-heap growth between frames, not a precise allocation count. NGO includes overloaded workloads and is not eligible for a best-value claim. One run; no repeat variability measured.",
+      "number": 3,
+      "reduction_percent": 86.02534822404631,
+      "reduction_percent_rounded": 86,
+      "alt": "GC allocation across workloads. PurrNet’s estimated GC allocation rate was 86% lower than FishNet’s across the active workloads. NetworkTransform + SyncVars + RPCs + spawn/despawn, 100 connections, 20 Hz."
+    }
+  ]
+}

@@ -189,6 +189,31 @@ jobs:
           # Same block as the job summary, minus the picture (its SVGs are not reachable from here).
           sed '/<picture>/,/<\/picture>/d' results-out/latest.md >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Set up Python for promotional charts
+        if: ${{ steps.report.outputs.complete == 'true' }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: .github/scripts/requirements-promo.txt
+
+      - name: Install chart dependencies
+        if: ${{ steps.report.outputs.complete == 'true' }}
+        run: python -m pip install -r .github/scripts/requirements-promo.txt
+
+      - name: Check promotional chart calculations
+        if: ${{ steps.report.outputs.complete == 'true' }}
+        run: python .github/scripts/test-promo.py
+
+      - name: Render promotional charts
+        id: promo
+        if: ${{ steps.report.outputs.complete == 'true' }}
+        run: |
+          set -eu
+          python .github/scripts/render-promo.py \
+            --data results-out/scaling.json --summary results-out/latest.md \
+            --output results-out/promo --source-revision "$(git rev-parse HEAD)" --ci
+
       - name: Upload combined results
         if: always()
         uses: actions/upload-artifact@v7
@@ -204,7 +229,7 @@ jobs:
       # datapoint exists and fleet coordination succeeded. Partial results remain downloadable;
       # a missing worker or failed completion barrier must not replace the published report.
       - name: Commit latest results to the repository
-        if: ${{ steps.report.outputs.complete == 'true' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+        if: ${{ success() && steps.report.outputs.complete == 'true' && steps.promo.outcome == 'success' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
         run: |
           set -eu
           mkdir -p docs
@@ -212,6 +237,11 @@ jobs:
           cp results-out/scaling.json docs/latest.json
           cp results-out/latest.md docs/latest.md
           cp results-out/svg/latest-light.svg results-out/svg/latest-dark.svg docs/
+          # Replace the bundle so a custom suite cannot retain charts from an older run.
+          # Dated archives and shared logo assets live outside this directory.
+          rm -rf -- docs/promo/latest
+          mkdir -p docs/promo/latest
+          cp -a results-out/promo/. docs/promo/latest/
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/

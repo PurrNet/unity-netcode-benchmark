@@ -11,6 +11,15 @@ metrics per test and session). Raw datapoints of the latest run are in `docs/lat
 Detailed workload/delivery diagnostics stay in the raw data. Run notes show only problems, not successful checks or routine measurements.
 RTT measurements remain in the raw data only; they are not used for comparisons.
 
+Promotional charts update automatically with each successful benchmark published from the default
+branch. The current PNGs are [state bandwidth](docs/promo/latest/01-state-bandwidth.png),
+[messaging CPU](docs/promo/latest/02-messaging-cpu.png),
+[GC allocation](docs/promo/latest/03-general-gc.png), and
+[connection scaling](docs/promo/latest/04-connection-scaling.png).
+The [chart bundle](docs/promo/latest/README.md) includes SVGs, source values and any skipped
+comparisons. Custom suites may omit charts when the required sessions or complete comparisons are
+unavailable; the bundle is replaced together so it never mixes runs. Dated chart archives remain available.
+
 ## What runs
 
 | Project | Netcode | Transport |
@@ -69,8 +78,17 @@ Quick reference run while iterating on one netcode: select that `netcodes` entry
 
 Each run renders the job summary, uploads raw per-process JSON as the `benchmark-results`
 artifact. When all planned datapoints exist and the workflow succeeds, it commits `docs/`
-(interactive report, `latest.json`, `latest.md`). A failed fleet or missing completion acknowledgement
+(interactive report, `latest.json`, `latest.md`, and `promo/latest/`). The artifact also includes the
+new chart bundle in `results-out/promo/`. A failed fleet, missing completion acknowledgement or chart rendering error
 does not replace the published report. GitHub Pages serves `docs/` as the live report.
+
+To regenerate the charts locally from the published results (Python 3.12):
+
+```bash
+python -m pip install -r .github/scripts/requirements-promo.txt
+python .github/scripts/render-promo.py --data docs/latest.json --summary docs/latest.md \
+  --output docs/promo/latest --source-revision "$(git rev-parse HEAD)" --ci
+```
 
 How to read the results: the report opens with one row per netcode.
 Bandwidth and CPU are a multiple of the best netcode in each load test, averaged over the seven
