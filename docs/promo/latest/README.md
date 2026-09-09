@@ -2,15 +2,15 @@
 
 4 charts, with 1920 × 1080 PNG and matching SVG exports, from **2026-09-09**.
 
-[PurrNet 1.23.0-beta.42 · FishNet 4.7.3 · Mirror 96.0.1 · NGO 2.13.2 · Fusion 2.1.2 Stable 2279](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/34364138644)
+[PurrNet 1.23.0-beta.44 · FishNet 4.7.3 · Mirror 96.0.1 · NGO 2.13.2 · Fusion 2.1.2 Stable 2279](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/34383416617)
 
 These are selected resource comparisons, not an overall netcode ranking. Each chart includes all five netcodes on a linear scale starting at zero. Asterisks and hatching mark overload. Relative percentages use unrounded values and round to the nearest whole percent.
 
 ## State replication bandwidth
 
-State replication bandwidth. PurrNet’s downstream bandwidth was 33% lower than FishNet across the state replication workloads. NetworkTransform + SyncVars, 100 connections, 20 Hz.
+State replication bandwidth. PurrNet’s downstream bandwidth was 35% lower than FishNet across the state replication workloads. NetworkTransform + SyncVars, 100 connections, 20 Hz.
 
-![State replication bandwidth. PurrNet’s downstream bandwidth was 33% lower than FishNet across the state replication workloads. NetworkTransform + SyncVars, 100 connections, 20 Hz.](01-state-bandwidth.png)
+![State replication bandwidth. PurrNet’s downstream bandwidth was 35% lower than FishNet across the state replication workloads. NetworkTransform + SyncVars, 100 connections, 20 Hz.](01-state-bandwidth.png)
 
 [PNG](01-state-bandwidth.png) / [SVG](01-state-bandwidth.svg)
 
@@ -32,9 +32,9 @@ One published run. Overloaded rows describe saturated servers and are not used f
 
 ## GC allocation across workloads
 
-GC allocation across workloads. PurrNet’s estimated GC allocation rate was 86% lower than FishNet across the active workloads. NetworkTransform + SyncVars + RPCs + spawn/despawn, 100 connections, 20 Hz.
+GC allocation across workloads. PurrNet’s estimated GC allocation rate was 81% lower than FishNet across the active workloads. NetworkTransform + SyncVars + RPCs + spawn/despawn, 100 connections, 20 Hz.
 
-![GC allocation across workloads. PurrNet’s estimated GC allocation rate was 86% lower than FishNet across the active workloads. NetworkTransform + SyncVars + RPCs + spawn/despawn, 100 connections, 20 Hz.](03-general-gc.png)
+![GC allocation across workloads. PurrNet’s estimated GC allocation rate was 81% lower than FishNet across the active workloads. NetworkTransform + SyncVars + RPCs + spawn/despawn, 100 connections, 20 Hz.](03-general-gc.png)
 
 [PNG](03-general-gc.png) / [SVG](03-general-gc.svg)
 
@@ -44,9 +44,9 @@ One published run. Overloaded rows describe saturated servers and are not used f
 
 ## Bandwidth per added connection
 
-Bandwidth per added connection. PurrNet’s additional downstream bandwidth per connection was 26% lower than FishNet from 10 to 100 connections. NetworkTransform + SyncVars + RPCs + spawn/despawn, 10 → 100 connections, 20 Hz.
+Bandwidth per added connection. PurrNet’s additional downstream bandwidth per connection was 28% lower than FishNet from 10 to 100 connections. NetworkTransform + SyncVars + RPCs + spawn/despawn, 10 → 100 connections, 20 Hz.
 
-![Bandwidth per added connection. PurrNet’s additional downstream bandwidth per connection was 26% lower than FishNet from 10 to 100 connections. NetworkTransform + SyncVars + RPCs + spawn/despawn, 10 → 100 connections, 20 Hz.](04-connection-scaling.png)
+![Bandwidth per added connection. PurrNet’s additional downstream bandwidth per connection was 28% lower than FishNet from 10 to 100 connections. NetworkTransform + SyncVars + RPCs + spawn/despawn, 10 → 100 connections, 20 Hz.](04-connection-scaling.png)
 
 [PNG](04-connection-scaling.png) / [SVG](04-connection-scaling.svg)
 
@@ -56,12 +56,12 @@ One published run. Overloaded rows describe saturated servers and are not used f
 
 ## Source and calculation
 
-- [Workflow run](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/34364138644)
+- [Workflow run](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/34383416617)
 - [Exact raw data used for these images](source-data.json)
 - [Run metadata and original summary](source-summary.md)
 - [Plotted values, claims and skipped charts](chart-data.json)
-- Raw data SHA-256: `13d99fafb30f9109e8eff58f9463e0c6df49e66dfda8749058422cc0ce1bc373`
-- Renderer checkout revision: `8a50dd332178e9ed70b9215721cbb2543a920363`. This identifies the code checkout, not the data snapshot.
+- Raw data SHA-256: `82e638a6dd223bd880ac3dd315ffb6e1f766f694b0f512851ed15c6f70a26e4f`
+- Renderer checkout revision: `6a990a91dfed1ba8f9f42d9af835791c69219726`. This identifies the code checkout, not the data snapshot.
 - Lower/higher comparisons use `100 × (PurrNet / named competitor − 1)`. Zero baselines and overloaded comparators receive neutral text.
 - Bandwidth and CPU categories use arithmetic means. General GC uses the six active workloads. Scaling averages their per-test `(100 connections − 10 connections) / 90` bandwidth deltas.
 - Idle and Static are excluded. Missing or incomplete workloads are not treated as zero.
