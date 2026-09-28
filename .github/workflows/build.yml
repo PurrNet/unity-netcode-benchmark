@@ -19,6 +19,11 @@ on:
         type: string
         required: false
         default: ubuntu-latest
+      purrnet_ref:
+        description: "PurrNet branch, tag or commit to build (purrnet only; empty keeps the committed manifest)"
+        type: string
+        required: false
+        default: dev
   workflow_dispatch:
     inputs:
       netcode:
@@ -34,6 +39,11 @@ on:
         type: string
         required: false
         default: ubuntu-latest
+      purrnet_ref:
+        description: "PurrNet branch, tag or commit to build (purrnet only; empty keeps the committed manifest)"
+        type: string
+        required: false
+        default: dev
 
 jobs:
   build:
@@ -42,6 +52,18 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
+
+      # PurrNet follows a ref (dev by default) rather than a committed tag. The manifest is pinned to
+      # the ref's commit before any cache key is computed, so a new PurrNet commit builds a new player
+      # and an unchanged one reuses the cached player. scaling.yml resolves the ref once and passes the
+      # commit, so the build and the reported version agree even if dev moves mid-run.
+      - name: Pin PurrNet
+        if: ${{ inputs.netcode == 'purrnet' && inputs.purrnet_ref != '' }}
+        env:
+          PURRNET_REF: ${{ inputs.purrnet_ref }}
+        run: |
+          sha=$(python3 .github/scripts/pin-purrnet.py --write "$PURRNET_REF")
+          echo "PurrNet $PURRNET_REF -> $sha"
 
       # No restore prefix: a finished player is reusable only for identical build inputs.
       # ProjectSettings includes the Unity version; the workflow includes the builder/configuration.

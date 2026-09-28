@@ -76,6 +76,33 @@ Useful inputs: `netcodes`, `sessions`, `bench_seconds`, `bench_objects`, `profil
 Quick reference run while iterating on one netcode: select that `netcodes` entry, `sessions: 10,100`,
 `bench_seconds: 5`. Use the full suite and normal windows for published comparisons.
 
+PurrNet follows its `dev` branch: `purrnet_ref` (default `dev`; a tag or commit also works) is
+resolved to one commit when the run starts, and the build pins `purrnet/Packages/manifest.json` to
+it (`.github/scripts/pin-purrnet.py`), so the player cache rebuilds exactly when PurrNet changed.
+Results report PurrNet's `package.json` version at that commit plus the commit itself
+(`versions.json` → `purrnet_commit`), since `dev` often runs ahead of its last tag. The committed
+manifest says `#dev` too; locally, Unity keeps the commit in `packages-lock.json` until you update
+the package.
+
+### History on purrnet.dev
+
+Every default-branch run with datapoints is also sent to purrnet.dev (`/admin/benchmarks`, admin
+only for now), which keeps the history the repository does not: a slider over every run, trends per
+netcode, and each netcode's run-to-run noise at an unchanged version, so a PurrNet change can be told
+apart from the bench wobbling. An incomplete run is stored but left out of trends.
+
+The upload needs the `PURRNET_BENCH_TOKEN` repository secret, equal to the site's
+`BENCHMARK_INGEST_TOKEN`; without it the step only prints a notice. The repository is public, but
+secrets never reach forks or pull requests, and the endpoint refuses anything without the token.
+A failed upload warns without failing the run. To (re)send every published run from git history
+(idempotent: a run is keyed by its workflow run id):
+
+```bash
+PURRNET_BENCH_TOKEN=... python .github/scripts/upload-results.py backfill   # --dry-run to list
+```
+
+`PURRNET_BENCH_URL` (a repository variable in CI) points it elsewhere, such as a local dev server.
+
 Each run renders the job summary, uploads raw per-process JSON as the `benchmark-results`
 artifact. When all planned datapoints exist and the workflow succeeds, it commits `docs/`
 (interactive report, `latest.json`, `latest.md`, and `promo/latest/`). The artifact also includes the
