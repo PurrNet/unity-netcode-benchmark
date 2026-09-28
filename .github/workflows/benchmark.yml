@@ -58,6 +58,9 @@ on:
       region:
         description: "Photon Cloud region"
         default: "eu"
+      purrnet_ref:
+        description: "PurrNet branch, tag or commit to build (empty keeps the committed manifest)"
+        default: "dev"
   workflow_call:
     inputs:
       netcodes:
@@ -108,6 +111,9 @@ on:
       region:
         type: string
         default: "eu"
+      purrnet_ref:
+        type: string
+        default: "dev"
 
 env:
   SERVER_HOST: nb-srv-${{ github.run_id }}-${{ github.run_attempt }}-fleet
@@ -158,6 +164,7 @@ jobs:
       netcode: ${{ matrix.netcode }}
       profiling: ${{ inputs.profiling }}
       runner: ${{ inputs.runner }}
+      purrnet_ref: ${{ inputs.purrnet_ref }}
 
   server:
     name: Server (all sessions)

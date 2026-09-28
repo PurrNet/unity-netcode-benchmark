@@ -65,6 +65,10 @@ on:
         description: "Compatibility input: must be 1. The reused fleet runs all measurements sequentially."
         required: false
         default: "1"
+      purrnet_ref:
+        description: "PurrNet branch, tag or commit to benchmark (dev = its latest commit at dispatch)"
+        required: false
+        default: "dev"
 
 # The dedicated bench-server takes one session at a time: a second dispatch waits for the running
 # one to finish instead of starting alongside it. GitHub keeps one waiting run per group, so a third
@@ -80,8 +84,17 @@ jobs:
     outputs:
       netcode_matrix: ${{ steps.gen.outputs.netcode_matrix }}
       expected: ${{ steps.gen.outputs.expected }}
+      purrnet_sha: ${{ steps.purrnet.outputs.sha }}
     steps:
       - uses: actions/checkout@v7
+      # One commit for the whole run: the build pins it and the results report it.
+      - name: Resolve PurrNet
+        id: purrnet
+        env:
+          PURRNET_REF: ${{ inputs.purrnet_ref }}
+        run: |
+          sha=$(python3 .github/scripts/pin-purrnet.py "$PURRNET_REF")
+          echo "PurrNet $PURRNET_REF -> $sha"
       - id: gen
         env:
           NETCODES: ${{ inputs.netcodes }}
@@ -110,6 +123,7 @@ jobs:
       netcode: ${{ matrix.netcode }}
       profiling: ${{ inputs.profiling }}
       runner: ${{ inputs.runner }}
+      purrnet_ref: ${{ needs.prep.outputs.purrnet_sha }}
 
   bench:
     name: Sequential benchmark fleet
@@ -153,6 +167,9 @@ jobs:
           merge-multiple: true
 
       - name: Merge datapoints
+        env:
+          # The commit the build pinned; this checkout's manifest follows a branch.
+          PURRNET_COMMIT: ${{ needs.prep.outputs.purrnet_sha }}
         run: |
           # No matching artifacts (e.g. a failed build) means download-artifact may not create all/.
           mkdir -p all
@@ -256,3 +273,26 @@ jobs:
           done
           echo "::error::Could not push results commit"
           exit 1
+
+      # Every default-branch run with datapoints goes to purrnet.dev (/admin/benchmarks), which keeps
+      # the history: an incomplete run is stored but left out of its trends. The endpoint only
+      # accepts PURRNET_BENCH_TOKEN, which forks and pull requests never see. A failed upload warns
+      # and never fails the run; `upload-results.py backfill` resends published runs from git.
+      - name: Upload results to purrnet.dev
+        if: ${{ !cancelled() && steps.report.outcome == 'success' && steps.report.outputs.count != '0' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+        continue-on-error: true
+        env:
+          PURRNET_BENCH_TOKEN: ${{ secrets.PURRNET_BENCH_TOKEN }}
+          PURRNET_BENCH_URL: ${{ vars.PURRNET_BENCH_URL }}
+          INPUTS_JSON: ${{ toJSON(inputs) }}
+          COMPLETE: ${{ steps.report.outputs.complete }}
+          RUN_URL: ${{ steps.report.outputs.run_url }}
+        run: |
+          if [ -z "$PURRNET_BENCH_TOKEN" ]; then
+            echo "::notice::PURRNET_BENCH_TOKEN is not set; results not sent to purrnet.dev"
+            exit 0
+          fi
+          python3 .github/scripts/upload-results.py send \
+            --data results-out/scaling.json --versions all/versions.json --complete "$COMPLETE" \
+            --run-id "$GITHUB_RUN_ID" --run-url "$RUN_URL" --commit "$GITHUB_SHA" --config-json "$INPUTS_JSON" \
+            || { echo "::warning::Could not send results to purrnet.dev; resend with upload-results.py"; exit 1; }
