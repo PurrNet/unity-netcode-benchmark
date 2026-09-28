@@ -50,6 +50,14 @@ jobs:
     name: Build ${{ inputs.netcode }}
     runs-on: ${{ inputs.runner }}
     timeout-minutes: 90
+    # Builds of the same player wait for each other instead of compiling side by side (a benchmark
+    # dispatched while a hand-started build runs): the second starts once the first has saved the
+    # finished player, and restores it when the inputs match. A waiting job holds no runner.
+    # GitHub keeps one waiting job per group, so a third concurrent build of the same player
+    # cancels the one already waiting.
+    concurrency:
+      group: player-build-${{ inputs.netcode }}-${{ inputs.profiling && 'dev' || 'rel' }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v7
 
