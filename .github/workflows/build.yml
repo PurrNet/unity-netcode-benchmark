@@ -103,6 +103,9 @@ jobs:
           linux64RemoveExecutableExtension: true
           buildsPath: build
           unityVersion: auto
+          # Pin PurrNet rewrites the manifest on purpose. game-ci otherwise refuses a checkout with
+          # uncommitted changes (it derives a semantic version from git; nothing here reads it).
+          allowDirtyBuild: true
           # Custom method: game-ci has no development-build toggle. Flags travel on the Unity
           # command line (customParameters) because the build container only forwards an env allowlist.
           buildMethod: PurrNet.NetBench.Editor.CIBuild.BuildLinuxPlayer
