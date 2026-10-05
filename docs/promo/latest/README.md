@@ -1,8 +1,8 @@
 # PurrNet promotional benchmark charts
 
-4 charts, with 1920 × 1080 PNG and matching SVG exports, from **2026-09-28**.
+4 charts, with 1920 × 1080 PNG and matching SVG exports, from **2026-10-05**.
 
-[PurrNet 1.24.0-beta.21 · FishNet 4.7.3 · Mirror 96.0.1 · NGO 2.13.2 · Fusion 2.1.2 Stable 2279](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/36489837711)
+[PurrNet 1.24.0-beta.30 · FishNet 4.7.3 · Mirror 96.0.1 · NGO 2.13.2 · Fusion 2.1.2 Stable 2279](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/37328339458)
 
 These are selected resource comparisons, not an overall netcode ranking. Each chart includes all five netcodes on a linear scale starting at zero. Asterisks and hatching mark overload. Relative percentages use unrounded values and round to the nearest whole percent.
 
@@ -20,9 +20,9 @@ One published run. Overloaded rows describe saturated servers and are not used f
 
 ## Messaging server CPU
 
-Messaging server CPU. PurrNet’s server CPU usage was 52% lower than Mirror and 22% lower than FishNet in the messaging workloads. RPCs: server broadcasts + client inputs, 100 connections, 20 Hz.
+Messaging server CPU. PurrNet’s server CPU usage was 51% lower than Mirror and 19% lower than FishNet in the messaging workloads. RPCs: server broadcasts + client inputs, 100 connections, 20 Hz.
 
-![Messaging server CPU. PurrNet’s server CPU usage was 52% lower than Mirror and 22% lower than FishNet in the messaging workloads. RPCs: server broadcasts + client inputs, 100 connections, 20 Hz.](02-messaging-cpu.png)
+![Messaging server CPU. PurrNet’s server CPU usage was 51% lower than Mirror and 19% lower than FishNet in the messaging workloads. RPCs: server broadcasts + client inputs, 100 connections, 20 Hz.](02-messaging-cpu.png)
 
 [PNG](02-messaging-cpu.png) / [SVG](02-messaging-cpu.svg)
 
@@ -32,9 +32,9 @@ One published run. Overloaded rows describe saturated servers and are not used f
 
 ## GC allocation across workloads
 
-GC allocation across workloads. PurrNet’s estimated GC allocation rate was 84% lower than FishNet across the active workloads. NetworkTransform + SyncVars + RPCs + spawn/despawn, 100 connections, 20 Hz.
+GC allocation across workloads. PurrNet’s estimated GC allocation rate was 86% lower than FishNet across the active workloads. NetworkTransform + SyncVars + RPCs + spawn/despawn, 100 connections, 20 Hz.
 
-![GC allocation across workloads. PurrNet’s estimated GC allocation rate was 84% lower than FishNet across the active workloads. NetworkTransform + SyncVars + RPCs + spawn/despawn, 100 connections, 20 Hz.](03-general-gc.png)
+![GC allocation across workloads. PurrNet’s estimated GC allocation rate was 86% lower than FishNet across the active workloads. NetworkTransform + SyncVars + RPCs + spawn/despawn, 100 connections, 20 Hz.](03-general-gc.png)
 
 [PNG](03-general-gc.png) / [SVG](03-general-gc.svg)
 
@@ -56,12 +56,12 @@ One published run. Overloaded rows describe saturated servers and are not used f
 
 ## Source and calculation
 
-- [Workflow run](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/36489837711)
+- [Workflow run](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/37328339458)
 - [Exact raw data used for these images](source-data.json)
 - [Run metadata and original summary](source-summary.md)
 - [Plotted values, claims and skipped charts](chart-data.json)
-- Raw data SHA-256: `22ebe55b38aa3d60d58cffe9321c5480422a4d0de813720bcc4fe6ba096ffd8b`
-- Renderer checkout revision: `5df042299d262b2b2ae575b80f0fcc8c35ad139e`. This identifies the code checkout, not the data snapshot.
+- Raw data SHA-256: `6e0723957754a58f0a09b71b72b1737b647a3bc9a2450b2962bf122f6a14966d`
+- Renderer checkout revision: `6df81d5acd683f66b7ed1bdf567c84ffc3eec7d2`. This identifies the code checkout, not the data snapshot.
 - Lower/higher comparisons use `100 × (PurrNet / named competitor − 1)`. Zero baselines and overloaded comparators receive neutral text.
 - Bandwidth and CPU categories use arithmetic means. General GC uses the six active workloads. Scaling averages their per-test `(100 connections − 10 connections) / 90` bandwidth deltas.
 - Idle and Static are excluded. Missing or incomplete workloads are not treated as zero.
