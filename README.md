@@ -63,6 +63,10 @@ single-process measured clients (the remaining connections run as load generator
 
 ## Running it
 
+Client-side prediction has its own **Prediction Benchmark** workflow and
+[suite documentation](prediction/README.md), with native PurrDiction, FishNet and Fusion Server-mode
+adapters. Its workloads, validation, artifacts and reports are separate from this replication suite.
+
 Dispatch **Netcode Scaling Benchmark** (`.github/workflows/scaling.yml`). Defaults run all five
 netcodes in three sessions, `10@20,100@20,100@60` (connections@tickHz), with 10-second windows
 (Idle and Static use 5, since they only check the floor).

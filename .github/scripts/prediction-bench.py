@@ -1,0 +1,298 @@
+#!/usr/bin/env python3
+"""Independent prediction case matrix, barriers and strict final-state validation."""
+import argparse
+from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import hashlib
+import itertools
+import json
+import math
+import os
+import platform
+from pathlib import Path
+import signal
+import subprocess
+import shutil
+import sys
+import threading
+import time
+import uuid
+
+SOLUTIONS = ('purrdiction', 'fishnet', 'fusion')
+WORKLOAD = 'sequenced-state-v1'
+
+
+def csv_ints(text, minimum, maximum):
+    values = [int(value.strip()) for value in text.split(',')]
+    if not values or len(values) != len(set(values)) or any(not minimum <= x <= maximum for x in values):
+        raise ValueError(f'Expected unique integers in [{minimum}, {maximum}]: {text!r}')
+    return values
+
+
+def make_plan(solutions, clients, ticks, objects, repeats, seconds, warmup):
+    selected = [s.strip() for s in solutions.split(',')]
+    if not selected or len(selected) != len(set(selected)) or any(s not in SOLUTIONS for s in selected):
+        raise ValueError('Solutions must be unique entries from ' + ','.join(SOLUTIONS))
+    counts, rates, populations = csv_ints(clients, 1, 16), csv_ints(ticks, 1, 240), csv_ints(objects, 1, 10000)
+    if min(populations) < max(counts):
+        raise ValueError('Each object count must give every client at least one owned object')
+    if not 1 <= repeats <= 20 or not math.isfinite(seconds) or not 0.1 <= seconds <= 600 or not math.isfinite(warmup) or not 0 <= warmup <= 60:
+        raise ValueError('Invalid measurement duration, warmup or repeat count')
+    return [dict(id=i, solution=s, clients=n, tickRate=t, objects=o, repeat=r,
+                 seconds=seconds, warmupSeconds=warmup, workload=WORKLOAD)
+            for i, (s, n, t, o, r) in enumerate(itertools.product(selected, counts, rates, populations, range(1, repeats + 1)), 1)]
+
+
+class Barrier:
+    def __init__(self, peers, timeout):
+        self.peers = set(peers)
+        self.timeout = timeout
+        self.condition = threading.Condition()
+        self.arrivals = {phase: set() for phase in ('ready', 'stopped', 'done')}
+        self.aborted = False
+
+    def arrive(self, phase, peer):
+        with self.condition:
+            if phase not in self.arrivals or peer not in self.peers:
+                raise ValueError('Unknown phase or peer')
+            previous = {'stopped': 'ready', 'done': 'stopped'}.get(phase)
+            if previous and self.arrivals[previous] != self.peers:
+                raise ValueError('Barrier reached out of order')
+            if peer in self.arrivals[phase]:
+                raise ValueError('Duplicate barrier arrival')
+            self.arrivals[phase].add(peer)
+            self.condition.notify_all()
+            completed = self.condition.wait_for(lambda: self.aborted or self.arrivals[phase] == self.peers, self.timeout)
+            if not completed or self.aborted:
+                raise TimeoutError('Barrier aborted or timed out')
+
+    def abort(self):
+        with self.condition:
+            self.aborted = True
+            self.condition.notify_all()
+
+
+@contextmanager
+def coordinator(peers, timeout):
+    barrier = Barrier(peers, timeout)
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def do_POST(self):
+            try:
+                phase, peer = self.path.strip('/').split('/')
+                barrier.arrive(phase, peer)
+                status, payload = 200, b'{}'
+            except (ValueError, TimeoutError) as error:
+                status, payload = 400, str(error).encode()
+            try:
+                self.send_response(status)
+                self.send_header('Content-Length', str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+
+    server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+    server.daemon_threads = True
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f'http://127.0.0.1:{server.server_port}', barrier
+    finally:
+        barrier.abort()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def validate_case(case, reports):
+    expected = {'server', *(f'client-{i}' for i in range(1, case['clients'] + 1))}
+    if set(reports) != expected:
+        raise ValueError('Missing or unexpected peer reports')
+    snapshots = {}
+    owners = []
+    for peer, report in reports.items():
+        if not report.get('success') or report.get('schemaVersion') != 1 or report.get('suite') != 'prediction':
+            raise ValueError(f'{peer}: failed or unsupported report: {report.get("error")}')
+        if report.get('solution') != case['solution'] or report.get('workload') != WORKLOAD or report.get('peer') != peer:
+            raise ValueError(f'{peer}: wrong solution, workload or peer')
+        config = report.get('config', {})
+        for key in ('clients', 'objects', 'tickRate', 'seconds', 'warmupSeconds'):
+            if config.get(key) != case[key]:
+                raise ValueError(f'{peer}: mismatched {key}')
+        role = 'server' if peer == 'server' else 'client'
+        if report.get('role') != role or report.get('actualTickRate') != case['tickRate']:
+            raise ValueError(f'{peer}: wrong role or actual tick rate')
+        if report.get('requestedFrameCap') != 60 or report.get('actualFrameCap') != 60:
+            raise ValueError(f'{peer}: wrong measurement frame cap')
+        if report.get('observedObjects') != case['objects'] or (role == 'client' and report.get('ownedObjects', 0) < 1):
+            raise ValueError(f'{peer}: incomplete population or no owned objects')
+        load = report.get('load', {})
+        if not math.isfinite(load.get('wallSeconds', 0)) or load.get('wallSeconds', 0) < case['seconds'] * .8 or load.get('frameCount', 0) < 1:
+            raise ValueError(f'{peer}: incomplete measurement window')
+        if report.get('forwardCalls', 0) + report.get('replayCalls', 0) < 1:
+            raise ValueError(f'{peer}: no native prediction callbacks')
+        if role == 'client' and report.get('ownedForwardCalls', 0) < 1:
+            raise ValueError(f'{peer}: no owned forward prediction callbacks')
+        entries = report.get('finalState', [])
+        indexed = {p['index']: p['state'] for p in entries}
+        if len(entries) != case['objects'] or set(indexed) != set(range(case['objects'])):
+            raise ValueError(f'{peer}: duplicate or missing final objects')
+        fields = {'x', 'z', 'lastSequence', 'appliedInputs', 'hash', 'a', 'b', 'c'}
+        if any(set(s) != fields or any(type(value) is not int for value in s.values()) for s in indexed.values()):
+            raise ValueError(f'{peer}: invalid final state schema')
+        if any(s.get('appliedInputs', 0) < 1 or s.get('lastSequence', 0) < 1 for s in indexed.values()):
+            raise ValueError(f'{peer}: inactive inputs')
+        if role == 'client':
+            owned = [p['index'] for p in entries if p.get('owned')]
+            if len(owned) != report['ownedObjects']:
+                raise ValueError(f'{peer}: owned-object count changed')
+            owners.extend(owned)
+        snapshots[peer] = indexed
+    reference = snapshots['server']
+    if sorted(owners) != list(range(case['objects'])):
+        raise ValueError('Final ownership does not assign exactly one owner to every object')
+    for peer, state in snapshots.items():
+        if state != reference:
+            raise ValueError(f'{peer}: final predicted state differs from authority')
+    return True
+
+
+def stop_process(process):
+    if os.name == 'nt':
+        if process.poll() is not None:
+            return
+        subprocess.run(['taskkill', '/PID', str(process.pid), '/T', '/F'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        # An exited xvfb wrapper can still have descendants in its process group.
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            pass
+        finally:
+            # Clean descendants even if the wrapper/parent already exited.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+    process.wait(timeout=10)
+
+
+def run_case(case, binary, directory, timeout, region):
+    directory.mkdir()
+    deadline = time.monotonic() + timeout
+    peers = ['server', *(f'client-{i}' for i in range(1, case['clients'] + 1))]
+    commands, processes, streams = {}, {}, []
+    session = 'csp-' + uuid.uuid4().hex
+    try:
+        with coordinator(peers, timeout) as (url, barrier):
+            for peer in peers:
+                commands[peer] = [str(binary), '-batchmode', '-nographics', '-predictionRole', 'server' if peer == 'server' else 'client',
+                    '-predictionPeer', peer, '-predictionCoordinator', url,
+                    '-count', str(case['clients']), '-benchObjects', str(case['objects']), '-tickRate', str(case['tickRate']),
+                    '-benchSeconds', str(case['seconds']), '-warmupSeconds', str(case['warmupSeconds']),
+                    '-serverHost', '127.0.0.1', '-port', '17800', '-session', session, '-region', region,
+                    '-predictionResults', str(directory / (peer + '.json')), '-logFile', str(directory / (peer + '.log')),
+                    '-job-worker-count', '2']
+                stream = (directory / (peer + '.stdout.log')).open('wb')
+                streams.append(stream)
+                command = commands[peer]
+                if os.name != 'nt' and shutil.which('xvfb-run'):
+                    command = ['xvfb-run', '-a', *command]
+                processes[peer] = subprocess.Popen(command, stdout=stream, stderr=subprocess.STDOUT,
+                    start_new_session=os.name != 'nt', creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+                if peer == 'server':
+                    # Photon rooms do not exist until the server has finished connecting.
+                    # Starting clients concurrently can make a valid Fusion run fail to join.
+                    listening_deadline = min(deadline, time.monotonic() + 120)
+                    log = directory / 'server.log'
+                    while not log.is_file() or '[PredictionBench] Server listening' not in log.read_text(encoding='utf-8', errors='replace'):
+                        if processes[peer].poll() is not None or time.monotonic() > listening_deadline:
+                            raise RuntimeError('Server did not become ready before clients started')
+                        time.sleep(.1)
+            (directory / 'commands.json').write_text(json.dumps(commands, indent=2))
+            while any(p.poll() is None for p in processes.values()):
+                failed = [name for name, p in processes.items() if p.poll() not in (None, 0)]
+                if failed or time.monotonic() > deadline:
+                    barrier.abort()
+                    raise RuntimeError('Failed processes: ' + ','.join(failed) if failed else 'Case timeout')
+                time.sleep(.2)
+            reports = {peer: json.loads((directory / (peer + '.json')).read_text(encoding='utf-8-sig')) for peer in peers}
+            validate_case(case, reports)
+            return reports
+    finally:
+        for process in processes.values():
+            stop_process(process)
+        for stream in streams:
+            stream.close()
+
+
+def inventory(root):
+    hashes = {}
+    for path in sorted(root.rglob('*')):
+        if path.is_file() and not any('ButDontShipItWithYourGame' in part or 'BurstDebugInformation_DoNotShip' in part for part in path.parts):
+            with path.open('rb') as stream:
+                hashes[path.relative_to(root).as_posix()] = hashlib.file_digest(stream, 'sha256').hexdigest()
+    return hashes
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--solutions', default='purrdiction,fishnet,fusion')
+    parser.add_argument('--clients', default='1,2,4')
+    parser.add_argument('--ticks', default='20,60')
+    parser.add_argument('--objects', default='32,128')
+    parser.add_argument('--repeats', type=int, default=3)
+    parser.add_argument('--seconds', type=float, default=10)
+    parser.add_argument('--warmup', type=float, default=3)
+    parser.add_argument('--timeout', type=float, default=240)
+    parser.add_argument('--players', type=Path, default=Path('prediction-players'))
+    parser.add_argument('--output', type=Path, default=Path('prediction-results'))
+    parser.add_argument('--region', default='eu')
+    parser.add_argument('--dry-run', action='store_true')
+    args = parser.parse_args()
+    plan = make_plan(args.solutions, args.clients, args.ticks, args.objects, args.repeats, args.seconds, args.warmup)
+    if not math.isfinite(args.timeout) or args.timeout < args.seconds + args.warmup + 15:
+        parser.error('--timeout must leave at least 15 seconds outside sampling and warmup')
+    run = args.output.resolve() / (time.strftime('%Y%m%d-%H%M%S') + '-' + uuid.uuid4().hex[:8])
+    run.mkdir(parents=True)
+    manifest = {'schemaVersion': 1, 'suite': 'prediction', 'cases': plan, 'dryRun': args.dry_run,
+        'execution': 'Sequential cases; one dedicated server plus N clients sharing one machine',
+        'network': 'Direct loopback for PurrDiction/FishNet; Photon Cloud Server mode for Fusion; no artificial delay/loss',
+        'comparison': 'Diagnostic baseline, not an overall ranking. Prediction scopes and transport routes differ.',
+        'machine': {'platform': platform.platform(), 'processor': platform.processor(), 'logicalProcessors': os.cpu_count()},
+        'workflowRun': os.environ.get('GITHUB_RUN_ID'), 'benchmarkCommit': os.environ.get('GITHUB_SHA'), 'region': args.region, 'players': {}}
+    for solution in {case['solution'] for case in plan}:
+        binary = args.players.resolve() / solution / ('PredictionBench.exe' if os.name == 'nt' else 'PredictionBench')
+        if not args.dry_run and not binary.is_file():
+            parser.error(f'Player missing: {binary}')
+        manifest['players'][solution] = {'path': str(binary), 'runtimeSha256': inventory(binary.parent) if binary.is_file() else {}}
+    (run / 'manifest.json').write_text(json.dumps(manifest, indent=2))
+    print(run, flush=True)
+    if args.dry_run:
+        return
+    failures = []
+    for case in plan:
+        print(f'Case {case["id"]}/{len(plan)}: {case}', flush=True)
+        try:
+            run_case(case, Path(manifest['players'][case['solution']]['path']), run / f'case-{case["id"]:04d}', args.timeout, args.region)
+        except Exception as error:
+            failures.append({'id': case['id'], 'error': str(error)})
+            print(f'Failed: {error}', flush=True)
+    (run / 'failures.json').write_text(json.dumps(failures, indent=2))
+    if failures:
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    def terminate(signum, frame):
+        raise SystemExit(128 + signum)
+    signal.signal(signal.SIGTERM, terminate)
+    main()

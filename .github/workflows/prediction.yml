@@ -1,0 +1,202 @@
+name: Prediction Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      solutions:
+        description: "Prediction adapters (separate from replication): purrdiction,fishnet,fusion"
+        default: "purrdiction,fishnet,fusion"
+        required: true
+      client_counts:
+        description: "Client counts; every peer is measured on the same runner"
+        default: "1,2,4"
+        required: true
+      tick_rates:
+        description: "Tick rates in Hz"
+        default: "20,60"
+        required: true
+      object_counts:
+        description: "Fixed total predicted-object populations, independent of client count"
+        default: "32,128"
+        required: true
+      seconds:
+        description: "Measurement seconds per case (after 3 seconds warmup)"
+        default: "10"
+        required: true
+      repeats:
+        description: "Fresh-process repeats per case"
+        default: "3"
+        required: true
+      purrdiction_ref:
+        description: "PurrDiction source branch, tag or commit; pinned before building"
+        default: "dev"
+        required: true
+      profiling:
+        description: "Development build for allocation counters; record this when comparing runs"
+        type: boolean
+        default: true
+      runner:
+        description: "Runner for sequential measurements; all processes share its hardware"
+        default: "ubuntu-latest"
+        required: true
+      region:
+        description: "Photon Cloud region (Fusion Server mode)"
+        default: "eu"
+        required: true
+
+# Share the measurement lock with replication: choosing the dedicated server for this
+# workflow must not overlap another suite on that same machine.
+concurrency:
+  group: netcode-scaling-bench
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      solutions: ${{ steps.plan.outputs.solutions }}
+      prediction_sha: ${{ steps.pin.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate independent prediction matrix
+        id: plan
+        env:
+          SOLUTIONS: ${{ inputs.solutions }}
+          CLIENTS: ${{ inputs.client_counts }}
+          TICKS: ${{ inputs.tick_rates }}
+          OBJECTS: ${{ inputs.object_counts }}
+          SECONDS: ${{ inputs.seconds }}
+          REPEATS: ${{ inputs.repeats }}
+        run: |
+          python3 .github/scripts/prediction-bench.py --dry-run --solutions "$SOLUTIONS" --clients "$CLIENTS" --ticks "$TICKS" --objects "$OBJECTS" --seconds "$SECONDS" --repeats "$REPEATS"
+          python3 - <<'PY'
+          import json, os
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('solutions=' + json.dumps([s.strip() for s in os.environ['SOLUTIONS'].split(',')]) + '\n')
+          PY
+      - name: Resolve PurrDiction once
+        id: pin
+        if: contains(inputs.solutions, 'purrdiction')
+        env:
+          PREDICTION_REF: ${{ inputs.purrdiction_ref }}
+        run: |
+          python3 - <<'PY'
+          import os, re, subprocess
+          ref = os.environ['PREDICTION_REF'].strip()
+          if re.fullmatch(r'[0-9a-fA-F]{40}', ref):
+              sha = ref.lower()
+          else:
+              result = subprocess.check_output(['git', 'ls-remote', 'https://github.com/PurrNet/PurrDiction.git', 'refs/heads/' + ref, 'refs/tags/' + ref, 'refs/tags/' + ref + '^{}'], text=True)
+              refs = dict(line.split('\t')[::-1] for line in result.splitlines() if '\t' in line)
+              sha = next((refs[name] for name in ('refs/tags/' + ref + '^{}', 'refs/tags/' + ref, 'refs/heads/' + ref) if name in refs), None)
+              if not sha: raise SystemExit('PurrDiction ref not found')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output: output.write('sha=' + sha + '\n')
+          PY
+
+  build:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        solution: ${{ fromJSON(needs.plan.outputs.solutions) }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Checkout pinned prediction source
+        if: matrix.solution == 'purrdiction'
+        uses: actions/checkout@v7
+        with:
+          repository: PurrNet/PurrDiction
+          ref: ${{ needs.plan.outputs.prediction_sha }}
+          path: prediction-source
+      - name: Generate isolated project
+        env:
+          SOLUTION: ${{ matrix.solution }}
+        run: python3 .github/scripts/prediction-prepare.py "$SOLUTION" --output "prediction-projects/$SOLUTION" --prediction-source prediction-source
+      - name: Restore prediction Library
+        uses: actions/cache@v6
+        with:
+          path: prediction-projects/${{ matrix.solution }}/Library
+          key: Prediction-Library-${{ matrix.solution }}-${{ inputs.profiling && 'dev' || 'rel' }}-${{ hashFiles('prediction-projects/**/Assets/**', 'prediction-projects/**/Packages/**', 'prediction-projects/**/ProjectSettings/**', 'prediction/**', '.github/workflows/prediction.yml') }}
+          restore-keys: Prediction-Library-${{ matrix.solution }}-${{ inputs.profiling && 'dev' || 'rel' }}-
+      - name: Build dedicated prediction player
+        uses: game-ci/unity-builder@v5
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+        with:
+          projectPath: prediction-projects/${{ matrix.solution }}
+          targetPlatform: StandaloneLinux64
+          buildName: PredictionBench
+          linux64RemoveExecutableExtension: true
+          buildsPath: build
+          unityVersion: auto
+          allowDirtyBuild: true
+          buildMethod: PredictionBench.Editor.PredictionBenchBuild.BuildLinux
+          customParameters: ${{ inputs.profiling && '-devBuild' || '' }}
+      - name: Upload prediction player
+        uses: actions/upload-artifact@v7
+        with:
+          name: prediction-player-${{ matrix.solution }}
+          path: build/StandaloneLinux64/
+          if-no-files-found: error
+          retention-days: 3
+      - name: Upload source provenance and build logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: prediction-build-${{ matrix.solution }}
+          path: |
+            prediction-projects/${{ matrix.solution }}/prediction-provenance.json
+            prediction-projects/${{ matrix.solution }}/Logs/
+          retention-days: 14
+
+  benchmark:
+    needs: [plan, build]
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: prediction-player-*
+          path: downloaded-players
+      - name: Arrange independent players
+        run: |
+          mkdir -p prediction-players
+          for path in downloaded-players/prediction-player-*; do
+            solution="${path##*prediction-player-}"
+            mv "$path" "prediction-players/$solution"
+            chmod +x "prediction-players/$solution/PredictionBench"
+          done
+      - name: Run sequential prediction cases
+        env:
+          SOLUTIONS: ${{ inputs.solutions }}
+          CLIENTS: ${{ inputs.client_counts }}
+          TICKS: ${{ inputs.tick_rates }}
+          OBJECTS: ${{ inputs.object_counts }}
+          SECONDS: ${{ inputs.seconds }}
+          REPEATS: ${{ inputs.repeats }}
+          REGION: ${{ inputs.region }}
+        run: python3 .github/scripts/prediction-bench.py --solutions "$SOLUTIONS" --clients "$CLIENTS" --ticks "$TICKS" --objects "$OBJECTS" --seconds "$SECONDS" --repeats "$REPEATS" --region "$REGION"
+      - name: Render separate prediction report
+        if: always()
+        run: |
+          python3 .github/scripts/prediction-report.py prediction-results prediction-report
+          cat prediction-report/latest.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload prediction results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: prediction-benchmark-results
+          path: |
+            prediction-results/
+            prediction-report/
+          if-no-files-found: error
+          retention-days: 30
