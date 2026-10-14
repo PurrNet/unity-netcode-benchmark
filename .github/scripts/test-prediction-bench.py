@@ -22,6 +22,45 @@ def module(name, file):
 bench = module('prediction_bench', 'prediction-bench.py')
 reporter = module('prediction_report', 'prediction-report.py')
 prepare = module('prediction_prepare', 'prediction-prepare.py')
+arranger = module('prediction_arrange', 'prediction-arrange.py')
+
+
+class ArtifactLayoutTests(unittest.TestCase):
+    def test_single_artifact_flat_layout(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'downloaded'
+            source.mkdir()
+            (source / 'PredictionBench').write_bytes(b'player')
+            (source / 'PredictionBench_Data').mkdir()
+            (source / 'PredictionBench_Data/data').write_bytes(b'data')
+            arranger.arrange(source, root / 'players', 'purrdiction')
+            self.assertEqual((root / 'players/purrdiction/PredictionBench').read_bytes(), b'player')
+            self.assertEqual((root / 'players/purrdiction/PredictionBench_Data/data').read_bytes(), b'data')
+
+    def test_multi_artifact_layout(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'downloaded'
+            for name in ('purrdiction', 'fishnet'):
+                player = source / ('prediction-player-' + name)
+                player.mkdir(parents=True)
+                (player / 'PredictionBench').write_text(name)
+            arranger.arrange(source, root / 'players', 'purrdiction,fishnet')
+            for name in ('purrdiction', 'fishnet'):
+                self.assertEqual((root / 'players' / name / 'PredictionBench').read_text(), name)
+
+    def test_ambiguous_flat_layout_and_missing_players_fail_before_copying(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'downloaded'
+            source.mkdir()
+            with self.assertRaises(FileNotFoundError):
+                arranger.arrange(source, root / 'players', 'purrdiction')
+            (source / 'PredictionBench').write_bytes(b'player')
+            with self.assertRaises(ValueError):
+                arranger.arrange(source, root / 'players', 'purrdiction,fishnet')
+            self.assertFalse((root / 'players').exists())
 
 
 def fixture():

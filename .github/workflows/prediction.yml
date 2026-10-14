@@ -168,13 +168,9 @@ jobs:
           pattern: prediction-player-*
           path: downloaded-players
       - name: Arrange independent players
-        run: |
-          mkdir -p prediction-players
-          for path in downloaded-players/prediction-player-*; do
-            solution="${path##*prediction-player-}"
-            mv "$path" "prediction-players/$solution"
-            chmod +x "prediction-players/$solution/PredictionBench"
-          done
+        env:
+          SOLUTIONS: ${{ inputs.solutions }}
+        run: python3 .github/scripts/prediction-arrange.py --solutions "$SOLUTIONS"
       - name: Run sequential prediction cases
         env:
           SOLUTIONS: ${{ inputs.solutions }}
