@@ -54,5 +54,6 @@ namespace PredictionBench
             .Select(p => new PawnSnapshot { index = p.Index, owned = p.IsOwner(), state = p.currentState.value }).ToArray();
         public override void BeginDiagnostics() => PredictionPerformanceTelemetry.Begin(world);
         public override string EndDiagnostics() => JsonUtility.ToJson(PredictionPerformanceTelemetry.End());
+        public override string MemoryDiagnostics() => JsonUtility.ToJson(PurrDictionMemoryDiagnostics.Capture(world));
     }
 }

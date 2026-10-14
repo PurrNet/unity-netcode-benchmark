@@ -1,0 +1,16 @@
+<linker>
+  <assembly fullname="PurrNet.Prediction">
+    <type fullname="PurrNet.Prediction.PredictedIdentity`1">
+      <field name="_stateHistory" />
+      <field name="_verifiedHistory" />
+    </type>
+    <type fullname="PurrNet.Prediction.PredictedIdentity`2">
+      <field name="_inputHistory" />
+    </type>
+    <type fullname="PurrNet.Prediction.History`1">
+      <field name="m_values" />
+      <method name="get_Count" />
+      <method name="get_BackingStoragePayloadBytes" />
+    </type>
+  </assembly>
+</linker>

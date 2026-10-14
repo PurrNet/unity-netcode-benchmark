@@ -38,5 +38,6 @@ namespace PredictionBench
         public abstract PawnSnapshot[] Snapshot();
         public virtual void BeginDiagnostics() { }
         public virtual string EndDiagnostics() => "{}";
+        public virtual string MemoryDiagnostics() => null;
     }
 }

@@ -106,6 +106,12 @@ profiles, input latency and presentation-error instrumentation, colliding rigidb
 large/history-owning states, spawn churn and outage recovery. PurrDiction's existing full physics
 benchmark is a separate diagnostic source; it must not be scored against this math-only workload.
 
+PurrDiction also exports `memoryDiagnosticJson` after the measured window. It counts the
+benchmark pawns' predicted, verified, and input history slots, live entries, and backing-array
+payload bytes. This excludes array/object headers, owned payloads, framework statics, and
+native memory; it is not a whole-heap census. An unavailable census reports its error instead
+of treating missing reflection metadata or an empty population as zero memory.
+
 ## Local runs
 
 Generate projects without modifying the replication projects. PurrDiction needs a source checkout;

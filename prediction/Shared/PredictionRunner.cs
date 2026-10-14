@@ -21,6 +21,7 @@ namespace PredictionBench
         public string scriptingBackend;
         public string networkCounterScope = "host-wide loopback aggregate; not per-peer bandwidth; excludes Photon Cloud traffic";
         public string error;
+        public string memoryDiagnosticJson;
         public PredictionConfig config;
         public int actualTickRate, observedObjects, ownedObjects;
         public int requestedFrameCap = 60, actualFrameCap;
@@ -135,6 +136,7 @@ namespace PredictionBench
             _report.cpuMetricsAvailable = _report.load.cpuPercent >= 0;
             PredictionWorkload.Sampling = false;
             _report.diagnosticJson = adapter.EndDiagnostics();
+            _report.memoryDiagnosticJson = adapter.MemoryDiagnostics();
             _report.forwardCalls = PredictionWorkload.ForwardCalls;
             _report.replayCalls = PredictionWorkload.ReplayCalls;
             _report.ownedForwardCalls = PredictionWorkload.OwnedForwardCalls;
