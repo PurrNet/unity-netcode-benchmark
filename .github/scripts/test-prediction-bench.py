@@ -6,6 +6,7 @@ import json
 import signal
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
@@ -23,6 +24,35 @@ bench = module('prediction_bench', 'prediction-bench.py')
 reporter = module('prediction_report', 'prediction-report.py')
 prepare = module('prediction_prepare', 'prediction-prepare.py')
 arranger = module('prediction_arrange', 'prediction-arrange.py')
+ab = module('prediction_ab', 'prediction-ab.py')
+
+
+class RevisionComparisonTests(unittest.TestCase):
+    def args(self, **overrides):
+        values = dict(baseline=Path('baseline'), candidate=Path('candidate'), output=Path('results'),
+                      clients='4', ticks='60', objects='128', repeats=3, seconds=20, warmup=20, dry_run=False)
+        values.update(overrides)
+        return SimpleNamespace(**values)
+
+    def test_order_alternates_and_sampling_is_identical(self):
+        commands = ab.commands(self.args())
+        self.assertEqual([c[c.index('--players') + 1] for c in commands],
+                         ['baseline', 'candidate', 'candidate', 'baseline', 'baseline', 'candidate'])
+        for command in commands:
+            self.assertEqual(command[command.index('--repeats') + 1], '1')
+            self.assertEqual(command[command.index('--seconds') + 1], '20')
+            self.assertEqual(command[command.index('--warmup') + 1], '20')
+
+    def test_failure_is_reported_and_remaining_revisions_are_measured(self):
+        execute = Mock(side_effect=[SimpleNamespace(returncode=1), SimpleNamespace(returncode=0)])
+        self.assertEqual(ab.run(self.args(repeats=1), execute), 1)
+        self.assertEqual(execute.call_count, 2)
+
+    def test_invalid_matrix_never_starts_a_player(self):
+        execute = Mock()
+        with self.assertRaises(ValueError):
+            ab.run(self.args(repeats=0), execute)
+        execute.assert_not_called()
 
 
 class ArtifactLayoutTests(unittest.TestCase):

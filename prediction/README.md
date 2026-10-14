@@ -11,6 +11,13 @@ The first suite answers how much input/state prediction costs, how that changes 
 population and client count, and how much native replay work is performed. It is a diagnostic
 baseline. It does not yet establish an overall winner or cover all prediction architectures.
 
+For revision comparisons, dispatch **Prediction Revision Comparison**
+(`.github/workflows/prediction-ab.yml`) with two successful prediction run IDs. It downloads
+their existing PurrDiction players and alternates baseline/candidate order on one runner.
+Both revisions use identical sampling parameters and fresh processes. Separate reports retain
+the original build provenance and runtime hashes. This helps distinguish code changes from
+differences between hosted runners; the source artifacts expire after three days.
+
 ## Workload and adapters
 
 `sequenced-state-v1` supplies a changing, 12-byte logical input (`sequence`, `x`, `z`) through
