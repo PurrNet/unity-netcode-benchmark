@@ -22,6 +22,8 @@ namespace PredictionBench
         public string networkCounterScope = "host-wide loopback aggregate; not per-peer bandwidth; excludes Photon Cloud traffic";
         public string error;
         public string memoryDiagnosticJson;
+        public bool memorySnapshotRequested, memorySnapshotSucceeded;
+        public string memorySnapshotPath;
         public PredictionConfig config;
         public int actualTickRate, observedObjects, ownedObjects;
         public int requestedFrameCap = 60, actualFrameCap;
@@ -155,6 +157,30 @@ namespace PredictionBench
             }
             yield return new WaitForSecondsRealtime(5);
             _report.finalState = adapter.Snapshot().OrderBy(p => p.index).ToArray();
+            // Optional retained-heap diagnostic, after timing, input shutdown and final state capture.
+            string snapshotPath = Arg("-predictionMemorySnapshot", "");
+            if (!string.IsNullOrEmpty(snapshotPath))
+            {
+                _report.memorySnapshotRequested = true;
+                _report.memorySnapshotPath = Path.GetFullPath(snapshotPath);
+                bool completed = false;
+                if (File.Exists(_report.memorySnapshotPath))
+                    _error = "Refusing to replace memory snapshot: " + _report.memorySnapshotPath;
+                else
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(_report.memorySnapshotPath));
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers();
+                    GC.Collect();
+                    Unity.Profiling.Memory.MemoryProfiler.TakeSnapshot(_report.memorySnapshotPath,
+                        (_, success) => { _report.memorySnapshotSucceeded = success; completed = true; },
+                        Unity.Profiling.Memory.CaptureFlags.ManagedObjects | Unity.Profiling.Memory.CaptureFlags.NativeObjects);
+                    double snapshotDeadline = Time.realtimeSinceStartupAsDouble + 30;
+                    while (!completed && Time.realtimeSinceStartupAsDouble < snapshotDeadline) yield return null;
+                    if (!completed || !_report.memorySnapshotSucceeded)
+                        _error = "Memory snapshot capture failed or timed out";
+                }
+            }
             bool active = _report.forwardCalls + _report.replayCalls > 0 &&
                 _report.finalState.Length == _config.objects && _report.finalState.All(p => p.state.appliedInputs > 0);
             Finish(active && _error == null, _error ?? (active ? null : "Inactive or incomplete predicted workload"), quit: false);

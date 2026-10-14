@@ -185,7 +185,17 @@ def stop_process(process):
     process.wait(timeout=10)
 
 
-def run_case(case, binary, directory, timeout, region):
+def validate_memory_snapshots(reports, directory):
+    for peer in ('server', 'client-1'):
+        report = reports[peer]
+        expected = directory / (peer + '.snap')
+        if not report.get('memorySnapshotRequested') or not report.get('memorySnapshotSucceeded'):
+            raise ValueError(f'{peer}: memory snapshot was not captured')
+        if Path(report.get('memorySnapshotPath', '')).resolve() != expected.resolve() or not expected.is_file() or expected.stat().st_size == 0:
+            raise ValueError(f'{peer}: missing or mismatched memory snapshot artifact')
+
+
+def run_case(case, binary, directory, timeout, region, memory_snapshots=False):
     directory.mkdir()
     deadline = time.monotonic() + timeout
     peers = ['server', *(f'client-{i}' for i in range(1, case['clients'] + 1))]
@@ -201,6 +211,8 @@ def run_case(case, binary, directory, timeout, region):
                     '-serverHost', '127.0.0.1', '-port', '17800', '-session', session, '-region', region,
                     '-predictionResults', str(directory / (peer + '.json')), '-logFile', str(directory / (peer + '.log')),
                     '-job-worker-count', '2']
+                if memory_snapshots and peer in ('server', 'client-1'):
+                    commands[peer] += ['-predictionMemorySnapshot', str(directory / (peer + '.snap'))]
                 stream = (directory / (peer + '.stdout.log')).open('wb')
                 streams.append(stream)
                 command = commands[peer]
@@ -226,6 +238,8 @@ def run_case(case, binary, directory, timeout, region):
                 time.sleep(.2)
             reports = {peer: json.loads((directory / (peer + '.json')).read_text(encoding='utf-8-sig')) for peer in peers}
             validate_case(case, reports)
+            if memory_snapshots:
+                validate_memory_snapshots(reports, directory)
             return reports
     finally:
         for process in processes.values():
@@ -257,6 +271,8 @@ def main():
     parser.add_argument('--output', type=Path, default=Path('prediction-results'))
     parser.add_argument('--region', default='eu')
     parser.add_argument('--dry-run', action='store_true')
+    parser.add_argument('--memory-snapshots', action='store_true',
+                        help='Capture server/client-1 retained heaps after sampling and final state capture')
     args = parser.parse_args()
     plan = make_plan(args.solutions, args.clients, args.ticks, args.objects, args.repeats, args.seconds, args.warmup)
     if not math.isfinite(args.timeout) or args.timeout < args.seconds + args.warmup + 15:
@@ -282,7 +298,7 @@ def main():
     for case in plan:
         print(f'Case {case["id"]}/{len(plan)}: {case}', flush=True)
         try:
-            run_case(case, Path(manifest['players'][case['solution']]['path']), run / f'case-{case["id"]:04d}', args.timeout, args.region)
+            run_case(case, Path(manifest['players'][case['solution']]['path']), run / f'case-{case["id"]:04d}', args.timeout, args.region, args.memory_snapshots)
         except Exception as error:
             failures.append({'id': case['id'], 'error': str(error)})
             print(f'Failed: {error}', flush=True)

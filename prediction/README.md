@@ -119,6 +119,13 @@ The optional `hierarchy` section separately counts hierarchy history arrays and 
 piece/deletion lists retained by those histories, including their list capacities. List slots
 are reported separately from array payload bytes and are not a whole-heap estimate.
 
+For a retained-heap investigation, add `--memory-snapshots` to a local launcher command.
+It captures server and client-1 `.snap` files after measurement, input shutdown, and final
+state capture, with a full collection first. Players keep networking alive until those
+captures finish. Open the files in Unity's Memory Profiler; timing and heap figures in the
+report were recorded before capture. The launcher rejects missing captures and older
+players that ignore the request. Ordinary runs do not request snapshots.
+
 ## Local runs
 
 Generate projects without modifying the replication projects. PurrDiction needs a source checkout;

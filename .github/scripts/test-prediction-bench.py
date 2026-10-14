@@ -132,6 +132,28 @@ class Matrix(unittest.TestCase):
             with self.subTest(options=options), self.assertRaises(ValueError): bench.make_plan(*options)
 
 
+class SnapshotValidation(unittest.TestCase):
+    def test_old_players_cannot_silently_ignore_snapshot_requests(self):
+        with tempfile.TemporaryDirectory() as temp:
+            with self.assertRaisesRegex(ValueError, 'not captured'):
+                bench.validate_memory_snapshots({'server': {}, 'client-1': {}}, Path(temp))
+
+    def test_both_nonempty_artifacts_and_matching_paths_are_required(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            reports = {peer: {'memorySnapshotRequested': True, 'memorySnapshotSucceeded': True,
+                'memorySnapshotPath': str(root / (peer + '.snap'))} for peer in ('server', 'client-1')}
+            for peer in reports: (root / (peer + '.snap')).write_bytes(b'example artifact')
+            bench.validate_memory_snapshots(reports, root)
+            (root / 'client-1.snap').write_bytes(b'')
+            with self.assertRaisesRegex(ValueError, 'artifact'):
+                bench.validate_memory_snapshots(reports, root)
+            (root / 'client-1.snap').write_bytes(b'example artifact')
+            reports['client-1']['memorySnapshotPath'] = str(root / 'unrelated.snap')
+            with self.assertRaisesRegex(ValueError, 'artifact'):
+                bench.validate_memory_snapshots(reports, root)
+
+
 class Barriers(unittest.TestCase):
     def test_all_peers_required_and_phase_order(self):
         barrier = bench.Barrier(['server', 'client-1'], 2)
