@@ -115,6 +115,9 @@ benchmark pawns' predicted, verified, and input history slots, live entries, and
 payload bytes. This excludes array/object headers, owned payloads, framework statics, and
 native memory; it is not a whole-heap census. An unavailable census reports its error instead
 of treating missing reflection metadata or an empty population as zero memory.
+The optional `hierarchy` section separately counts hierarchy history arrays and the unique
+piece/deletion lists retained by those histories, including their list capacities. List slots
+are reported separately from array payload bytes and are not a whole-heap estimate.
 
 ## Local runs
 

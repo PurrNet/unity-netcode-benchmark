@@ -10,7 +10,11 @@
     <type fullname="PurrNet.Prediction.History`1">
       <field name="m_values" />
       <method name="get_Count" />
+      <method name="get_Item" />
       <method name="get_BackingStoragePayloadBytes" />
+    </type>
+    <type fullname="PurrNet.Prediction.FULL_STATE`1">
+      <field name="state" />
     </type>
   </assembly>
 </linker>
