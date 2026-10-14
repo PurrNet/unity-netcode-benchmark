@@ -27,6 +27,10 @@ on:
         description: "Fresh-process repeats per case"
         default: "3"
         required: true
+      warmup_seconds:
+        description: "Warmup seconds before measuring (use 20 for filled histories)"
+        default: "3"
+        required: true
       purrdiction_ref:
         description: "PurrDiction source branch, tag or commit; pinned before building"
         default: "dev"
@@ -70,8 +74,9 @@ jobs:
           OBJECTS: ${{ inputs.object_counts }}
           SECONDS: ${{ inputs.seconds }}
           REPEATS: ${{ inputs.repeats }}
+          WARMUP: ${{ inputs.warmup_seconds }}
         run: |
-          python3 .github/scripts/prediction-bench.py --dry-run --solutions "$SOLUTIONS" --clients "$CLIENTS" --ticks "$TICKS" --objects "$OBJECTS" --seconds "$SECONDS" --repeats "$REPEATS"
+          python3 .github/scripts/prediction-bench.py --dry-run --solutions "$SOLUTIONS" --clients "$CLIENTS" --ticks "$TICKS" --objects "$OBJECTS" --seconds "$SECONDS" --repeats "$REPEATS" --warmup "$WARMUP"
           python3 - <<'PY'
           import json, os
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
@@ -179,8 +184,9 @@ jobs:
           OBJECTS: ${{ inputs.object_counts }}
           SECONDS: ${{ inputs.seconds }}
           REPEATS: ${{ inputs.repeats }}
+          WARMUP: ${{ inputs.warmup_seconds }}
           REGION: ${{ inputs.region }}
-        run: python3 .github/scripts/prediction-bench.py --solutions "$SOLUTIONS" --clients "$CLIENTS" --ticks "$TICKS" --objects "$OBJECTS" --seconds "$SECONDS" --repeats "$REPEATS" --region "$REGION"
+        run: python3 .github/scripts/prediction-bench.py --solutions "$SOLUTIONS" --clients "$CLIENTS" --ticks "$TICKS" --objects "$OBJECTS" --seconds "$SECONDS" --repeats "$REPEATS" --warmup "$WARMUP" --region "$REGION"
       - name: Render separate prediction report
         if: always()
         run: |
