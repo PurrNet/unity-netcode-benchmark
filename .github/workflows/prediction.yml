@@ -56,12 +56,6 @@ on:
         default: "eu"
         required: true
 
-# Share the measurement lock with replication: choosing the dedicated server for this
-# workflow must not overlap another suite on that same machine.
-concurrency:
-  group: netcode-scaling-bench
-  cancel-in-progress: false
-
 permissions:
   contents: read
   actions: read
@@ -173,6 +167,11 @@ jobs:
           retention-days: 14
 
   benchmark:
+    # Hosted builds can overlap; only measurements share the replication runner lock.
+    concurrency:
+      group: netcode-scaling-bench
+      cancel-in-progress: false
+      queue: max
     needs: [plan, build]
     runs-on: ${{ inputs.runner }}
     timeout-minutes: 120
@@ -214,6 +213,10 @@ jobs:
           retention-days: 30
 
   revision_compare:
+    concurrency:
+      group: netcode-scaling-bench
+      cancel-in-progress: false
+      queue: max
     if: inputs.baseline_run != ''
     runs-on: ${{ inputs.runner }}
     timeout-minutes: 120

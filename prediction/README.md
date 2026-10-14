@@ -18,6 +18,10 @@ Both revisions use identical sampling parameters and fresh processes. Separate r
 the original build provenance and runtime hashes. This helps distinguish code changes from
 differences between hosted runners; the source artifacts expire after three days.
 
+Hosted builds may run while another revision is being measured. Measurement jobs share
+the replication scaling runner lock and queue in order, so multiple requested comparisons
+can wait without replacing one another.
+
 ## Workload and adapters
 
 `sequenced-state-v1` supplies a changing, 12-byte logical input (`sequence`, `x`, `z`) through
