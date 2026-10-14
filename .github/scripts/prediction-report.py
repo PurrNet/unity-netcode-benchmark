@@ -52,7 +52,12 @@ def render(source, output):
                 sample = {}
                 for metric in ('cpuPercent', 'p95FrameMs', 'p99FrameMs', 'managedHeapBytes', 'peakRssBytes'):
                     values = [peer['load'][metric] for peer in peers]
-                    available = metric not in ('cpuPercent', 'peakRssBytes') or all(peer.get('linuxMetricsAvailable') for peer in peers)
+                    if metric == 'cpuPercent':
+                        available = all(peer.get('cpuMetricsAvailable', peer.get('linuxMetricsAvailable')) for peer in peers)
+                    elif metric == 'peakRssBytes':
+                        available = all(peer.get('linuxMetricsAvailable') for peer in peers)
+                    else:
+                        available = True
                     sample[metric] = statistics.mean(values) if available and all(v >= 0 for v in values) else None
                 sample['callbacksPerSecond'] = statistics.mean(
                     (peer['forwardCalls'] + peer['replayCalls']) / peer['load']['wallSeconds'] for peer in peers)

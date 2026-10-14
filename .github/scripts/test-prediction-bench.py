@@ -200,6 +200,19 @@ class Reports(unittest.TestCase):
             self.assertTrue(all(row['cpuPercent'] is None for row in data['groups']))
             self.assertIn('unavailable', (root / 'report/latest.md').read_text())
 
+    def test_windows_cpu_clock_is_scored_while_rss_stays_unavailable(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.make_run(root, linux=False)
+            for path in (root / 'run/case-0001').glob('*.json'):
+                peer = json.loads(path.read_text())
+                peer['cpuMetricsAvailable'] = True
+                path.write_text(json.dumps(peer))
+            data = reporter.render(root, root / 'report')
+            self.assertTrue(data['complete'])
+            self.assertTrue(all(row['cpuPercent'] == 10 for row in data['groups']))
+            self.assertTrue(all(row['peakRssBytes'] is None for row in data['groups']))
+
     def test_different_source_hashes_are_not_pooled(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

@@ -41,8 +41,8 @@ namespace PurrNet.NetBench
 
     /// <summary>
     /// Process CPU time (all threads, from /proc/self/stat), main-thread frame times, GC pressure,
-    /// peak RSS and on-wire interface counters (/proc/net/dev) over a measurement window. Linux only
-    /// for CPU/RSS/iface; frame stats work everywhere.
+    /// peak RSS and on-wire interface counters (/proc/net/dev) over a measurement window.
+    /// CPU supports Linux and Windows; RSS/iface are Linux only. Frame stats work everywhere.
     /// </summary>
     public class LoadSampler
     {
@@ -100,14 +100,15 @@ namespace PurrNet.NetBench
 
         public LoadStats End()
         {
-            double cpu = ReadProcessCpuSeconds() - _startCpuSeconds;
+            double endCpu = ReadProcessCpuSeconds();
+            double cpu = endCpu - _startCpuSeconds;
             double wall = NowSeconds() - _startWallSeconds;
             var endIface = ReadIface(_iface);
             _gcAlloc.Dispose();
 
             var stats = new LoadStats
             {
-                cpuPercent = wall > 0 ? cpu / wall * 100.0 : 0,
+                cpuPercent = wall > 0 && _startCpuSeconds >= 0 && endCpu >= _startCpuSeconds ? cpu / wall * 100.0 : -1,
                 peakRssBytes = ReadPeakResidentBytes(),
                 frameCount = _frameMs.Count,
                 gcCollections = GC.CollectionCount(0) - _startGcCollections,
@@ -177,7 +178,8 @@ namespace PurrNet.NetBench
             return sorted[lo] + (sorted[hi] - sorted[lo]) * (rank - lo);
         }
 
-        private static double NowSeconds() => DateTime.UtcNow.Ticks / (double)TimeSpan.TicksPerSecond;
+        private static double NowSeconds() => System.Diagnostics.Stopwatch.GetTimestamp() /
+            (double)System.Diagnostics.Stopwatch.Frequency;
 
         [StructLayout(LayoutKind.Sequential)]
         private struct Timespec
@@ -193,12 +195,25 @@ namespace PurrNet.NetBench
 
         private static bool s_cpuClockBroken;
 
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr GetCurrentProcess();
+
+        [DllImport("kernel32.dll")]
+        private static extern bool GetProcessTimes(IntPtr process, out ulong creation, out ulong exit,
+            out ulong kernel, out ulong user);
+#endif
+
         /// <summary>
         /// CPU time of the whole process, all threads. The process CPU clock has nanosecond resolution;
         /// /proc/self/stat is the fallback and only has 10 ms ticks, which is 0.1 points on a 10 s window.
         /// </summary>
         private static double ReadProcessCpuSeconds()
         {
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+            return GetProcessTimes(GetCurrentProcess(), out _, out _, out ulong kernel, out ulong user)
+                ? (kernel + user) / 1e7 : -1;
+#else
             if (!s_cpuClockBroken)
             {
                 try
@@ -224,8 +239,9 @@ namespace PurrNet.NetBench
             }
             catch
             {
-                return 0;
+                return -1;
             }
+#endif
         }
 
         private static long ReadPeakResidentBytes()

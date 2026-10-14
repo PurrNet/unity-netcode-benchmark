@@ -17,6 +17,7 @@ namespace PredictionBench
         public string solution, predictionScope, replayDefinition, unityVersion, peer, role, diagnosticJson, provenanceJson;
         public bool success, restoresAvailable;
         public bool linuxMetricsAvailable, developmentBuild;
+        public bool cpuMetricsAvailable;
         public string scriptingBackend;
         public string networkCounterScope = "host-wide loopback aggregate; not per-peer bandwidth; excludes Photon Cloud traffic";
         public string error;
@@ -131,6 +132,7 @@ namespace PredictionBench
                 yield return null;
             }
             _report.load = _sampler.End();
+            _report.cpuMetricsAvailable = _report.load.cpuPercent >= 0;
             PredictionWorkload.Sampling = false;
             _report.diagnosticJson = adapter.EndDiagnostics();
             _report.forwardCalls = PredictionWorkload.ForwardCalls;

@@ -54,12 +54,14 @@ warmup. Control traffic is outside timing; there is no coordinator polling durin
 Every process collects its own wall-clock window after warmup (three seconds by default) and a full GC.
 The workflow's `warmup_seconds` input can use 20 seconds to measure filled histories separately
 from startup growth; compare all adapters with the same warmup and sampling duration.
-The suite reuses the established load sampler for whole-process CPU, frame distributions,
+The suite reuses the established load sampler for whole-process CPU (Linux process clock or
+Windows `GetProcessTimes`, summing all threads), frame distributions,
 managed heap, allocations/GC and Linux RSS. Harness and diagnostic overhead is included.
 Development mode and scripting backend are recorded. The frame cap is 60 fps, so frame time
 includes pacing; use process CPU and native work counters to investigate cost. Exact allocation
 counters depend on Unity availability; the sampler marks heap-growth estimates explicitly.
-Linux process CPU/RSS are unavailable in Windows smoke runs.
+Peak RSS and interface counters remain unavailable in Windows runs. Older Windows reports
+without a CPU availability flag keep CPU marked unavailable.
 FishNet's native server/client frame-rate settings are set to 60, and the common harness
 reasserts the cap before warmup and timing. Changing that cap or losing the native connection
 during measurement fails the case.
