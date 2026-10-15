@@ -237,7 +237,8 @@ def fixture():
             'config': {key: case[key] for key in ('clients', 'objects', 'tickRate', 'seconds', 'warmupSeconds')},
             'actualTickRate': 60, 'observedObjects': 2, 'ownedObjects': 2 if role == 'client' else 0,
             'requestedFrameCap': 60, 'actualFrameCap': 60,
-            'forwardCalls': 120, 'replayCalls': 60, 'ownedForwardCalls': 120 if role == 'client' else 0,
+            'forwardCalls': 120, 'replayCalls': 60, 'appliedInputs': 100,
+            'ownedForwardCalls': 120 if role == 'client' else 0,
             'load': {'wallSeconds': 2, 'frameCount': 120, 'cpuPercent': 10, 'p95FrameMs': 17,
                 'p99FrameMs': 18, 'managedHeapBytes': 1048576, 'peakRssBytes': 2097152,
                 'gcAllocBytes': 100, 'gcAllocEstimated': False},
@@ -413,6 +414,19 @@ class Validation(unittest.TestCase):
 
     def test_complete_authoritative_convergence(self):
         self.assertTrue(bench.validate_case(*fixture()))
+
+    def test_warmup_progress_does_not_hide_stalled_server_inputs_during_sampling(self):
+        for count in (0, -1, None, True):
+            case, reports = fixture()
+            reports['server']['appliedInputs'] = count
+            with self.assertRaisesRegex(ValueError, 'no new input commands during sampling'):
+                bench.validate_case(case, reports)
+
+    def test_missing_sampled_input_activity_cannot_be_scored(self):
+        case, reports = fixture()
+        del reports['server']['appliedInputs']
+        with self.assertRaisesRegex(ValueError, 'no new input commands during sampling'):
+            bench.validate_case(case, reports)
 
     def test_missing_peer_rejected(self):
         case, reports = fixture()
