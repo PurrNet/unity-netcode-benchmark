@@ -238,7 +238,8 @@ jobs:
 
   revision_compare:
     concurrency:
-      group: netcode-scaling-bench
+      # Each standard hosted job has its own VM; custom runners retain the shared lock.
+      group: ${{ inputs.runner == 'ubuntu-latest' && format('prediction-hosted-{0}', github.run_id) || 'netcode-scaling-bench' }}
       cancel-in-progress: false
       queue: max
     if: inputs.baseline_run != '' && inputs.profile_run == ''
@@ -292,7 +293,7 @@ jobs:
   native_profile:
     if: inputs.profile_run != ''
     concurrency:
-      group: netcode-scaling-bench
+      group: ${{ inputs.runner == 'ubuntu-latest' && startsWith(inputs.solutions, 'purrdiction') && format('prediction-hosted-{0}', github.run_id) || 'netcode-scaling-bench' }}
       cancel-in-progress: false
       queue: max
     runs-on: ${{ inputs.runner }}
