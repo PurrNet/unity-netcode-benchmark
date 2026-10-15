@@ -10,6 +10,7 @@ namespace PredictionBench
     {
         public NetworkManager manager;
         public PredictionManager world;
+        private readonly PurrDictionWorkCounters _workCounters = new PurrDictionWorkCounters();
         private GameObject[] _prefabs;
 #if PURRDICTION_OWNED_ONLY
         private const PredictionPolicy PawnPolicy = PredictionPolicy.PredictedIfOwned;
@@ -65,6 +66,8 @@ namespace PredictionBench
         }
         public override string EndDiagnostics() => Config.detailedDiagnostics
             ? JsonUtility.ToJson(PredictionPerformanceTelemetry.End()) : "{}";
+        public override void BeginWorkCounters() => _workCounters.Begin(world);
+        public override string EndWorkCounters() => _workCounters.End(world);
         public override string MemoryDiagnostics() => JsonUtility.ToJson(PurrDictionMemoryDiagnostics.Capture(world));
     }
 }

@@ -15,6 +15,7 @@ namespace PredictionBench
         public int schemaVersion = 1;
         public string suite = "prediction", workload = "sequenced-state-v1";
         public string solution, predictionScope, replayDefinition, unityVersion, peer, role, diagnosticJson, provenanceJson;
+        public string workCountersJson;
         public bool success, restoresAvailable;
         public bool linuxMetricsAvailable, developmentBuild;
         public bool cpuMetricsAvailable;
@@ -126,6 +127,7 @@ namespace PredictionBench
             GC.WaitForPendingFinalizers();
             GC.Collect();
             _report.rttMs = adapter.RttMs;
+            adapter.BeginWorkCounters();
             adapter.BeginDiagnostics();
             PredictionWorkload.Begin();
             _sampler.Begin(Arg("-iface", "lo"));
@@ -142,6 +144,7 @@ namespace PredictionBench
             _report.cpuMetricsAvailable = _report.load.cpuPercent >= 0;
             PredictionWorkload.Sampling = false;
             _report.diagnosticJson = adapter.EndDiagnostics();
+            _report.workCountersJson = adapter.EndWorkCounters();
             _report.memoryDiagnosticJson = adapter.MemoryDiagnostics();
             _report.forwardCalls = PredictionWorkload.ForwardCalls;
             _report.replayCalls = PredictionWorkload.ReplayCalls;

@@ -20,6 +20,51 @@ import uuid
 
 SOLUTIONS = ('purrdiction', 'purrdiction-owned', 'fishnet', 'fusion')
 WORKLOAD = 'sequenced-state-v1'
+WORK_COUNTER_NAMES = (
+    'deltaFramesWrittenTotal', 'fullFramesSentTotal',
+    'deltaSectionDeleteBitsTotal', 'deltaSectionHierarchyBitsTotal',
+    'deltaSectionInputBitsTotal', 'deltaSectionStateBitsTotal',
+    'deltaFrameBytesTotal', 'fullFrameBytesTotal',
+    'inputSendsTotal', 'inputBytesSentTotal', 'inputTicksSentTotal',
+    'framesReceivedTotal', 'fullFramesReceivedTotal',
+    'leadJumpsTotal', 'leadPausesTotal', 'minLeadSnapsTotal', 'starvationJumpsTotal',
+    'renderPhaseFrameAppliesTotal', 'tickPhaseFrameAppliesTotal',
+)
+
+
+def work_counter_delta(report):
+    """Validate optional boundary snapshots; legacy/other adapters remain unavailable."""
+    provenance = json.loads(report.get('provenanceJson') or '{}')
+    if not isinstance(provenance, dict):
+        raise ValueError('Invalid work counter provenance')
+    expected = provenance.get('workCountersSchema')
+    raw = report.get('workCountersJson')
+    if expected is not None and (type(expected) is not int or expected != 1):
+        raise ValueError('Unsupported work counter capability')
+    if not raw:
+        if expected is not None:
+            raise ValueError('Missing promised work counters')
+        return None
+    window = json.loads(raw)
+    if not isinstance(window, dict) or type(window.get('schemaVersion')) is not int or window['schemaVersion'] != 1:
+        raise ValueError('Unsupported work counter window')
+    for name in ('scope', 'sectionScope', 'byteScope'):
+        if not isinstance(window.get(name), str) or not window[name]:
+            raise ValueError('Missing work counter scope')
+    for name in ('localTickStart', 'localTickEnd', 'maxAckLagTicksStart', 'maxAckLagTicksEnd'):
+        value = window.get(name)
+        if type(value) is not int or not 0 <= value <= 2**64 - 1:
+            raise ValueError('Invalid work counter gauge')
+    snapshots = [window.get(name) for name in ('start', 'end')]
+    for snapshot in snapshots:
+        if not isinstance(snapshot, dict) or set(snapshot) != set(WORK_COUNTER_NAMES):
+            raise ValueError('Incomplete work counter snapshot')
+        if any(type(value) is not int or not 0 <= value <= 2**64 - 1 for value in snapshot.values()):
+            raise ValueError('Invalid work counter value')
+    start, end = snapshots
+    if any(end[name] < start[name] for name in WORK_COUNTER_NAMES):
+        raise ValueError('Work counter reset during measurement')
+    return {name: end[name] - start[name] for name in WORK_COUNTER_NAMES}
 
 
 def host_snapshot(proc=Path('/proc'), sysfs=Path('/sys')):
@@ -174,6 +219,7 @@ def validate_case(case, reports):
             raise ValueError(f'{peer}: failed or unsupported report: {report.get("error")}')
         if report.get('solution') != case['solution'] or report.get('workload') != WORKLOAD or report.get('peer') != peer:
             raise ValueError(f'{peer}: wrong solution, workload or peer')
+        work_counter_delta(report)
         config = report.get('config', {})
         for key in ('clients', 'objects', 'tickRate', 'seconds', 'warmupSeconds'):
             if config.get(key) != case[key]:

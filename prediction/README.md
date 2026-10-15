@@ -15,6 +15,24 @@ New workflow builds default to release IL2CPP players (`profiling=false`). Enabl
 `profiling=true` when development-build allocation counters are needed; compare players with
 matching build settings and check the effective modes recorded in their peer results.
 
+New PurrDiction players also record `workCountersJson` with start/end snapshots of existing
+world counters immediately outside CPU timing. This runs independently of detailed telemetry,
+including release players with `diagnostics=off`; it adds no per-tick instrumentation. Reports
+show counter differences per second without adjusting CPU scores. Raw snapshots retain input
+transmissions, received frames, reconciliation batches, lead changes, and endpoint tick/ACK-lag
+gauges. Input-window ticks include retransmissions, not unique commands; render/tick apply
+counters count batches, not every received frame. Prepared frame/section counts include bodies
+replaced before sending. Frame payload bytes precede RPC compression, headers and fragmentation
+and are not wire bandwidth. The observed prepared section bits exclude full frames and trailing
+event sections.
+
+The additional harness code changes its provenance hash. Rebuild both revisions with this same
+harness for new comparisons; do not compare a newly instrumented player against an older frozen
+player as a code-only change. Legacy artifacts remain readable with work counters unavailable.
+An A/A run can set `baseline_run` and `candidate_run` to the same frozen run to measure apparent
+differences without a binary change. A/A variation is context, not a correction factor or a
+universal noise threshold.
+
 For revision comparisons, dispatch **Prediction Benchmark** with `baseline_run` and
 `candidate_run` set to two successful prediction run IDs. This optional mode downloads
 their existing PurrDiction players and alternates baseline/candidate order on one runner.

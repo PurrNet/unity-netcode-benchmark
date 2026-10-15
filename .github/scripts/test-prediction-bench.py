@@ -233,6 +233,65 @@ def fixture():
     return case, reports
 
 
+def work_window(amount=10):
+    return dict(schemaVersion=1, scope='outside timing', sectionScope='prepared ordinary sections',
+                byteScope='before RPC framing', localTickStart=20, localTickEnd=30,
+                maxAckLagTicksStart=4, maxAckLagTicksEnd=2,
+                start={name: 100 for name in bench.WORK_COUNTER_NAMES},
+                end={name: 100 + amount for name in bench.WORK_COUNTER_NAMES})
+
+
+class WorkCounters(unittest.TestCase):
+    def report(self, window=None):
+        return dict(provenanceJson='{"workCountersSchema":1}',
+                    workCountersJson=json.dumps(work_window() if window is None else window))
+
+    def test_release_off_window_excludes_warmup_and_gauges_are_not_deltas(self):
+        case, reports = fixture()
+        case['diagnostics'] = 'off'
+        for report in reports.values():
+            report.update(self.report(), detailedDiagnostics=False, developmentBuild=False)
+        self.assertTrue(bench.validate_case(case, reports))
+        self.assertEqual(bench.work_counter_delta(reports['server']),
+                         {name: 10 for name in bench.WORK_COUNTER_NAMES})
+
+    def test_legacy_and_other_adapters_remain_explicitly_unavailable(self):
+        self.assertIsNone(bench.work_counter_delta(dict(provenanceJson='{}')))
+        self.assertIsNone(bench.work_counter_delta(dict(provenanceJson='{}', workCountersJson=None)))
+
+    def test_promised_or_partial_window_cannot_silently_become_unavailable(self):
+        with self.assertRaisesRegex(ValueError, 'Missing promised'):
+            bench.work_counter_delta(dict(provenanceJson='{"workCountersSchema":1}'))
+        window = work_window()
+        window['end'].pop('deltaFramesWrittenTotal')
+        with self.assertRaisesRegex(ValueError, 'Incomplete'):
+            bench.work_counter_delta(self.report(window))
+
+    def test_reset_and_invalid_counter_values_are_rejected(self):
+        for value in (99, -1, 2**64, True, '101', 101.5):
+            window = work_window()
+            window['end']['inputSendsTotal'] = value
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                bench.work_counter_delta(self.report(window))
+
+    def test_unsigned_64_bit_counts_keep_integer_precision(self):
+        window = work_window()
+        window['start']['inputBytesSentTotal'] = 2**63 + 5
+        window['end']['inputBytesSentTotal'] = 2**63 + 9
+        self.assertEqual(bench.work_counter_delta(self.report(window))['inputBytesSentTotal'], 4)
+
+    def test_unknown_schema_and_malformed_json_are_rejected(self):
+        for value in (2, True):
+            report = self.report()
+            report['provenanceJson'] = json.dumps(dict(workCountersSchema=value))
+            with self.assertRaises(ValueError):
+                bench.work_counter_delta(report)
+        report = self.report()
+        report['workCountersJson'] = '{'
+        with self.assertRaises(ValueError):
+            bench.work_counter_delta(report)
+
+
 class Matrix(unittest.TestCase):
     def test_repeats_rotate_adapter_positions_and_preserve_every_case(self):
         solutions = ['purrdiction', 'purrdiction-owned', 'fishnet', 'fusion']
@@ -382,6 +441,55 @@ class Validation(unittest.TestCase):
 
 
 class Reports(unittest.TestCase):
+    def test_work_rates_average_clients_before_repeat_medians(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for index, amount in enumerate((0, 100, 20)):
+                parent = root / str(index)
+                parent.mkdir()
+                self.make_run(parent)
+                run = parent / 'run'
+                manifest = json.loads((run / 'manifest.json').read_text())
+                manifest['cases'][0]['clients'] = 2
+                (run / 'manifest.json').write_text(json.dumps(manifest))
+                folder = run / 'case-0001'
+                client = json.loads((folder / 'client-1.json').read_text())
+                client['peer'] = 'client-2'
+                client['load']['wallSeconds'] = 4
+                (folder / 'client-2.json').write_text(json.dumps(client))
+                for path in folder.glob('*.json'):
+                    report = json.loads(path.read_text())
+                    report['config']['clients'] = 2
+                    role = report['role']
+                    owned_index = 0 if report['peer'] == 'client-1' else 1
+                    report['ownedObjects'] = 0 if role == 'server' else 1
+                    for pawn in report['finalState']:
+                        pawn['owned'] = role == 'client' and pawn['index'] == owned_index
+                    report.update(WorkCounters().report(work_window(amount)))
+                    path.write_text(json.dumps(report))
+            data = reporter.render(root, root / 'report')
+            self.assertTrue(data['complete'], data['failures'])
+            client = next(row for row in data['groups'] if row['role'] == 'client')
+            self.assertEqual(client['repeats'], 3)
+            # Per-repeat means: 0, (100/2 + 100/4)/2, (20/2 + 20/4)/2.
+            self.assertEqual(client['workCountersPerSecond']['inputSendsTotal'], 7.5)
+
+    def test_work_rates_use_window_differences_and_preserve_cpu_scores(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.make_run(root)
+            original = reporter.render(root, root / 'old-report')
+            for path in (root / 'run/case-0001').glob('*.json'):
+                report = json.loads(path.read_text())
+                report.update(WorkCounters().report(work_window(40)))
+                path.write_text(json.dumps(report))
+            data = reporter.render(root / 'run', root / 'report')
+            self.assertTrue(data['complete'])
+            for before, after in zip(original['groups'], data['groups']):
+                self.assertEqual(before['cpuPercent'], after['cpuPercent'])
+                self.assertEqual(after['workCountersPerSecond']['inputSendsTotal'], 20)
+            self.assertIn('PurrDiction work counters', (root / 'report/latest.md').read_text())
+
     def test_diagnostics_modes_and_legacy_reports_are_never_pooled(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -525,6 +633,8 @@ class Preparation(unittest.TestCase):
             self.assertEqual(full['purrnetDependency'], owned['purrnetDependency'])
             self.assertEqual(full['predictionPolicy'], 'FullPrediction')
             self.assertEqual(owned['predictionPolicy'], 'PredictedIfOwned')
+            self.assertEqual(full['workCountersSchema'], 1)
+            self.assertEqual(owned['workCountersSchema'], 1)
             adapter_path = 'Adapter/PurrDictionPredictionAdapter.cs'
             self.assertNotEqual(full['adapterSha256'][adapter_path], owned['adapterSha256'][adapter_path])
             self.assertTrue((root / 'owned/Assets/PredictionBench' / adapter_path).read_text().startswith('#define PURRDICTION_OWNED_ONLY\n'))

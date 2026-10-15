@@ -48,7 +48,8 @@ def render(source, output):
                 key = (case['solution'], case['clients'], case['tickRate'], case['objects'], role, build, hardware)
                 item = groups.setdefault(key, {'samples': [], 'predictionScope': peers[0]['predictionScope'],
                                               'replayDefinition': peers[0]['replayDefinition'],
-                                              'detailedDiagnostics': peers[0].get('detailedDiagnostics')})
+                                              'detailedDiagnostics': peers[0].get('detailedDiagnostics'),
+                                              'workSamples': []})
                 # One datapoint per repeat; clients on the same case are averaged before
                 # taking the median across independent runs.
                 sample = {}
@@ -67,6 +68,10 @@ def render(source, output):
                 sample['gcBytesPerSecond'] = statistics.mean(peer['load']['gcAllocBytes'] / peer['load']['wallSeconds'] for peer in peers)
                 sample['gcEstimated'] = any(peer['load']['gcAllocEstimated'] for peer in peers)
                 item['samples'].append(sample)
+                counters = [BENCH.work_counter_delta(peer) for peer in peers]
+                item['workSamples'].append({name: statistics.mean(
+                    count[name] / peer['load']['wallSeconds'] for count, peer in zip(counters, peers))
+                    for name in BENCH.WORK_COUNTER_NAMES} if all(count is not None for count in counters) else None)
     aggregates = []
     for key, group in sorted(groups.items()):
         row = dict(zip(('solution', 'clients', 'tickRate', 'objects', 'role', 'buildFingerprint', 'environmentFingerprint'), key))
@@ -75,6 +80,9 @@ def render(source, output):
         for metric in group['samples'][0]:
             values = [sample[metric] for sample in group['samples']]
             row[metric] = any(values) if metric == 'gcEstimated' else statistics.median(values) if all(v is not None for v in values) else None
+        row['workCountersPerSecond'] = {name: statistics.median(sample[name] for sample in group['workSamples'])
+                                       for name in BENCH.WORK_COUNTER_NAMES} if all(
+                                           sample is not None for sample in group['workSamples']) else None
         aggregates.append(row)
     data = {'schemaVersion': 1, 'suite': 'prediction', 'complete': not failures and bool(raw),
             'groups': aggregates, 'failures': failures, 'raw': raw}
@@ -100,6 +108,20 @@ def render(source, output):
     for solution in sorted({row['solution'] for row in aggregates}):
         row = next(row for row in aggregates if row['solution'] == solution)
         lines.append(f'- **{solution}**: {row["predictionScope"]}. Replay classification: {row["replayDefinition"]}.')
+    work_rows = [row for row in aggregates if row['workCountersPerSecond'] is not None]
+    if work_rows:
+        lines += ['', '## PurrDiction work counters', '',
+                  'Existing per-world counters are read outside CPU timing, including release runs with detailed diagnostics off. Client peers are averaged before repeat medians. These describe work; CPU scores are not normalized.', '',
+                  'Prepared delta frames/section bits include bodies replaced before sending. State/input sections exclude full frames and trailing event sections. Frame body bytes are before RPC compression, headers and fragmentation; they are not wire bandwidth. Start/end snapshots and lead-adjustment counters remain in raw JSON.', '',
+                  '| Policy | Objects | Role | Prepared deltas/s | Prepared state kbit/s | Prepared input kbit/s | Frame body KiB/s | Received frames/s | Input sends/s |',
+                  '|---|---:|---|---:|---:|---:|---:|---:|---:|']
+        for row in work_rows:
+            work = row['workCountersPerSecond']
+            lines.append('| ' + ' | '.join([row['solution'], str(row['objects']), row['role'],
+                number(work['deltaFramesWrittenTotal']), number(work['deltaSectionStateBitsTotal'], 1000),
+                number(work['deltaSectionInputBitsTotal'], 1000),
+                number(work['deltaFrameBytesTotal'] + work['fullFrameBytesTotal'], 1024),
+                number(work['framesReceivedTotal']), number(work['inputSendsTotal'])]) + ' |')
     if failures:
         lines += ['', '## Incomplete cases', '']
         lines += [f'- {item["case"]["solution"]}, case {item["case"]["id"]}: {item["error"]}' for item in failures]

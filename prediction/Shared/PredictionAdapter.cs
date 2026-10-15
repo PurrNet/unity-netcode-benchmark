@@ -37,6 +37,8 @@ namespace PredictionBench
         protected abstract void Connect();
         public abstract void Spawn();
         public abstract PawnSnapshot[] Snapshot();
+        public virtual void BeginWorkCounters() { }
+        public virtual string EndWorkCounters() => null;
         public virtual void BeginDiagnostics() { }
         public virtual string EndDiagnostics() => "{}";
         public virtual string MemoryDiagnostics() => null;
