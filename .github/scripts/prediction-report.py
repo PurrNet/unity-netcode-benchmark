@@ -113,11 +113,11 @@ def render(source, output):
         lines += ['', '## PurrDiction work counters', '',
                   'Existing per-world counters are read outside CPU timing, including release runs with detailed diagnostics off. Client peers are averaged before repeat medians. These describe work; CPU scores are not normalized.', '',
                   'Prepared delta frames/section bits include bodies replaced before sending. State/input sections exclude full frames and trailing event sections. Frame body bytes are before RPC compression, headers and fragmentation; they are not wire bandwidth. Start/end snapshots and lead-adjustment counters remain in raw JSON.', '',
-                  '| Policy | Objects | Role | Prepared deltas/s | Prepared state kbit/s | Prepared input kbit/s | Frame body KiB/s | Received frames/s | Input sends/s |',
-                  '|---|---:|---|---:|---:|---:|---:|---:|---:|']
+                  '| Policy | Clients | Hz | Objects | Role | Prepared deltas/s | Prepared state kbit/s | Prepared input kbit/s | Frame body KiB/s | Received frames/s | Input sends/s |',
+                  '|---|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|']
         for row in work_rows:
             work = row['workCountersPerSecond']
-            lines.append('| ' + ' | '.join([row['solution'], str(row['objects']), row['role'],
+            lines.append('| ' + ' | '.join([row['solution'], str(row['clients']), str(row['tickRate']), str(row['objects']), row['role'],
                 number(work['deltaFramesWrittenTotal']), number(work['deltaSectionStateBitsTotal'], 1000),
                 number(work['deltaSectionInputBitsTotal'], 1000),
                 number(work['deltaFrameBytesTotal'] + work['fullFrameBytesTotal'], 1024),
