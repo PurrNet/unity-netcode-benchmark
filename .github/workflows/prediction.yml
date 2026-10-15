@@ -12,7 +12,7 @@ on:
         default: ""
         required: false
       solutions:
-        description: "Prediction adapters (separate from replication): purrdiction,fishnet,fusion"
+        description: "Prediction adapters: purrdiction,purrdiction-owned,fishnet,fusion (owned is optional)"
         default: "purrdiction,fishnet,fusion"
         required: true
       client_counts:
@@ -116,7 +116,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Checkout pinned prediction source
-        if: matrix.solution == 'purrdiction'
+        if: startsWith(matrix.solution, 'purrdiction')
         uses: actions/checkout@v7
         with:
           repository: PurrNet/PurrDiction

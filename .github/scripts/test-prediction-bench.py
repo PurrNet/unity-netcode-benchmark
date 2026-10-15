@@ -72,12 +72,12 @@ class ArtifactLayoutTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = root / 'downloaded'
-            for name in ('purrdiction', 'fishnet'):
+            for name in ('purrdiction', 'purrdiction-owned', 'fishnet'):
                 player = source / ('prediction-player-' + name)
                 player.mkdir(parents=True)
                 (player / 'PredictionBench').write_text(name)
-            arranger.arrange(source, root / 'players', 'purrdiction,fishnet')
-            for name in ('purrdiction', 'fishnet'):
+            arranger.arrange(source, root / 'players', 'purrdiction,purrdiction-owned,fishnet')
+            for name in ('purrdiction', 'purrdiction-owned', 'fishnet'):
                 self.assertEqual((root / 'players' / name / 'PredictionBench').read_text(), name)
 
     def test_ambiguous_flat_layout_and_missing_players_fail_before_copying(self):
@@ -114,6 +114,10 @@ def fixture():
 
 
 class Matrix(unittest.TestCase):
+    def test_owned_and_full_world_variants_are_separate_cases(self):
+        cases = bench.make_plan('purrdiction,purrdiction-owned', '4', '60', '128', 1, 20, 20)
+        self.assertEqual([case['solution'] for case in cases], ['purrdiction', 'purrdiction-owned'])
+
     def test_independent_dimensions_and_fixed_population(self):
         cases = bench.make_plan('purrdiction,fishnet,fusion', '1,2,4', '20,60', '32,128', 3, 10, 3)
         self.assertEqual(len(cases), 108)
@@ -243,6 +247,28 @@ class Reports(unittest.TestCase):
             self.assertFalse(data['complete'])
             self.assertEqual(data['groups'], [])
 
+    def test_owned_and_full_world_results_are_never_pooled(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for solution in ('purrdiction', 'purrdiction-owned'):
+                variant = root / solution
+                variant.mkdir()
+                self.make_run(variant)
+                path = variant / 'run/manifest.json'
+                manifest = json.loads(path.read_text())
+                manifest['cases'][0]['solution'] = solution
+                path.write_text(json.dumps(manifest))
+                for path in (variant / 'run/case-0001').glob('*.json'):
+                    peer = json.loads(path.read_text())
+                    peer['solution'] = solution
+                    peer['predictionScope'] = solution
+                    path.write_text(json.dumps(peer))
+            data = reporter.render(root, root / 'report')
+            self.assertTrue(data['complete'])
+            self.assertEqual(len(data['groups']), 4)
+            self.assertEqual({row['solution'] for row in data['groups']}, {'purrdiction', 'purrdiction-owned'})
+            self.assertTrue(all(row['repeats'] == 1 for row in data['groups']))
+
     def test_windows_missing_cpu_is_not_reported_as_zero(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -297,6 +323,40 @@ class Reports(unittest.TestCase):
 
 
 class Preparation(unittest.TestCase):
+    def test_owned_variant_reuses_pinned_source_but_has_distinct_policy_and_adapter_hash(self):
+        adapter_source = (prepare.ROOT / 'prediction/Adapters/purrdiction/PurrDictionPredictionAdapter.cs').read_text()
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            files = {
+                'purrnet/Assets/_Benchmark/Prefabs/NetworkManager.prefab': 'manager',
+                'purrnet/Packages/manifest.json': '{"dependencies": {}}',
+                'purrnet/Packages/packages-lock.json': '{"dependencies": {}}',
+                'purrnet/ProjectSettings/ProjectVersion.txt': 'm_EditorVersion: test',
+                'source/Assets/PurrDiction/package.json': '{"version": "test"}',
+                'source/Packages/manifest.json': '{"dependencies": {"dev.purrnet.purrnet": "https://example.com/purrnet.git#pinned"}}',
+                'prediction/Shared/Runner.cs': 'shared harness',
+                'prediction/Adapters/purrdiction/PurrDictionPredictionAdapter.cs': adapter_source,
+                'Shared/com.purrnet.netbench/Runtime/LoadSampler.cs': '    public struct LoadStats {}',
+            }
+            for directory in ('Runtime', 'Codegen', 'Editor'):
+                files[f'source/Assets/PurrDiction/{directory}/Code.cs'] = 'package code'
+                files[f'source/Assets/PurrDiction/{directory}.meta'] = 'guid: package'
+            for name, content in files.items():
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content)
+            with patch.object(prepare, 'ROOT', root), patch.object(prepare, 'git', side_effect=lambda root, *args: '' if args[0] == 'status' else 'b' * 40):
+                full = prepare.prepare('purrdiction', root / 'full', root / 'source')
+                owned = prepare.prepare('purrdiction-owned', root / 'owned', root / 'source')
+            self.assertEqual(full['predictionCommit'], owned['predictionCommit'])
+            self.assertEqual(full['purrnetDependency'], owned['purrnetDependency'])
+            self.assertEqual(full['predictionPolicy'], 'FullPrediction')
+            self.assertEqual(owned['predictionPolicy'], 'PredictedIfOwned')
+            adapter_path = 'Adapter/PurrDictionPredictionAdapter.cs'
+            self.assertNotEqual(full['adapterSha256'][adapter_path], owned['adapterSha256'][adapter_path])
+            self.assertTrue((root / 'owned/Assets/PredictionBench' / adapter_path).read_text().startswith('#define PURRDICTION_OWNED_ONLY\n'))
+            self.assertFalse((root / 'full/Assets/PredictionBench' / adapter_path).read_text().startswith('#define'))
+
     def test_isolated_project_preserves_manager_guid_and_pins_git_dependencies(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

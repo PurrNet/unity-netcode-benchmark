@@ -18,7 +18,7 @@ import threading
 import time
 import uuid
 
-SOLUTIONS = ('purrdiction', 'fishnet', 'fusion')
+SOLUTIONS = ('purrdiction', 'purrdiction-owned', 'fishnet', 'fusion')
 WORKLOAD = 'sequenced-state-v1'
 
 

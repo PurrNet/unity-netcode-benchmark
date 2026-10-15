@@ -11,8 +11,15 @@ namespace PredictionBench
         public NetworkManager manager;
         public PredictionManager world;
         private GameObject[] _prefabs;
+#if PURRDICTION_OWNED_ONLY
+        private const PredictionPolicy PawnPolicy = PredictionPolicy.PredictedIfOwned;
+        public override string Solution => "purrdiction-owned";
+        public override string PredictionScope => "PredictedIfOwned: owned objects predict and replay; remote objects run verified ServerRelay ticks";
+#else
+        private const PredictionPolicy PawnPolicy = PredictionPolicy.FullPrediction;
         public override string Solution => "purrdiction";
         public override string PredictionScope => "FullPrediction for every object; world rollback";
+#endif
         public override string ReplayDefinition => "PredictionManager.isReplaying (verified + gap + speculative); diagnosticJson separates passes";
         public override bool Connected => (Server ? manager.isServer : manager.isClient) && world.isSpawned;
         public override int ConnectedClients => manager.playerCount;
@@ -36,7 +43,7 @@ namespace PredictionBench
                 pawn.SetActive(false);
                 var component = pawn.AddComponent<PurrDictionPredictionPawn>();
                 component.Index = i;
-                component.SetPredictionPolicyOverride(PredictionPolicy.FullPrediction);
+                component.SetPredictionPolicyOverride(PawnPolicy);
                 _prefabs[i] = pawn;
                 prefabs.prefabs.Add(new PredictedPrefab { prefab = pawn, pooled = false });
             }

@@ -9,7 +9,7 @@ import shutil
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
-SOLUTIONS = ('purrdiction', 'fishnet', 'fusion')
+SOLUTIONS = ('purrdiction', 'purrdiction-owned', 'fishnet', 'fusion')
 
 
 def git(path, *args):
@@ -21,9 +21,10 @@ def prepare(solution, output, prediction_source=None):
         raise ValueError(f'Unknown prediction solution: {solution}')
     if output.exists():
         raise ValueError(f'Refusing to overwrite generated project: {output}')
-    if solution == 'purrdiction' and (prediction_source is None or not (prediction_source / 'Assets/PurrDiction/package.json').is_file()):
+    is_prediction = solution in ('purrdiction', 'purrdiction-owned')
+    if is_prediction and (prediction_source is None or not (prediction_source / 'Assets/PurrDiction/package.json').is_file()):
         raise ValueError('PurrDiction requires --prediction-source pointing to a source checkout')
-    base = ROOT / ('purrnet' if solution == 'purrdiction' else solution)
+    base = ROOT / ('purrnet' if is_prediction else solution)
     for name in ('Assets', 'Packages', 'ProjectSettings'):
         def ignore(path, names):
             if Path(path) == base / 'Assets/_Benchmark':
@@ -45,7 +46,7 @@ def prepare(solution, output, prediction_source=None):
             manifest['dependencies'][key] = value.split('#')[0] + '#' + locked[key]['hash']
     provenance = {'suite': 'prediction', 'solution': solution, 'benchmarkCommit': git(ROOT, 'rev-parse', 'HEAD'),
                   'benchmarkDirty': bool(git(ROOT, 'status', '--porcelain')), 'sourceUnity': (base / 'ProjectSettings/ProjectVersion.txt').read_text().splitlines()[0]}
-    if solution == 'purrdiction':
+    if is_prediction:
         package = prediction_source / 'Assets/PurrDiction'
         destination = output / 'Assets/PurrDiction'
         destination.mkdir()
@@ -64,6 +65,7 @@ def prepare(solution, output, prediction_source=None):
                           predictionDirty=bool(git(prediction_source, 'status', '--porcelain')),
                           predictionVersion=json.loads((package / 'package.json').read_text())['version'],
                           purrnetDependency=manifest['dependencies']['dev.purrnet.purrnet'])
+        provenance['predictionPolicy'] = 'PredictedIfOwned' if solution == 'purrdiction-owned' else 'FullPrediction'
     else:
         provenance['vendoredSourceCommit'] = provenance['benchmarkCommit']
     manifest_path.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
@@ -71,7 +73,10 @@ def prepare(solution, output, prediction_source=None):
     (output / 'Packages/packages-lock.json').unlink(missing_ok=True)
     target = output / 'Assets/PredictionBench'
     shutil.copytree(ROOT / 'prediction/Shared', target)
-    shutil.copytree(ROOT / 'prediction/Adapters' / solution, target / 'Adapter')
+    shutil.copytree(ROOT / 'prediction/Adapters' / ('purrdiction' if is_prediction else solution), target / 'Adapter')
+    if solution == 'purrdiction-owned':
+        adapter = target / 'Adapter/PurrDictionPredictionAdapter.cs'
+        adapter.write_text('#define PURRDICTION_OWNED_ONLY\n' + adapter.read_text(encoding='utf-8-sig'), encoding='utf-8')
     # Reuse the established load counter implementation, without activating BenchRunner.
     shutil.copy2(ROOT / 'Shared/com.purrnet.netbench/Runtime/LoadSampler.cs', target / 'LoadSampler.cs')
     sampler = target / 'LoadSampler.cs'

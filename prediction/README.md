@@ -40,6 +40,7 @@ Object populations are fixed independently of connection count.
 | Adapter | Native path | Prediction scope |
 |---|---|---|
 | PurrDiction | `PredictedIdentity<INPUT, STATE>`, `GetFinalInput`, `Simulate`; `FullPrediction` | Every object participates in world prediction/replay |
+| PurrDiction owned (optional `purrdiction-owned`) | Same API and source revision; existing `PredictedIfOwned` policy | Owned objects predict and replay; remote objects run verified `ServerRelay` ticks |
 | FishNet | `TickNetworkBehaviour`, `[Replicate]`, `[Reconcile]`; prediction and state forwarding enabled | Owned objects and spectators process forwarded state/input |
 | Fusion 2 | `INetworkInput`, `OnInput`, `[Networked]` state, `FixedUpdateNetwork`; dedicated `GameMode.Server` | Native input-authority prediction; proxies receive networked state |
 
@@ -48,6 +49,12 @@ exercise this server-authoritative rollback/resimulation path. FishNet's state f
 explicitly enabled in the generated prefab. These scopes are reported alongside results; a
 solution doing less speculative world work cannot be described as performing the same service
 just because its CPU number is smaller.
+
+Include `purrdiction-owned` in the `solutions` input to measure that existing policy separately.
+It has its own player artifact, solution name, policy provenance and report rows, so its results
+cannot be pooled with `purrdiction`. The default matrix keeps the full-world case. The owned
+variant is closer to Fusion's input-authority scope, but still executes verified remote simulation;
+it does not make the adapters identical or measure interactions between predicted objects.
 
 Replay counters also have native meanings: PurrDiction `isReplaying` includes verified, gap,
 and speculative passes; FishNet uses `ContainsReplayed`; Fusion uses `IsResimulation`.
