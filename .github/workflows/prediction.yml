@@ -47,6 +47,11 @@ on:
         description: "Development build for allocation counters; record this when comparing runs"
         type: boolean
         default: true
+      diagnostics:
+        description: "Detailed pass telemetry: auto enables it in development players only"
+        type: choice
+        options: ["auto", "on", "off"]
+        default: "auto"
       runner:
         description: "Runner for sequential measurements; all processes share its hardware"
         default: "ubuntu-latest"
@@ -79,8 +84,9 @@ jobs:
           SECONDS: ${{ inputs.seconds }}
           REPEATS: ${{ inputs.repeats }}
           WARMUP: ${{ inputs.warmup_seconds }}
+          DIAGNOSTICS: ${{ inputs.diagnostics }}
         run: |
-          python3 .github/scripts/prediction-bench.py --dry-run --solutions "$SOLUTIONS" --clients "$CLIENTS" --ticks "$TICKS" --objects "$OBJECTS" --seconds "$SECONDS" --repeats "$REPEATS" --warmup "$WARMUP"
+          python3 .github/scripts/prediction-bench.py --dry-run --solutions "$SOLUTIONS" --clients "$CLIENTS" --ticks "$TICKS" --objects "$OBJECTS" --seconds "$SECONDS" --repeats "$REPEATS" --warmup "$WARMUP" --diagnostics "$DIAGNOSTICS"
           python3 - <<'PY'
           import json, os
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
@@ -195,7 +201,8 @@ jobs:
           REPEATS: ${{ inputs.repeats }}
           WARMUP: ${{ inputs.warmup_seconds }}
           REGION: ${{ inputs.region }}
-        run: python3 .github/scripts/prediction-bench.py --solutions "$SOLUTIONS" --clients "$CLIENTS" --ticks "$TICKS" --objects "$OBJECTS" --seconds "$SECONDS" --repeats "$REPEATS" --warmup "$WARMUP" --region "$REGION"
+          DIAGNOSTICS: ${{ inputs.diagnostics }}
+        run: python3 .github/scripts/prediction-bench.py --solutions "$SOLUTIONS" --clients "$CLIENTS" --ticks "$TICKS" --objects "$OBJECTS" --seconds "$SECONDS" --repeats "$REPEATS" --warmup "$WARMUP" --region "$REGION" --diagnostics "$DIAGNOSTICS"
       - name: Render separate prediction report
         if: always()
         run: |
@@ -242,9 +249,10 @@ jobs:
           SECONDS: ${{ inputs.seconds }}
           WARMUP: ${{ inputs.warmup_seconds }}
           REPEATS: ${{ inputs.repeats }}
+          DIAGNOSTICS: ${{ inputs.diagnostics }}
         run: |
           chmod +x prediction-players/{baseline,candidate}/purrdiction/PredictionBench
-          python3 .github/scripts/prediction-ab.py --baseline prediction-players/baseline --candidate prediction-players/candidate --clients "$CLIENTS" --ticks "$TICKS" --objects "$OBJECTS" --seconds "$SECONDS" --warmup "$WARMUP" --repeats "$REPEATS"
+          python3 .github/scripts/prediction-ab.py --baseline prediction-players/baseline --candidate prediction-players/candidate --clients "$CLIENTS" --ticks "$TICKS" --objects "$OBJECTS" --seconds "$SECONDS" --warmup "$WARMUP" --repeats "$REPEATS" --diagnostics "$DIAGNOSTICS"
       - name: Report both revisions
         if: always()
         run: |

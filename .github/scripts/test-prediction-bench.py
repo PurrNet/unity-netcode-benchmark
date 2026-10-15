@@ -30,7 +30,7 @@ ab = module('prediction_ab', 'prediction-ab.py')
 class RevisionComparisonTests(unittest.TestCase):
     def args(self, **overrides):
         values = dict(baseline=Path('baseline'), candidate=Path('candidate'), output=Path('results'),
-                      clients='4', ticks='60', objects='128', repeats=3, seconds=20, warmup=20, dry_run=False)
+                      clients='4', ticks='60', objects='128', repeats=3, seconds=20, warmup=20, dry_run=False, diagnostics='auto')
         values.update(overrides)
         return SimpleNamespace(**values)
 
@@ -48,10 +48,21 @@ class RevisionComparisonTests(unittest.TestCase):
         self.assertEqual(ab.run(self.args(repeats=1), execute), 1)
         self.assertEqual(execute.call_count, 2)
 
+    def test_diagnostics_mode_applies_to_both_revisions(self):
+        for mode in ('on', 'off', 'auto'):
+            for command in ab.commands(self.args(diagnostics=mode)):
+                self.assertEqual(command[command.index('--diagnostics') + 1], mode)
+
     def test_invalid_matrix_never_starts_a_player(self):
         execute = Mock()
         with self.assertRaises(ValueError):
             ab.run(self.args(repeats=0), execute)
+        execute.assert_not_called()
+
+    def test_invalid_diagnostics_never_starts_a_player(self):
+        execute = Mock()
+        with self.assertRaises(ValueError):
+            ab.run(self.args(diagnostics='invalid'), execute)
         execute.assert_not_called()
 
 
@@ -184,6 +195,26 @@ class Barriers(unittest.TestCase):
 
 
 class Validation(unittest.TestCase):
+    def test_explicit_diagnostics_modes_must_be_honored_by_every_peer(self):
+        for mode in ('on', 'off'):
+            case, reports = fixture()
+            case['diagnostics'] = mode
+            with self.assertRaisesRegex(ValueError, 'honor'):
+                bench.validate_case(case, reports)
+            for peer in reports.values():
+                peer['detailedDiagnostics'] = mode == 'on'
+            self.assertTrue(bench.validate_case(case, reports))
+            reports['client-1']['detailedDiagnostics'] = mode != 'on'
+            with self.assertRaisesRegex(ValueError, 'Mismatched'):
+                bench.validate_case(case, reports)
+
+    def test_diagnostics_flags_require_real_booleans(self):
+        for value in ('false', 0, 1):
+            case, reports = fixture()
+            reports['client-1']['detailedDiagnostics'] = value
+            with self.assertRaisesRegex(ValueError, 'Mismatched'):
+                bench.validate_case(case, reports)
+
     def test_complete_authoritative_convergence(self):
         self.assertTrue(bench.validate_case(*fixture()))
 
@@ -227,6 +258,24 @@ class Validation(unittest.TestCase):
 
 
 class Reports(unittest.TestCase):
+    def test_diagnostics_modes_and_legacy_reports_are_never_pooled(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for index, mode in enumerate((True, False, None)):
+                parent = root / str(index)
+                parent.mkdir()
+                self.make_run(parent)
+                if mode is not None:
+                    for path in (parent / 'run/case-0001').glob('*.json'):
+                        peer = json.loads(path.read_text())
+                        peer['detailedDiagnostics'] = mode
+                        path.write_text(json.dumps(peer))
+            data = reporter.render(root, root / 'report')
+            self.assertTrue(data['complete'])
+            self.assertEqual(len(data['groups']), 6)
+            self.assertEqual({row['detailedDiagnostics'] for row in data['groups']}, {True, False, None})
+            self.assertTrue(all(row['repeats'] == 1 for row in data['groups']))
+
     def make_run(self, root, failed=False, linux=True):
         case, reports = fixture()
         run = root / 'run'

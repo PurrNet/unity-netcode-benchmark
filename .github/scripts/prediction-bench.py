@@ -114,6 +114,14 @@ def validate_case(case, reports):
         raise ValueError('Missing or unexpected peer reports')
     snapshots = {}
     owners = []
+    modes = [report.get('detailedDiagnostics') for report in reports.values()]
+    if any(mode is not None and type(mode) is not bool for mode in modes) or len(set(modes)) != 1:
+        raise ValueError('Mismatched detailed diagnostics modes')
+    requested = case.get('diagnostics', 'auto')
+    if requested not in ('auto', 'on', 'off'):
+        raise ValueError('Invalid detailed diagnostics mode')
+    if requested in ('on', 'off') and modes[0] is not (requested == 'on'):
+        raise ValueError('Player did not honor the requested detailed diagnostics mode')
     for peer, report in reports.items():
         if not report.get('success') or report.get('schemaVersion') != 1 or report.get('suite') != 'prediction':
             raise ValueError(f'{peer}: failed or unsupported report: {report.get("error")}')
@@ -213,6 +221,8 @@ def run_case(case, binary, directory, timeout, region, memory_snapshots=False):
                     '-job-worker-count', '2']
                 if memory_snapshots and peer in ('server', 'client-1'):
                     commands[peer] += ['-predictionMemorySnapshot', str(directory / (peer + '.snap'))]
+                if case.get('diagnostics', 'auto') != 'auto':
+                    commands[peer] += ['-predictionDiagnostics', str(case['diagnostics'] == 'on').lower()]
                 stream = (directory / (peer + '.stdout.log')).open('wb')
                 streams.append(stream)
                 command = commands[peer]
@@ -271,10 +281,14 @@ def main():
     parser.add_argument('--output', type=Path, default=Path('prediction-results'))
     parser.add_argument('--region', default='eu')
     parser.add_argument('--dry-run', action='store_true')
+    parser.add_argument('--diagnostics', choices=('auto', 'on', 'off'), default='auto',
+                        help='Detailed native pass telemetry: auto enables it only in development players')
     parser.add_argument('--memory-snapshots', action='store_true',
                         help='Capture server/client-1 retained heaps after sampling and final state capture')
     args = parser.parse_args()
     plan = make_plan(args.solutions, args.clients, args.ticks, args.objects, args.repeats, args.seconds, args.warmup)
+    for case in plan:
+        case['diagnostics'] = args.diagnostics
     if not math.isfinite(args.timeout) or args.timeout < args.seconds + args.warmup + 15:
         parser.error('--timeout must leave at least 15 seconds outside sampling and warmup')
     run = args.output.resolve() / (time.strftime('%Y%m%d-%H%M%S') + '-' + uuid.uuid4().hex[:8])

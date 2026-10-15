@@ -18,6 +18,7 @@ namespace PredictionBench
         public bool success, restoresAvailable;
         public bool linuxMetricsAvailable, developmentBuild;
         public bool cpuMetricsAvailable;
+        public bool detailedDiagnostics;
         public string scriptingBackend;
         public string networkCounterScope = "host-wide loopback aggregate; not per-peer bandwidth; excludes Photon Cloud traffic";
         public string error;
@@ -58,11 +59,13 @@ namespace PredictionBench
                 region = Arg("-region", "eu"), clients = int.Parse(Arg("-count", "1")),
                 objects = int.Parse(Arg("-benchObjects", "32")), tickRate = int.Parse(Arg("-tickRate", "60")),
                 port = int.Parse(Arg("-port", "17800")), seconds = float.Parse(Arg("-benchSeconds", "10"), System.Globalization.CultureInfo.InvariantCulture),
-                warmupSeconds = float.Parse(Arg("-warmupSeconds", "3"), System.Globalization.CultureInfo.InvariantCulture)
+                warmupSeconds = float.Parse(Arg("-warmupSeconds", "3"), System.Globalization.CultureInfo.InvariantCulture),
+                detailedDiagnostics = bool.Parse(Arg("-predictionDiagnostics", Debug.isDebugBuild ? "true" : "false"))
             };
             _report = new PredictionReport { solution = adapter.Solution, predictionScope = adapter.PredictionScope,
                 replayDefinition = adapter.ReplayDefinition, restoresAvailable = adapter.RestoresAvailable,
-                unityVersion = Application.unityVersion, peer = _config.peer, role = _config.role, config = _config };
+                unityVersion = Application.unityVersion, peer = _config.peer, role = _config.role, config = _config,
+                detailedDiagnostics = _config.detailedDiagnostics };
             _report.provenanceJson = Resources.Load<TextAsset>("PredictionProvenance").text;
             _report.linuxMetricsAvailable = File.Exists("/proc/self/stat");
             _report.developmentBuild = Debug.isDebugBuild;

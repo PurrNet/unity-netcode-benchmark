@@ -9,6 +9,7 @@ namespace PredictionBench
         public string role, peer, coordinator, serverHost, session, region;
         public int clients, objects, tickRate, port;
         public float seconds, warmupSeconds;
+        public bool detailedDiagnostics;
     }
 
     [Serializable]

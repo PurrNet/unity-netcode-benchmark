@@ -14,6 +14,8 @@ SPEC.loader.exec_module(BENCH)
 
 
 def commands(args):
+    if args.diagnostics not in ('auto', 'on', 'off'):
+        raise ValueError('Invalid detailed diagnostics mode')
     BENCH.make_plan('purrdiction', args.clients, args.ticks, args.objects,
                     args.repeats, args.seconds, args.warmup)
     builds = {'baseline': args.baseline, 'candidate': args.candidate}
@@ -25,7 +27,8 @@ def commands(args):
                 '--players', str(builds[variant]), '--output', str(args.output / variant),
                 '--clients', args.clients, '--ticks', args.ticks, '--objects', args.objects,
                 '--repeats', '1', '--seconds', str(args.seconds), '--warmup', str(args.warmup),
-                '--timeout', str(max(240, args.seconds + args.warmup + 120))])
+                '--timeout', str(max(240, args.seconds + args.warmup + 120)),
+                '--diagnostics', args.diagnostics])
     return planned
 
 
@@ -53,4 +56,5 @@ if __name__ == '__main__':
     parser.add_argument('--seconds', type=float, default=20)
     parser.add_argument('--warmup', type=float, default=20)
     parser.add_argument('--dry-run', action='store_true')
+    parser.add_argument('--diagnostics', choices=('auto', 'on', 'off'), default='auto')
     sys.exit(run(parser.parse_args()))

@@ -59,8 +59,12 @@ namespace PredictionBench
         public override PawnSnapshot[] Snapshot() => FindObjectsByType<PurrDictionPredictionPawn>(FindObjectsSortMode.None)
             .Where(p => p.predictionManager && p.gameObject.activeInHierarchy)
             .Select(p => new PawnSnapshot { index = p.Index, owned = p.IsOwner(), state = p.currentState.value }).ToArray();
-        public override void BeginDiagnostics() => PredictionPerformanceTelemetry.Begin(world);
-        public override string EndDiagnostics() => JsonUtility.ToJson(PredictionPerformanceTelemetry.End());
+        public override void BeginDiagnostics()
+        {
+            if (Config.detailedDiagnostics) PredictionPerformanceTelemetry.Begin(world);
+        }
+        public override string EndDiagnostics() => Config.detailedDiagnostics
+            ? JsonUtility.ToJson(PredictionPerformanceTelemetry.End()) : "{}";
         public override string MemoryDiagnostics() => JsonUtility.ToJson(PurrDictionMemoryDiagnostics.Capture(world));
     }
 }

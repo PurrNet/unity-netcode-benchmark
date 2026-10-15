@@ -36,6 +36,8 @@ namespace PurrNet.NetBench
         /// <summary>Process-lifetime RSS high-water mark, not a per-window peak.</summary>
         public long peakRssBytes;
         public double wallSeconds;
+        /// <summary>Counter initialization excluded from the sampled CPU/wall window.</summary>
+        public double setupWallSeconds;
         public IfaceCounters ifaceDelta;
     }
 
@@ -48,6 +50,7 @@ namespace PurrNet.NetBench
     {
         private double _startCpuSeconds;
         private double _startWallSeconds;
+        private double _setupWallSeconds;
         private int _startGcCollections;
         private ProfilerRecorder _gcAlloc;
         private long _gcAllocBytes;
@@ -60,10 +63,8 @@ namespace PurrNet.NetBench
 
         public void Begin(string iface)
         {
+            double setupStarted = NowSeconds();
             _iface = iface;
-            _startCpuSeconds = ReadProcessCpuSeconds();
-            _startWallSeconds = NowSeconds();
-            _startGcCollections = GC.CollectionCount(0);
             // Bytes handed out by the managed allocator per frame; collection counts only say when the
             // collector ran, this says how much garbage was made, however the collections happen to fall.
             _gcAllocBytes = 0;
@@ -71,11 +72,16 @@ namespace PurrNet.NetBench
             // The counter above only reports in development players; release builds fall back to the
             // managed heap's growth between frames, with the running average standing in for frames
             // where a collection shrank it. Heap growth covers every thread.
-            _lastHeap = GC.GetTotalMemory(false);
             _heapGrowth = 0;
             _growthFrames = 0;
             _startIface = ReadIface(iface);
             _frameMs.Clear();
+            // Recorder and counter initialization are outside the sampled workload.
+            _lastHeap = GC.GetTotalMemory(false);
+            _startGcCollections = GC.CollectionCount(0);
+            _startCpuSeconds = ReadProcessCpuSeconds();
+            _startWallSeconds = NowSeconds();
+            _setupWallSeconds = _startWallSeconds - setupStarted;
         }
 
         public void SampleFrame()
@@ -116,6 +122,7 @@ namespace PurrNet.NetBench
                 gcAllocEstimated = _gcAllocBytes <= 0,
                 managedHeapBytes = GC.GetTotalMemory(false),
                 wallSeconds = wall,
+                setupWallSeconds = _setupWallSeconds,
                 ifaceDelta = new IfaceCounters
                 {
                     valid = _startIface.valid && endIface.valid,
