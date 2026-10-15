@@ -25,9 +25,15 @@ Runtime sampling and diagnostics inputs still apply. Within each workload, repea
 adapter order to distribute early and late positions. Use a repeat count divisible by the
 number of adapters for balanced positions.
 
-Hosted builds may run while another revision is being measured. Measurement jobs share
-the replication scaling runner lock and queue in order, so multiple requested comparisons
-can wait without replacing one another.
+When only PurrDiction changes, keep `reuse_run` for the frozen comparison players and set
+`purrdiction_run` to the run containing the new PurrDiction players. Both PurrDiction policies
+use the override; FishNet and Fusion keep their original binaries. The override must contain
+every selected PurrDiction policy. Missing players fail before measurement, and raw results
+retain each selected binary's source provenance and runtime hash.
+
+Hosted builds may run while another revision is being measured. Standard hosted loopback
+comparisons and revision A/B jobs use independent VMs. Fusion comparisons and custom runners
+share the replication scaling runner lock and queue without replacing one another.
 
 ## Workload and adapters
 
