@@ -197,9 +197,9 @@ jobs:
           retention-days: 14
 
   benchmark:
-    # Hosted builds can overlap; only measurements share the replication runner lock.
+    # Hosted loopback jobs have separate VMs; keep Fusion and custom runners serialized.
     concurrency:
-      group: netcode-scaling-bench
+      group: ${{ inputs.runner == 'ubuntu-latest' && !contains(inputs.solutions, 'fusion') && format('prediction-hosted-{0}', github.run_id) || 'netcode-scaling-bench' }}
       cancel-in-progress: false
       queue: max
     needs: [plan, build]
