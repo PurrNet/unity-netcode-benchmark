@@ -322,6 +322,12 @@ jobs:
         run: |
           chmod +x "profile-players/$SOLUTION/PredictionBench"
           sudo python3 .github/scripts/prediction-profile.py --solution "$SOLUTION" --player-run "$PLAYER_RUN" --players profile-players --perf "$NATIVE_PERF" --clients "$CLIENTS" --ticks "$TICKS" --objects "$OBJECTS" --seconds "$SECONDS" --warmup "$WARMUP" --region "$REGION"
+      - name: Make diagnostic output readable by the runner
+        if: always()
+        run: |
+          if test -d prediction-native-profile; then
+            sudo chown -R "$(id -u):$(id -g)" prediction-native-profile
+          fi
       - uses: actions/upload-artifact@v7
         if: always()
         with:
