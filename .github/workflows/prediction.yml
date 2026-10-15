@@ -67,7 +67,7 @@ on:
       profiling:
         description: "Development build for allocation counters; record this when comparing runs"
         type: boolean
-        default: true
+        default: false
       diagnostics:
         description: "Detailed pass telemetry: auto enables it in development players only"
         type: choice

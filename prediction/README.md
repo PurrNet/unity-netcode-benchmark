@@ -11,6 +11,10 @@ The first suite answers how much input/state prediction costs, how that changes 
 population and client count, and how much native replay work is performed. It is a diagnostic
 baseline. It does not yet establish an overall winner or cover all prediction architectures.
 
+New workflow builds default to release IL2CPP players (`profiling=false`). Enable
+`profiling=true` when development-build allocation counters are needed; compare players with
+matching build settings and check the effective modes recorded in their peer results.
+
 For revision comparisons, dispatch **Prediction Benchmark** with `baseline_run` and
 `candidate_run` set to two successful prediction run IDs. This optional mode downloads
 their existing PurrDiction players and alternates baseline/candidate order on one runner.
