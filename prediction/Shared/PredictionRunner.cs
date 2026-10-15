@@ -178,7 +178,8 @@ namespace PredictionBench
                     GC.Collect();
                     Unity.Profiling.Memory.MemoryProfiler.TakeSnapshot(_report.memorySnapshotPath,
                         (_, success) => { _report.memorySnapshotSucceeded = success; completed = true; },
-                        Unity.Profiling.Memory.CaptureFlags.ManagedObjects | Unity.Profiling.Memory.CaptureFlags.NativeObjects);
+                        Unity.Profiling.Memory.CaptureFlags.ManagedObjects | Unity.Profiling.Memory.CaptureFlags.NativeObjects |
+                        Unity.Profiling.Memory.CaptureFlags.NativeAllocations);
                     double snapshotDeadline = Time.realtimeSinceStartupAsDouble + 30;
                     while (!completed && Time.realtimeSinceStartupAsDouble < snapshotDeadline) yield return null;
                     if (!completed || !_report.memorySnapshotSucceeded)
