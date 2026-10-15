@@ -81,6 +81,59 @@ class RevisionComparisonTests(unittest.TestCase):
 
 
 class ArtifactLayoutTests(unittest.TestCase):
+    def test_purrdiction_overrides_keep_other_frozen_players_and_provenance(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, override = root / 'original', root / 'candidate'
+            names = ('purrdiction', 'purrdiction-owned', 'fishnet', 'fusion')
+            for name in names:
+                player = source / ('prediction-player-' + name)
+                player.mkdir(parents=True)
+                (player / 'PredictionBench').write_text('old-' + name)
+                (player / 'stale-only.txt').write_text('old')
+            for name in names[:2]:
+                player = override / ('prediction-player-' + name)
+                player.mkdir(parents=True)
+                (player / 'PredictionBench').write_text('new-' + name)
+                (player / 'prediction-provenance.json').write_text('candidate-' + name)
+            arranger.arrange(source, root / 'players', ','.join(names), override)
+            for name in names:
+                player = root / 'players' / name
+                self.assertEqual((player / 'PredictionBench').read_text(),
+                                 ('new-' if name in names[:2] else 'old-') + name)
+                self.assertEqual((player / 'stale-only.txt').exists(), name not in names[:2])
+                if name in names[:2]:
+                    self.assertEqual((player / 'prediction-provenance.json').read_text(), 'candidate-' + name)
+
+    def test_flat_sources_are_unambiguous_with_one_adapter_each(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, override = root / 'original', root / 'candidate'
+            source.mkdir(); override.mkdir()
+            (source / 'PredictionBench').write_text('fishnet')
+            (override / 'PredictionBench').write_text('purrdiction')
+            arranger.arrange(source, root / 'players', 'purrdiction,fishnet', override)
+            for name in ('purrdiction', 'fishnet'):
+                self.assertEqual((root / 'players' / name / 'PredictionBench').read_text(), name)
+
+    def test_missing_override_never_falls_back_to_original_purrdiction(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, override = root / 'original', root / 'candidate'
+            player = source / 'prediction-player-purrdiction'
+            player.mkdir(parents=True)
+            (player / 'PredictionBench').write_text('old')
+            with self.assertRaises(FileNotFoundError):
+                arranger.arrange(source, root / 'players', 'purrdiction', override)
+            self.assertFalse((root / 'players').exists())
+
+    def test_unused_override_fails_before_copying(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with self.assertRaises(ValueError):
+                arranger.arrange(root / 'original', root / 'players', 'fishnet', root / 'candidate')
+            self.assertFalse((root / 'players').exists())
+
     def test_single_artifact_flat_layout(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

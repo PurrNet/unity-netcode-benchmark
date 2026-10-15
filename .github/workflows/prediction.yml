@@ -7,6 +7,10 @@ on:
         description: "Optional existing player run ID; reuse its frozen sources and build settings"
         default: ""
         required: false
+      purrdiction_run:
+        description: "Optional PurrDiction player override run; reuse_run supplies the other adapters"
+        default: ""
+        required: false
       baseline_run:
         description: "Optional existing PurrDiction run ID for revision A/B mode"
         default: ""
@@ -98,10 +102,16 @@ jobs:
           REPEATS: ${{ inputs.repeats }}
           WARMUP: ${{ inputs.warmup_seconds }}
           DIAGNOSTICS: ${{ inputs.diagnostics }}
+          REUSE_RUN: ${{ inputs.reuse_run }}
+          PURRDICTION_RUN: ${{ inputs.purrdiction_run }}
         run: |
           python3 .github/scripts/prediction-bench.py --dry-run --solutions "$SOLUTIONS" --clients "$CLIENTS" --ticks "$TICKS" --objects "$OBJECTS" --seconds "$SECONDS" --repeats "$REPEATS" --warmup "$WARMUP" --diagnostics "$DIAGNOSTICS"
           python3 - <<'PY'
           import json, os
+          override = os.environ['PURRDICTION_RUN'].strip()
+          if override and (not override.isdecimal() or not os.environ['REUSE_RUN'].strip().isdecimal() or
+                           not any(s.strip().startswith('purrdiction') for s in os.environ['SOLUTIONS'].split(','))):
+              raise SystemExit('purrdiction_run requires numeric run IDs, reuse_run and a selected PurrDiction adapter')
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               output.write('solutions=' + json.dumps([s.strip() for s in os.environ['SOLUTIONS'].split(',')]) + '\n')
           PY
@@ -204,10 +214,22 @@ jobs:
           path: downloaded-players
           run-id: ${{ inputs.reuse_run || github.run_id }}
           github-token: ${{ github.token }}
+      - name: Download frozen PurrDiction overrides
+        if: inputs.purrdiction_run != ''
+        uses: actions/download-artifact@v8
+        with:
+          pattern: prediction-player-purrdiction*
+          path: overridden-players
+          run-id: ${{ inputs.purrdiction_run }}
+          github-token: ${{ github.token }}
       - name: Arrange independent players
         env:
           SOLUTIONS: ${{ inputs.solutions }}
-        run: python3 .github/scripts/prediction-arrange.py --solutions "$SOLUTIONS"
+          PURRDICTION_RUN: ${{ inputs.purrdiction_run }}
+        run: |
+          override=()
+          if [[ -n "$PURRDICTION_RUN" ]]; then override=(--purrdiction-source overridden-players); fi
+          python3 .github/scripts/prediction-arrange.py --solutions "$SOLUTIONS" "${override[@]}"
       - name: Run sequential prediction cases
         env:
           SOLUTIONS: ${{ inputs.solutions }}
