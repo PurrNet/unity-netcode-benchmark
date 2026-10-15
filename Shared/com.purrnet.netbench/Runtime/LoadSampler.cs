@@ -38,6 +38,9 @@ namespace PurrNet.NetBench
         public double wallSeconds;
         /// <summary>Counter initialization excluded from the sampled CPU/wall window.</summary>
         public double setupWallSeconds;
+        public double unityWallSeconds;
+        public double stopwatchWallSeconds;
+        public string wallClock;
         public IfaceCounters ifaceDelta;
     }
 
@@ -51,6 +54,9 @@ namespace PurrNet.NetBench
         private double _startCpuSeconds;
         private double _startWallSeconds;
         private double _setupWallSeconds;
+        private double _startUnitySeconds;
+        private double _startStopwatchSeconds;
+        private double _lastFrameSeconds;
         private int _startGcCollections;
         private ProfilerRecorder _gcAlloc;
         private long _gcAllocBytes;
@@ -81,12 +87,18 @@ namespace PurrNet.NetBench
             _startGcCollections = GC.CollectionCount(0);
             _startCpuSeconds = ReadProcessCpuSeconds();
             _startWallSeconds = NowSeconds();
+            _startUnitySeconds = Time.realtimeSinceStartupAsDouble;
+            _startStopwatchSeconds = StopwatchSeconds();
+            _lastFrameSeconds = -1;
             _setupWallSeconds = _startWallSeconds - setupStarted;
         }
 
         public void SampleFrame()
         {
-            _frameMs.Add(Time.unscaledDeltaTime * 1000f);
+            double now = NowSeconds();
+            if (_lastFrameSeconds >= 0)
+                _frameMs.Add((float)((now - _lastFrameSeconds) * 1000));
+            _lastFrameSeconds = now;
             if (_gcAlloc.Valid)
                 _gcAllocBytes += _gcAlloc.LastValue;
 
@@ -109,6 +121,8 @@ namespace PurrNet.NetBench
             double endCpu = ReadProcessCpuSeconds();
             double cpu = endCpu - _startCpuSeconds;
             double wall = NowSeconds() - _startWallSeconds;
+            double unityWall = Time.realtimeSinceStartupAsDouble - _startUnitySeconds;
+            double stopwatchWall = StopwatchSeconds() - _startStopwatchSeconds;
             var endIface = ReadIface(_iface);
             _gcAlloc.Dispose();
 
@@ -123,6 +137,9 @@ namespace PurrNet.NetBench
                 managedHeapBytes = GC.GetTotalMemory(false),
                 wallSeconds = wall,
                 setupWallSeconds = _setupWallSeconds,
+                unityWallSeconds = unityWall,
+                stopwatchWallSeconds = stopwatchWall,
+                wallClock = ClockName,
                 ifaceDelta = new IfaceCounters
                 {
                     valid = _startIface.valid && endIface.valid,
@@ -185,8 +202,41 @@ namespace PurrNet.NetBench
             return sorted[lo] + (sorted[hi] - sorted[lo]) * (rank - lo);
         }
 
-        private static double NowSeconds() => System.Diagnostics.Stopwatch.GetTimestamp() /
+        private static double NowSeconds() => MonotonicSeconds();
+
+        // Share one clock with the workload deadline and frame samples. Unity's
+        // elapsed time remains a diagnostic, rather than a second measurement clock.
+        public static double MonotonicSeconds()
+        {
+#if !UNITY_STANDALONE_WIN && !UNITY_EDITOR_WIN
+            if (!s_wallClockBroken)
+            {
+                try
+                {
+                    if (clock_gettime(1, out var ts) == 0)
+                        return ts.tv_sec + ts.tv_nsec / 1e9;
+                }
+                catch (Exception) { }
+                s_wallClockBroken = true;
+            }
+#endif
+            return StopwatchSeconds();
+        }
+
+        private static double StopwatchSeconds() => System.Diagnostics.Stopwatch.GetTimestamp() /
             (double)System.Diagnostics.Stopwatch.Frequency;
+
+        private static string ClockName
+        {
+            get
+            {
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+                return "Stopwatch";
+#else
+                return s_wallClockBroken ? "Stopwatch" : "CLOCK_MONOTONIC";
+#endif
+            }
+        }
 
         [StructLayout(LayoutKind.Sequential)]
         private struct Timespec
@@ -201,6 +251,7 @@ namespace PurrNet.NetBench
         private static extern int clock_gettime(int clockId, out Timespec ts);
 
         private static bool s_cpuClockBroken;
+        private static bool s_wallClockBroken;
 
 #if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
         [DllImport("kernel32.dll")]

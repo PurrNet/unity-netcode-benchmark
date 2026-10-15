@@ -118,7 +118,8 @@ namespace PredictionBench
             Application.targetFrameRate = 60;
             QualitySettings.vSyncCount = 0;
             PredictionWorkload.Running = true;
-            yield return new WaitForSecondsRealtime(_config.warmupSeconds);
+            double warmupEnd = LoadSampler.MonotonicSeconds() + _config.warmupSeconds;
+            while (LoadSampler.MonotonicSeconds() < warmupEnd) yield return null;
             GC.Collect();
             Application.targetFrameRate = 60;
             _report.actualFrameCap = Application.targetFrameRate;
@@ -128,9 +129,9 @@ namespace PredictionBench
             adapter.BeginDiagnostics();
             PredictionWorkload.Begin();
             _sampler.Begin(Arg("-iface", "lo"));
-            double end = Time.realtimeSinceStartupAsDouble + _config.seconds;
+            double end = LoadSampler.MonotonicSeconds() + _config.seconds;
             yield return null; // Exclude the frame that established the measurement window.
-            while (Time.realtimeSinceStartupAsDouble < end && _error == null)
+            while (LoadSampler.MonotonicSeconds() < end && _error == null)
             {
                 if (!adapter.Connected || Application.targetFrameRate != 60)
                 { _error = "Connection or frame-cap changed during measurement"; break; }

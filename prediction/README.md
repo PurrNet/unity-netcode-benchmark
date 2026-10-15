@@ -176,6 +176,11 @@ off for cross-adapter CPU/memory comparisons, and on for investigating PurrDicti
 Counter initialization is outside the CPU/wall measurement window. Raw `load.setupWallSeconds`
 records that setup duration separately. Builds made before this change include setup in
 their sampled clocks, so compare revisions built with the same harness version.
+Warmup, the sample deadline, CPU denominator, and sampled frame intervals use one monotonic
+clock (`CLOCK_MONOTONIC` on Linux, Stopwatch on Windows). Raw `load.wallClock` identifies it;
+`load.unityWallSeconds` and `load.stopwatchWallSeconds` separately record those elapsed times
+to expose clock disagreement.
+The first partial frame interval is excluded from frame distributions.
 
 Primary references: [PurrDiction](https://purrnet.gitbook.io/docs/client-side-prediction),
 [FishNet prediction](https://fish-networking.gitbook.io/docs/guides/features/prediction),
