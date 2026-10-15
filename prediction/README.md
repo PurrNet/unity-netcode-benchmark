@@ -197,8 +197,11 @@ The first partial frame interval is excluded from frame distributions.
 
 For native CPU investigation, dispatch the same workflow with `profile_run` set to an existing
 player-build run, one `solutions` adapter, one client/tick/object count, `seconds=50`, and
-`warmup_seconds=20`. It samples the server and first client's main threads after warmup,
-checks matching ELF symbol build IDs, and uploads `prediction-native-profile` with raw stacks,
+`warmup_seconds=20`. It samples the server and first client's main threads after warmup.
+Set `profile_all_threads=true` to sample every thread in each process instead. The capture
+also reports per-thread CPU time over the sampling interval, identifies newly observed and
+exited threads, and excludes exited threads from CPU deltas when their final counters are
+unavailable. It checks matching ELF symbol build IDs and uploads `prediction-native-profile` with raw stacks,
 workload validation, and a summary of Unity frame-wait samples. Missing frame-wait symbols
 produce an unavailable percentage. These sampled runs carry a diagnostic marker and have
 their own artifact; they do not produce a comparative performance report.
