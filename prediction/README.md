@@ -63,6 +63,12 @@ explicitly enabled in the generated prefab. These scopes are reported alongside 
 solution doing less speculative world work cannot be described as performing the same service
 just because its CPU number is smaller.
 
+Input distribution also follows each native API. Fusion collects one 12-byte command per
+player per tick in `OnInput`; all of that player's input-authority pawns consume that stream.
+PurrDiction and FishNet collect a command separately for each owned pawn. Pawns use the same
+command generator, but input record counts are not normalized across adapters. This workload
+does not compare independently controlled objects or establish equal input-processing work.
+
 Include `purrdiction-owned` in the `solutions` input to measure that existing policy separately.
 It has its own player artifact, solution name, policy provenance and report rows, so its results
 cannot be pooled with `purrdiction`. The default matrix keeps the full-world case. The owned

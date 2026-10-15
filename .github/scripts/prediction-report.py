@@ -84,6 +84,7 @@ def render(source, output):
         'Cases run sequentially. Server and clients share one machine; this is a diagnostic baseline, not a ranking. Fusion uses Photon Cloud; PurrDiction/FishNet use loopback. No artificial latency or loss is applied.', '',
         'Client figures average peers within a run, then take the median across repeats. CPU is whole-process, all threads, as a percentage of one core. Frame time includes the 60 fps cap. RSS is the process-lifetime high-water mark. Estimated GC allocation is marked with `~`.', '',
         '**Native replay counts have different definitions and prediction scopes.** They explain work within an adapter; they are not interchangeable amounts of service.', '',
+        'Input distribution is native: Fusion collects one 12-byte command per player per tick, shared by that player\'s pawns; PurrDiction/FishNet collect commands per owned pawn. Input record counts are not normalized. This workload does not compare independently controlled objects.', '',
         'Detailed telemetry is optional: development players enable it by default; release players disable it. On, off and unrecorded legacy modes are never pooled.', '',
         f'Validated cases: {len(raw)} / {len(raw) + len(failures)}.', '',
         '| Solution | Clients | Hz | Objects | Role | Details | Repeats | CPU % | Frame p95 ms | Heap MiB | Peak RSS MiB | GC bytes/s | Calls/s | Native replay calls/s |',
