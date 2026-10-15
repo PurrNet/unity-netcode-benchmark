@@ -28,6 +28,10 @@ on:
         description: "Optional existing player run ID for native sampling; select one adapter and one workload"
         default: ""
         required: false
+      profile_all_threads:
+        description: "Sample every selected player's threads in native profile mode"
+        type: boolean
+        default: false
       solutions:
         description: "Prediction adapters: purrdiction,purrdiction-owned,fishnet,fusion (owned is optional)"
         default: "purrdiction,fishnet,fusion"
@@ -331,7 +335,11 @@ jobs:
           OBJECTS: ${{ inputs.object_counts }}
           SECONDS: ${{ inputs.seconds }}
           WARMUP: ${{ inputs.warmup_seconds }}
-        run: python3 .github/scripts/prediction-profile.py --dry-run --solution "$SOLUTION" --player-run "$PLAYER_RUN" --players profile-players --clients "$CLIENTS" --ticks "$TICKS" --objects "$OBJECTS" --seconds "$SECONDS" --warmup "$WARMUP"
+          ALL_THREADS: ${{ inputs.profile_all_threads }}
+        run: |
+          scope=()
+          if [[ "$ALL_THREADS" == 'true' ]]; then scope=(--all-threads); fi
+          python3 .github/scripts/prediction-profile.py --dry-run --solution "$SOLUTION" --player-run "$PLAYER_RUN" --players profile-players --clients "$CLIENTS" --ticks "$TICKS" --objects "$OBJECTS" --seconds "$SECONDS" --warmup "$WARMUP" "${scope[@]}"
       - uses: actions/download-artifact@v8
         with:
           name: prediction-player-${{ inputs.solutions }}
@@ -346,7 +354,7 @@ jobs:
           test -x "$profiler"
           "$profiler" --version
           echo "NATIVE_PERF=$profiler" >> "$GITHUB_ENV"
-      - name: Capture main-thread stacks
+      - name: Capture native stacks
         env:
           SOLUTION: ${{ inputs.solutions }}
           PLAYER_RUN: ${{ inputs.profile_run }}
@@ -356,9 +364,12 @@ jobs:
           SECONDS: ${{ inputs.seconds }}
           WARMUP: ${{ inputs.warmup_seconds }}
           REGION: ${{ inputs.region }}
+          ALL_THREADS: ${{ inputs.profile_all_threads }}
         run: |
           chmod +x "profile-players/$SOLUTION/PredictionBench"
-          sudo python3 .github/scripts/prediction-profile.py --solution "$SOLUTION" --player-run "$PLAYER_RUN" --players profile-players --perf "$NATIVE_PERF" --clients "$CLIENTS" --ticks "$TICKS" --objects "$OBJECTS" --seconds "$SECONDS" --warmup "$WARMUP" --region "$REGION"
+          scope=()
+          if [[ "$ALL_THREADS" == 'true' ]]; then scope=(--all-threads); fi
+          sudo python3 .github/scripts/prediction-profile.py --solution "$SOLUTION" --player-run "$PLAYER_RUN" --players profile-players --perf "$NATIVE_PERF" --clients "$CLIENTS" --ticks "$TICKS" --objects "$OBJECTS" --seconds "$SECONDS" --warmup "$WARMUP" --region "$REGION" "${scope[@]}"
       - name: Make diagnostic output readable by the runner
         if: always()
         run: |

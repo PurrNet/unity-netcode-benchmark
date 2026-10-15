@@ -15,6 +15,44 @@ import threading
 import time
 
 
+def recording_command(perf, pid, destination, duration, all_threads=False):
+    return [str(perf), 'record', '-B', '-e', 'cpu-clock', '-F', '999',
+            '--call-graph', 'dwarf,16384', '-p' if all_threads else '-t', str(pid),
+            '-o', str(destination), '--', 'sleep', str(duration)]
+
+
+def thread_cpu(pid, proc=Path('/proc')):
+    result = {}
+    for task in (proc / str(pid) / 'task').iterdir():
+        if not task.name.isdigit():
+            continue
+        try:
+            stat = (task / 'stat').read_text()
+        except (FileNotFoundError, ProcessLookupError):
+            continue  # A worker can exit between directory enumeration and reading.
+        close = stat.rindex(')')
+        fields = stat[close + 2:].split()
+        result[task.name] = dict(name=stat[stat.index('(') + 1:close],
+                                 ticks=int(fields[11]) + int(fields[12]), startTicks=int(fields[19]))
+    return result
+
+
+def thread_cpu_delta(before, after, ticks_per_second):
+    rows = []
+    for tid, current in after.items():
+        previous = before.get(tid)
+        if previous and previous['startTicks'] != current['startTicks']:
+            previous = None
+        ticks = current['ticks'] - (previous['ticks'] if previous else 0)
+        if ticks < 0:
+            continue
+        rows.append(dict(tid=int(tid), name=current['name'], cpuSeconds=ticks / ticks_per_second,
+                         presentAtStart=previous is not None))
+    return dict(threads=sorted(rows, key=lambda row: row['cpuSeconds'], reverse=True),
+                exitedThreadIds=sorted(int(tid) for tid in before.keys() - after.keys()),
+                note='Per-thread CPU counters; exited threads have no final counter and are not summed.')
+
+
 def summarize(path):
     total = waiting = managed = unresolved = 0
     leaves, inclusive = Counter(), Counter()
@@ -80,6 +118,7 @@ def main():
     parser.add_argument('--region', default='eu')
     parser.add_argument('--player-run', required=True)
     parser.add_argument('--dry-run', action='store_true')
+    parser.add_argument('--all-threads', action='store_true', help='Sample all threads of each selected process')
     args = parser.parse_args()
     spec = importlib.util.spec_from_file_location('prediction_bench', Path(__file__).with_name('prediction-bench.py'))
     bench = importlib.util.module_from_spec(spec)
@@ -92,7 +131,9 @@ def main():
                     clients=args.clients, tickRate=args.ticks, objects=args.objects,
                     warmupSeconds=args.warmup, measurementSeconds=args.seconds,
                     captureSeconds=duration, captureOffsetAfterReadySeconds=args.warmup + 2,
-                    peers=['server', 'client-1'], scope='999 Hz cpu-clock samples of each selected main thread')
+                    peers=['server', 'client-1'], allThreads=args.all_threads,
+                    scope='999 Hz cpu-clock samples of ' +
+                          ('all threads in each selected process' if args.all_threads else 'each selected main thread'))
     if args.dry_run:
         print(json.dumps(settings, indent=2))
         return
@@ -137,11 +178,11 @@ def main():
                             continue
                     if len(candidates) != 1:
                         raise RuntimeError(f'Expected one owned player PID for {peer}, got {candidates}')
-                    captures[peer] = dict(pid=candidates[0], startedMonotonic=time.monotonic())
+                    captures[peer] = dict(pid=candidates[0], startedMonotonic=time.monotonic(),
+                                          threadCpuBefore=thread_cpu(candidates[0]))
                     log = streams.enter_context((output / f'{peer}.perf.log').open('w'))
-                    process = original_launch([str(args.perf), 'record', '-B', '-e', 'cpu-clock', '-F', '999',
-                        '--call-graph', 'dwarf,16384', '-t', str(candidates[0]),
-                        '-o', str(output / f'{peer}.perf.data'), '--', 'sleep', str(duration)],
+                    process = original_launch(recording_command(args.perf, candidates[0],
+                        output / f'{peer}.perf.data', duration, args.all_threads),
                         stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
                     processes.append(process)
                 deadline = time.monotonic() + duration + 20
@@ -149,6 +190,10 @@ def main():
                     stop.wait(.1)
                 if any(process.poll() != 0 for process in processes):
                     raise RuntimeError('Native sampling failed, ended early or exceeded its deadline')
+                for capture in captures.values():
+                    capture['threadCpu'] = thread_cpu_delta(capture.pop('threadCpuBefore'),
+                        thread_cpu(capture['pid']), os.sysconf('SC_CLK_TCK'))
+                    capture['counterIntervalSeconds'] = time.monotonic() - capture['startedMonotonic']
         except Exception as error:
             errors.append(str(error))
         finally:
@@ -199,6 +244,7 @@ def main():
             subprocess.run([str(args.perf), 'script', '--no-inline', '-f', '-i', str(output / f'{peer}.perf.data')],
                            stdout=stream, check=True, env=dict(os.environ, DEBUGINFOD_URLS=''))
         summary['peers'][peer] = summarize(stacks)
+        summary['peers'][peer]['threadCpu'] = captures[peer]['threadCpu']
         if not wait_symbols:
             summary['peers'][peer]['frameWaitPercent'] = None
     (output / 'summary.json').write_text(json.dumps(summary, indent=2))
