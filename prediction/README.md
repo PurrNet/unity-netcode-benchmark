@@ -182,6 +182,14 @@ clock (`CLOCK_MONOTONIC` on Linux, Stopwatch on Windows). Raw `load.wallClock` i
 to expose clock disagreement.
 The first partial frame interval is excluded from frame distributions.
 
+For native CPU investigation, dispatch the same workflow with `profile_run` set to an existing
+player-build run, one `solutions` adapter, one client/tick/object count, `seconds=50`, and
+`warmup_seconds=20`. It samples the server and first client's main threads after warmup,
+checks matching ELF symbol build IDs, and uploads `prediction-native-profile` with raw stacks,
+workload validation, and a summary of Unity frame-wait samples. Missing frame-wait symbols
+produce an unavailable percentage. These sampled runs carry a diagnostic marker and have
+their own artifact; they do not produce a comparative performance report.
+
 Primary references: [PurrDiction](https://purrnet.gitbook.io/docs/client-side-prediction),
 [FishNet prediction](https://fish-networking.gitbook.io/docs/guides/features/prediction),
 [Fusion client-server input](https://doc.photonengine.com/fusion/v2/manual/input/player-input),

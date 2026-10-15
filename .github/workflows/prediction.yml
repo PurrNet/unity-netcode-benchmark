@@ -11,6 +11,10 @@ on:
         description: "Existing candidate run ID when baseline_run selects revision A/B mode"
         default: ""
         required: false
+      profile_run:
+        description: "Optional existing player run ID for native sampling; select one adapter and one workload"
+        default: ""
+        required: false
       solutions:
         description: "Prediction adapters: purrdiction,purrdiction-owned,fishnet,fusion (owned is optional)"
         default: "purrdiction,fishnet,fusion"
@@ -67,7 +71,7 @@ permissions:
 
 jobs:
   plan:
-    if: inputs.baseline_run == ''
+    if: inputs.baseline_run == '' && inputs.profile_run == ''
     runs-on: ubuntu-latest
     outputs:
       solutions: ${{ steps.plan.outputs.solutions }}
@@ -224,7 +228,7 @@ jobs:
       group: netcode-scaling-bench
       cancel-in-progress: false
       queue: max
-    if: inputs.baseline_run != ''
+    if: inputs.baseline_run != '' && inputs.profile_run == ''
     runs-on: ${{ inputs.runner }}
     timeout-minutes: 120
     steps:
@@ -270,3 +274,58 @@ jobs:
             prediction-ab-report/
           if-no-files-found: error
           retention-days: 30
+
+  native_profile:
+    if: inputs.profile_run != ''
+    concurrency:
+      group: netcode-scaling-bench
+      cancel-in-progress: false
+      queue: max
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate one diagnostic workload
+        env:
+          SOLUTION: ${{ inputs.solutions }}
+          PLAYER_RUN: ${{ inputs.profile_run }}
+          CLIENTS: ${{ inputs.client_counts }}
+          TICKS: ${{ inputs.tick_rates }}
+          OBJECTS: ${{ inputs.object_counts }}
+          SECONDS: ${{ inputs.seconds }}
+          WARMUP: ${{ inputs.warmup_seconds }}
+        run: python3 .github/scripts/prediction-profile.py --dry-run --solution "$SOLUTION" --player-run "$PLAYER_RUN" --players profile-players --clients "$CLIENTS" --ticks "$TICKS" --objects "$OBJECTS" --seconds "$SECONDS" --warmup "$WARMUP"
+      - uses: actions/download-artifact@v8
+        with:
+          name: prediction-player-${{ inputs.solutions }}
+          run-id: ${{ inputs.profile_run }}
+          github-token: ${{ github.token }}
+          path: profile-players/${{ inputs.solutions }}
+      - name: Install native sampler
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq linux-tools-generic
+          profiler=$(find /usr/lib/linux-tools* -type f -name perf | sort -V | tail -n 1)
+          test -x "$profiler"
+          "$profiler" --version
+          echo "NATIVE_PERF=$profiler" >> "$GITHUB_ENV"
+      - name: Capture main-thread stacks
+        env:
+          SOLUTION: ${{ inputs.solutions }}
+          PLAYER_RUN: ${{ inputs.profile_run }}
+          CLIENTS: ${{ inputs.client_counts }}
+          TICKS: ${{ inputs.tick_rates }}
+          OBJECTS: ${{ inputs.object_counts }}
+          SECONDS: ${{ inputs.seconds }}
+          WARMUP: ${{ inputs.warmup_seconds }}
+          REGION: ${{ inputs.region }}
+        run: |
+          chmod +x "profile-players/$SOLUTION/PredictionBench"
+          sudo python3 .github/scripts/prediction-profile.py --solution "$SOLUTION" --player-run "$PLAYER_RUN" --players profile-players --perf "$NATIVE_PERF" --clients "$CLIENTS" --ticks "$TICKS" --objects "$OBJECTS" --seconds "$SECONDS" --warmup "$WARMUP" --region "$REGION"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: prediction-native-profile
+          path: prediction-native-profile/
+          if-no-files-found: error
+          retention-days: 14
