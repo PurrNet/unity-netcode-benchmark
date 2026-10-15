@@ -16,5 +16,32 @@
     <type fullname="PurrNet.Prediction.FULL_STATE`1">
       <field name="state" />
     </type>
+    <type fullname="PurrNet.Prediction.PredictionManager">
+      <field name="_clientTicks" />
+      <field name="_verifiedServerTick" />
+      <field name="_ackedServerTick" />
+      <field name="_latestFrameServerTick" />
+      <field name="_inputAckTick" />
+      <field name="_pauseAdvanceTicks" />
+      <field name="_leadAdjustGateTick" />
+      <field name="_inputStarved" />
+      <field name="_frameInputMargin" />
+      <field name="_frameInputMarginTick" />
+      <field name="_hasFrameInputMargin" />
+      <field name="_frameInputSlackMs" />
+      <field name="_frameInputSlackServerTick" />
+      <field name="_frameInputSlackInputTick" />
+      <field name="_hasFrameInputSlack" />
+      <field name="_serverSendsInputSlack" />
+      <field name="_lowMarginStreak" />
+      <field name="_slackEmaMs" />
+      <field name="_slackDevEmaMs" />
+      <field name="_slackFloorEstimateMs" />
+      <field name="_hasSlackEma" />
+      <field name="_cachedInputFirstTick" />
+      <field name="_cachedInputTickCount" />
+      <field name="_cachedInputFragmented" />
+      <field name="_lastInputSendTime" />
+    </type>
   </assembly>
 </linker>

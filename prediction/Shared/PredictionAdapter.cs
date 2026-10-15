@@ -42,5 +42,6 @@ namespace PredictionBench
         public virtual void BeginDiagnostics() { }
         public virtual string EndDiagnostics() => "{}";
         public virtual string MemoryDiagnostics() => null;
+        public virtual string CaptureContext() => null;
     }
 }

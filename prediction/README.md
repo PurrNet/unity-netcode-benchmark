@@ -31,6 +31,13 @@ event sections.
 The additional harness code changes its provenance hash. Rebuild both revisions with this same
 harness for new comparisons; do not compare a newly instrumented player against an older frozen
 player as a code-only change. Legacy artifacts remain readable with work counters unavailable.
+This diagnostic branch also captures `sampleEndContextJson` after CPU timing and
+`finalContextJson` after the ordinary final-state snapshot. PurrDiction records local clock
+and lead gauges, per-player input-queue bounds, and owned generated/applied input sequences.
+Reflection fields are preserved explicitly; unavailable fields and capture errors remain
+visible. There are no added tick callbacks, and the normal five-second final drain is retained.
+Provenance marks these players `diagnosticCapture=prediction-final-context-v1`. Use this
+branch to investigate convergence; use matching scoring harnesses for performance A/B runs.
 An A/A run can set `baseline_run` and `candidate_run` to the same frozen run to measure apparent
 differences without a binary change. A/A variation is context, not a correction factor or a
 universal noise threshold.

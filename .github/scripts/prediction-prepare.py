@@ -67,6 +67,8 @@ def prepare(solution, output, prediction_source=None):
                           purrnetDependency=manifest['dependencies']['dev.purrnet.purrnet'])
         provenance['predictionPolicy'] = 'PredictedIfOwned' if solution == 'purrdiction-owned' else 'FullPrediction'
         provenance['workCountersSchema'] = 1
+        provenance['finalContextSchema'] = 1
+        provenance['diagnosticCapture'] = 'prediction-final-context-v1'
     else:
         provenance['vendoredSourceCommit'] = provenance['benchmarkCommit']
     manifest_path.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')

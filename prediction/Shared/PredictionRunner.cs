@@ -16,6 +16,7 @@ namespace PredictionBench
         public string suite = "prediction", workload = "sequenced-state-v1";
         public string solution, predictionScope, replayDefinition, unityVersion, peer, role, diagnosticJson, provenanceJson;
         public string workCountersJson;
+        public string sampleEndContextJson, finalContextJson;
         public bool success, restoresAvailable;
         public bool linuxMetricsAvailable, developmentBuild;
         public bool cpuMetricsAvailable;
@@ -146,6 +147,7 @@ namespace PredictionBench
             _report.diagnosticJson = adapter.EndDiagnostics();
             _report.workCountersJson = adapter.EndWorkCounters();
             _report.memoryDiagnosticJson = adapter.MemoryDiagnostics();
+            _report.sampleEndContextJson = adapter.CaptureContext();
             _report.forwardCalls = PredictionWorkload.ForwardCalls;
             _report.replayCalls = PredictionWorkload.ReplayCalls;
             _report.ownedForwardCalls = PredictionWorkload.OwnedForwardCalls;
@@ -164,6 +166,7 @@ namespace PredictionBench
             }
             yield return new WaitForSecondsRealtime(5);
             _report.finalState = adapter.Snapshot().OrderBy(p => p.index).ToArray();
+            _report.finalContextJson = adapter.CaptureContext();
             // Optional retained-heap diagnostic, after timing, input shutdown and final state capture.
             string snapshotPath = Arg("-predictionMemorySnapshot", "");
             if (!string.IsNullOrEmpty(snapshotPath))

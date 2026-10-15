@@ -10,6 +10,7 @@ namespace PredictionBench
     {
         public int Index;
         private int _sequence;
+        internal int GeneratedInputSequence => _sequence;
         public struct Input : IPredictedData { public DriveInput value; public void Dispose() { } }
         public struct State : IPredictedData<State> { public DriveState value; public void Dispose() { } }
         protected override void GetFinalInput(ref Input input) => input.value = PredictionWorkload.Next(ref _sequence);

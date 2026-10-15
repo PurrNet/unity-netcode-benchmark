@@ -69,5 +69,6 @@ namespace PredictionBench
         public override void BeginWorkCounters() => _workCounters.Begin(world);
         public override string EndWorkCounters() => _workCounters.End(world);
         public override string MemoryDiagnostics() => JsonUtility.ToJson(PurrDictionMemoryDiagnostics.Capture(world));
+        public override string CaptureContext() => PurrDictionEndContext.Capture(world);
     }
 }
