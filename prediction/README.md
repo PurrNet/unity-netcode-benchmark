@@ -201,6 +201,12 @@ clock (`CLOCK_MONOTONIC` on Linux, Stopwatch on Windows). Raw `load.wallClock` i
 to expose clock disagreement.
 The first partial frame interval is excluded from frame distributions.
 
+Each case also saves `host.json` before launching players and after they exit: available CPU
+model names, reported MHz, Linux scheduler counters (including steal), VM boot ID and clock
+source. The manifest includes an initial host snapshot. These optional diagnostics cover the
+whole case, including startup and warmup; they do not represent the player timing window and
+are never used to normalize scores. Missing host counters remain unavailable.
+
 For native CPU investigation, dispatch the same workflow with `profile_run` set to an existing
 player-build run, one `solutions` adapter, one client/tick/object count, `seconds=50`, and
 `warmup_seconds=20`. It samples the server and first client's main threads after warmup.

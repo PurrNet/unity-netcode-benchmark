@@ -27,6 +27,48 @@ arranger = module('prediction_arrange', 'prediction-arrange.py')
 ab = module('prediction_ab', 'prediction-ab.py')
 
 
+class HostSnapshotTests(unittest.TestCase):
+    def test_linux_snapshot_preserves_models_frequency_and_raw_scheduler_counters(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            proc, sysfs = root / 'proc', root / 'sys'
+            files = {
+                proc / 'cpuinfo': 'processor: 0\nmodel name: Example CPU\ncpu MHz: 3000\n\n'
+                                  'processor: 1\nmodel name: Example CPU\ncpu MHz: 2900.5\n',
+                proc / 'stat': 'cpu 1 2 3 4 5 6 7 8 9 10\ncpu0 1 2 3\n',
+                proc / 'sys/kernel/random/boot_id': 'example-boot\n',
+                sysfs / 'devices/system/clocksource/clocksource0/current_clocksource': 'tsc\n',
+            }
+            for path, value in files.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(value)
+            snapshot = bench.host_snapshot(proc, sysfs)
+            self.assertEqual(snapshot['cpuModels'], ['Example CPU'])
+            self.assertEqual(snapshot['cpuMhz'], [3000, 2900.5])
+            self.assertEqual(snapshot['schedulerCpuTicks']['steal'], 8)
+            self.assertEqual(snapshot['schedulerCpuTicks']['guestNice'], 10)
+            self.assertEqual(snapshot['bootId'], 'example-boot')
+            self.assertEqual(snapshot['clockSource'], 'tsc')
+
+    def test_unavailable_host_files_do_not_prevent_a_benchmark(self):
+        with tempfile.TemporaryDirectory() as directory:
+            snapshot = bench.host_snapshot(Path(directory) / 'proc', Path(directory) / 'sys')
+            self.assertEqual(snapshot['cpuModels'], [])
+            self.assertEqual(snapshot['cpuMhz'], [])
+            self.assertIsNone(snapshot['schedulerCpuTicks'])
+            self.assertIsNone(snapshot['clockSource'])
+            self.assertIsNone(snapshot['bootId'])
+
+    def test_malformed_optional_counters_stay_unavailable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'cpuinfo').write_text('cpu MHz: unavailable\ncpu MHz: nan\ncpu MHz: -1\n')
+            (root / 'stat').write_text('cpu invalid\n')
+            snapshot = bench.host_snapshot(root, root)
+            self.assertEqual(snapshot['cpuMhz'], [])
+            self.assertIsNone(snapshot['schedulerCpuTicks'])
+
+
 class RevisionComparisonTests(unittest.TestCase):
     def args(self, **overrides):
         values = dict(baseline=Path('baseline'), candidate=Path('candidate'), output=Path('results'),

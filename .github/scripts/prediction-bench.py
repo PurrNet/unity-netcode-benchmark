@@ -22,6 +22,47 @@ SOLUTIONS = ('purrdiction', 'purrdiction-owned', 'fishnet', 'fusion')
 WORKLOAD = 'sequenced-state-v1'
 
 
+def host_snapshot(proc=Path('/proc'), sysfs=Path('/sys')):
+    """Optional VM-wide context, collected outside player timing; never normalize scores."""
+    def read(path):
+        try:
+            return path.read_text(errors='replace').strip()
+        except OSError:
+            return ''
+    models, mhz = set(), []
+    for line in read(proc / 'cpuinfo').splitlines():
+        key, separator, value = line.partition(':')
+        if not separator:
+            continue
+        key, value = key.strip().lower(), value.strip()
+        if key in ('model name', 'hardware') and value:
+            models.add(value)
+        if key == 'cpu mhz':
+            try:
+                frequency = float(value)
+                if math.isfinite(frequency) and frequency > 0:
+                    mhz.append(frequency)
+            except ValueError:
+                pass
+    ticks = None
+    for line in read(proc / 'stat').splitlines():
+        if line.startswith('cpu '):
+            try:
+                ticks = dict(zip(('user', 'nice', 'system', 'idle', 'iowait', 'irq',
+                                  'softirq', 'steal', 'guest', 'guestNice'), map(int, line.split()[1:])))
+            except ValueError:
+                pass
+            break
+    try:
+        tick_rate = os.sysconf('SC_CLK_TCK')
+    except (AttributeError, OSError, ValueError):
+        tick_rate = None
+    return dict(capturedMonotonic=time.monotonic(), cpuModels=sorted(models), cpuMhz=mhz,
+                schedulerCpuTicks=ticks, schedulerTicksPerSecond=tick_rate,
+                bootId=read(proc / 'sys/kernel/random/boot_id') or None,
+                clockSource=read(sysfs / 'devices/system/clocksource/clocksource0/current_clocksource') or None)
+
+
 def csv_ints(text, minimum, maximum):
     values = [int(value.strip()) for value in text.split(',')]
     if not values or len(values) != len(set(values)) or any(not minimum <= x <= maximum for x in values):
@@ -211,6 +252,7 @@ def validate_memory_snapshots(reports, directory):
 
 def run_case(case, binary, directory, timeout, region, memory_snapshots=False):
     directory.mkdir()
+    host_before = host_snapshot()
     deadline = time.monotonic() + timeout
     peers = ['server', *(f'client-{i}' for i in range(1, case['clients'] + 1))]
     commands, processes, streams = {}, {}, []
@@ -262,6 +304,10 @@ def run_case(case, binary, directory, timeout, region, memory_snapshots=False):
             stop_process(process)
         for stream in streams:
             stream.close()
+        host_after = host_snapshot()
+        (directory / 'host.json').write_text(json.dumps(dict(before=host_before, after=host_after,
+            intervalSeconds=host_after['capturedMonotonic'] - host_before['capturedMonotonic'],
+            scope='VM-wide whole-case context including startup, warmup and shutdown; not the player measurement window. Not used to normalize scores.'), indent=2))
 
 
 def inventory(root):
@@ -303,7 +349,8 @@ def main():
         'execution': 'Sequential cases; one dedicated server plus N clients sharing one machine',
         'network': 'Direct loopback for PurrDiction/FishNet; Photon Cloud Server mode for Fusion; no artificial delay/loss',
         'comparison': 'Diagnostic baseline, not an overall ranking. Prediction scopes and transport routes differ.',
-        'machine': {'platform': platform.platform(), 'processor': platform.processor(), 'logicalProcessors': os.cpu_count()},
+        'machine': {'platform': platform.platform(), 'processor': platform.processor(), 'logicalProcessors': os.cpu_count(),
+                    'hostSnapshot': host_snapshot()},
         'workflowRun': os.environ.get('GITHUB_RUN_ID'), 'benchmarkCommit': os.environ.get('GITHUB_SHA'), 'region': args.region, 'players': {}}
     for solution in {case['solution'] for case in plan}:
         binary = args.players.resolve() / solution / ('PredictionBench.exe' if os.name == 'nt' else 'PredictionBench')
