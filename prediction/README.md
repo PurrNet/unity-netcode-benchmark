@@ -32,6 +32,12 @@ player as a code-only change. Legacy artifacts remain readable with work counter
 An A/A run can set `baseline_run` and `candidate_run` to the same frozen run to measure apparent
 differences without a binary change. A/A variation is context, not a correction factor or a
 universal noise threshold.
+Set `revision_shared_directory=true` for an additional A/A diagnostic that launches both
+slots from the same extracted player directory. It requires identical frozen run IDs and
+defaults to false. This probes directory placement as a possible source of variation without
+establishing a cause. Manifests record the directory mode, and reports keep modes separate.
+Host snapshots retain raw frequency and scheduler observations; aggregation uses stable host
+identity (including boot ID), rather than changing snapshot timestamps or counters.
 
 For revision comparisons, dispatch **Prediction Benchmark** with `baseline_run` and
 `candidate_run` set to two successful prediction run IDs. This optional mode downloads

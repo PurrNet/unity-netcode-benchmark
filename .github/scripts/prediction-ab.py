@@ -3,6 +3,7 @@
 import argparse
 import importlib.util
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -41,9 +42,12 @@ def run(args, execute=subprocess.run):
         print(json.dumps(planned, indent=2))
         return 0
     failed = False
+    environment = dict(os.environ, PREDICTION_EXECUTION_DIRECTORY_MODE=(
+        'shared-directory' if args.baseline.resolve() == args.candidate.resolve()
+        else 'separate-directories'))
     for index, command in enumerate(planned, 1):
         print(f'Comparison run {index}/{len(planned)}: {command}', flush=True)
-        failed |= execute(command, check=False).returncode != 0
+        failed |= execute(command, check=False, env=environment).returncode != 0
     return int(failed)
 
 

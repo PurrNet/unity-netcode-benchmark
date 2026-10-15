@@ -90,6 +90,19 @@ class RevisionComparisonTests(unittest.TestCase):
         self.assertEqual(ab.run(self.args(repeats=1), execute), 1)
         self.assertEqual(execute.call_count, 2)
 
+    def test_directory_mode_is_inherited_by_every_fresh_process(self):
+        for candidate, mode in ((Path('candidate'), 'separate-directories'),
+                                (Path('baseline') / '.', 'shared-directory')):
+            execute = Mock(return_value=SimpleNamespace(returncode=0))
+            with patch.dict('os.environ', {'PREDICTION_TEST_INHERITED': 'yes'}):
+                self.assertEqual(ab.run(self.args(candidate=candidate, repeats=1), execute), 0)
+            for call in execute.call_args_list:
+                self.assertEqual(call.kwargs['env']['PREDICTION_EXECUTION_DIRECTORY_MODE'], mode)
+                self.assertEqual(call.kwargs['env']['PREDICTION_TEST_INHERITED'], 'yes')
+            self.assertEqual([call.args[0][call.args[0].index('--output') + 1]
+                              for call in execute.call_args_list],
+                             [str(Path('results/baseline')), str(Path('results/candidate'))])
+
     def test_owned_policy_is_identical_for_both_revisions(self):
         commands = ab.commands(self.args(solution='purrdiction-owned'))
         self.assertEqual([c[c.index('--solutions') + 1] for c in commands],
@@ -601,6 +614,35 @@ class Reports(unittest.TestCase):
                 path.write_text(json.dumps(data))
             result = reporter.render(root, root / 'report')
             self.assertEqual(len(result['groups']), 4)
+
+    def test_transient_host_snapshots_aggregate_but_boots_and_capture_modes_do_not(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for index, (boot, mode) in enumerate((('boot-a', 'shared-directory'),
+                                                 ('boot-a', 'shared-directory'),
+                                                 ('boot-b', 'shared-directory'),
+                                                 ('boot-a', 'separate-directories'))):
+                parent = root / str(index)
+                parent.mkdir()
+                self.make_run(parent)
+                path = parent / 'run/manifest.json'
+                manifest = json.loads(path.read_text())
+                manifest['machine'].update(executionDirectoryMode=mode, hostSnapshot={
+                    'bootId': boot, 'cpuModels': ['Example CPU'], 'clockSource': 'tsc',
+                    'capturedMonotonic': index, 'cpuMhz': [2000 + index * 500],
+                    'schedulerCpuTicks': {'idle': index * 100}, 'ticksPerSecond': 100})
+                path.write_text(json.dumps(manifest))
+            result = reporter.render(root, root / 'report')
+            self.assertTrue(result['complete'])
+            self.assertEqual(len(result['groups']), 6)
+            self.assertEqual(sorted(row['repeats'] for row in result['groups']), [1, 1, 1, 1, 2, 2])
+            self.assertTrue(all(row['cpuPercent'] == 10 for row in result['groups']))
+            self.assertEqual(len({row['manifest']['machine']['hostSnapshot']['capturedMonotonic']
+                                  for row in result['raw']}), 4)
+
+    def test_legacy_machine_fingerprint_preserves_all_fields(self):
+        machine = {'cpu': 'legacy', 'diagnosticCapture': 'sampled'}
+        self.assertEqual(reporter.stable_machine(machine), machine)
 
 
 class Preparation(unittest.TestCase):

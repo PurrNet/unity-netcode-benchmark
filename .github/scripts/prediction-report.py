@@ -13,6 +13,16 @@ BENCH = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(BENCH)
 
 
+def stable_machine(machine):
+    """Keep host identity and capture modes; retain transient observations only in raw data."""
+    result = dict(machine)
+    snapshot = result.get('hostSnapshot')
+    if isinstance(snapshot, dict):
+        result['hostSnapshot'] = {key: snapshot[key] for key in
+                                  ('cpuModels', 'bootId', 'clockSource') if key in snapshot}
+    return result
+
+
 def render(source, output):
     output.mkdir(parents=True, exist_ok=True)
     groups, failures, raw = {}, [], []
@@ -43,7 +53,7 @@ def render(source, output):
                 build_inputs = [peers[0].get('provenanceJson'), manifest.get('players', {}).get(case['solution'], {}).get('runtimeSha256'),
                                 peers[0].get('detailedDiagnostics')]
                 build = hashlib.sha256(json.dumps(build_inputs, sort_keys=True).encode()).hexdigest()[:12]
-                environment = json.dumps([manifest['machine'], peers[0].get('unityVersion'), peers[0].get('scriptingBackend'), peers[0].get('developmentBuild')], sort_keys=True)
+                environment = json.dumps([stable_machine(manifest['machine']), peers[0].get('unityVersion'), peers[0].get('scriptingBackend'), peers[0].get('developmentBuild')], sort_keys=True)
                 hardware = hashlib.sha256(environment.encode()).hexdigest()[:12]
                 key = (case['solution'], case['clients'], case['tickRate'], case['objects'], role, build, hardware)
                 item = groups.setdefault(key, {'samples': [], 'predictionScope': peers[0]['predictionScope'],

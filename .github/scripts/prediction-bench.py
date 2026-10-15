@@ -396,7 +396,8 @@ def main():
         'network': 'Direct loopback for PurrDiction/FishNet; Photon Cloud Server mode for Fusion; no artificial delay/loss',
         'comparison': 'Diagnostic baseline, not an overall ranking. Prediction scopes and transport routes differ.',
         'machine': {'platform': platform.platform(), 'processor': platform.processor(), 'logicalProcessors': os.cpu_count(),
-                    'hostSnapshot': host_snapshot()},
+                    'hostSnapshot': host_snapshot(),
+                    'executionDirectoryMode': os.environ.get('PREDICTION_EXECUTION_DIRECTORY_MODE', 'adapter-default')},
         'workflowRun': os.environ.get('GITHUB_RUN_ID'), 'benchmarkCommit': os.environ.get('GITHUB_SHA'), 'region': args.region, 'players': {}}
     for solution in {case['solution'] for case in plan}:
         binary = args.players.resolve() / solution / ('PredictionBench.exe' if os.name == 'nt' else 'PredictionBench')

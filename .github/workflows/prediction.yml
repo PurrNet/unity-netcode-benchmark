@@ -24,6 +24,10 @@ on:
         type: choice
         options: ["purrdiction", "purrdiction-owned"]
         default: "purrdiction"
+      revision_shared_directory:
+        description: "A/A diagnostic: run both slots from one directory; requires equal frozen run IDs"
+        type: boolean
+        default: false
       profile_run:
         description: "Optional existing player run ID for native sampling; select one adapter and one workload"
         default: ""
@@ -273,6 +277,16 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v7
+      - name: Validate shared-directory control
+        env:
+          SHARED: ${{ inputs.revision_shared_directory }}
+          BASELINE_RUN: ${{ inputs.baseline_run }}
+          CANDIDATE_RUN: ${{ inputs.candidate_run }}
+        run: |
+          if [[ "$SHARED" == 'true' && "$BASELINE_RUN" != "$CANDIDATE_RUN" ]]; then
+            echo 'Shared-directory controls require identical baseline and candidate run IDs' >&2
+            exit 1
+          fi
       - uses: actions/download-artifact@v8
         with:
           name: prediction-player-${{ inputs.revision_solution }}
@@ -280,6 +294,7 @@ jobs:
           github-token: ${{ github.token }}
           path: prediction-players/baseline/${{ inputs.revision_solution }}
       - uses: actions/download-artifact@v8
+        if: ${{ !inputs.revision_shared_directory }}
         with:
           name: prediction-player-${{ inputs.revision_solution }}
           run-id: ${{ inputs.candidate_run }}
@@ -287,6 +302,7 @@ jobs:
           path: prediction-players/candidate/${{ inputs.revision_solution }}
       - name: Run alternating revisions
         env:
+          SHARED: ${{ inputs.revision_shared_directory }}
           SOLUTION: ${{ inputs.revision_solution }}
           CLIENTS: ${{ inputs.client_counts }}
           TICKS: ${{ inputs.tick_rates }}
@@ -296,8 +312,10 @@ jobs:
           REPEATS: ${{ inputs.repeats }}
           DIAGNOSTICS: ${{ inputs.diagnostics }}
         run: |
-          chmod +x "prediction-players/baseline/$SOLUTION/PredictionBench" "prediction-players/candidate/$SOLUTION/PredictionBench"
-          python3 .github/scripts/prediction-ab.py --solution "$SOLUTION" --baseline prediction-players/baseline --candidate prediction-players/candidate --clients "$CLIENTS" --ticks "$TICKS" --objects "$OBJECTS" --seconds "$SECONDS" --warmup "$WARMUP" --repeats "$REPEATS" --diagnostics "$DIAGNOSTICS"
+          candidate=prediction-players/candidate
+          if [[ "$SHARED" == 'true' ]]; then candidate=prediction-players/baseline; fi
+          chmod +x "prediction-players/baseline/$SOLUTION/PredictionBench" "$candidate/$SOLUTION/PredictionBench"
+          python3 .github/scripts/prediction-ab.py --solution "$SOLUTION" --baseline prediction-players/baseline --candidate "$candidate" --clients "$CLIENTS" --ticks "$TICKS" --objects "$OBJECTS" --seconds "$SECONDS" --warmup "$WARMUP" --repeats "$REPEATS" --diagnostics "$DIAGNOSTICS"
       - name: Report both revisions
         if: always()
         run: |
