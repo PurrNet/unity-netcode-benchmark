@@ -56,8 +56,16 @@ def thread_cpu_delta(before, after, ticks_per_second):
 def summarize(path):
     total = waiting = managed = unresolved = 0
     leaves, inclusive = Counter(), Counter()
+    thread_samples, thread_stacks, thread_names = Counter(), Counter(), {}
     for block in path.read_text(errors='replace').split('\n\n'):
+        lines = block.splitlines()
+        header = re.match(r'^(.*?)\s+(\d+)\s+[\d.]+:\s+\d+\s+cpu-clock:', lines[0]) if lines else None
         frames = [line for line in block.splitlines() if line.startswith('\t')]
+        if header:
+            tid = int(header[2])
+            thread_names[tid] = header[1].strip()
+            thread_samples[tid] += 1
+            thread_stacks[tid] += bool(frames)
         if not frames:
             continue
         total += 1
@@ -71,6 +79,10 @@ def summarize(path):
         raise RuntimeError(f'No sampled stacks: {path}')
     return dict(samples=total, frameWaitSamples=waiting, managedStackSamples=managed,
                 unresolvedLeafSamples=unresolved, frameWaitPercent=100 * waiting / total,
+                sampleHeaders=sum(thread_samples.values()),
+                byThread=[dict(tid=tid, name=thread_names[tid], samples=count, stackSamples=thread_stacks[tid])
+                          for tid, count in thread_samples.most_common()],
+                samplingNote='Stack counts describe sampled events, not exact CPU-time shares. Compare per-thread samples with threadCpu counters; coverage can differ between threads.',
                 leaf=leaves.most_common(25), inclusive=inclusive.most_common(35))
 
 

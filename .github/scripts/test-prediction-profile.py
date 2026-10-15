@@ -13,6 +13,21 @@ SPEC.loader.exec_module(PROFILE)
 
 
 class NativeProfileTests(unittest.TestCase):
+    def test_stack_summary_exposes_thread_coverage_including_samples_without_stacks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'samples.txt'
+            path.write_text('Unity Main Thre 123 1.000: 1001001 cpu-clock:\n'
+                            '\t  1234 MainWork+0x1 (/GameAssembly.so)\n\n'
+                            'ReceiveThread(1 124 1.100: 1001001 cpu-clock:\n'
+                            '\t  5678 ReceiveWork+0x2 (/libc.so)\n\n'
+                            'ReceiveThread(1 124 1.200: 1001001 cpu-clock:\n\n')
+            summary = PROFILE.summarize(path)
+            self.assertEqual(summary['samples'], 2)
+            self.assertEqual(summary['sampleHeaders'], 3)
+            threads = {row['tid']: row for row in summary['byThread']}
+            self.assertEqual(threads[123], dict(tid=123, name='Unity Main Thre', samples=1, stackSamples=1))
+            self.assertEqual(threads[124], dict(tid=124, name='ReceiveThread(1', samples=2, stackSamples=1))
+
     def test_capture_scope_selects_process_or_main_thread(self):
         for all_threads, selector in ((False, '-t'), (True, '-p')):
             command = PROFILE.recording_command(Path('perf'), 123, Path('out.data'), 25, all_threads)

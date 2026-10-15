@@ -213,7 +213,9 @@ player-build run, one `solutions` adapter, one client/tick/object count, `second
 Set `profile_all_threads=true` to sample every thread in each process instead. The capture
 also reports per-thread CPU time over the sampling interval, identifies newly observed and
 exited threads, and excludes exited threads from CPU deltas when their final counters are
-unavailable. It checks matching ELF symbol build IDs and uploads `prediction-native-profile` with raw stacks,
+unavailable. Per-thread sample counts are reported separately: compare their coverage with
+CPU counters before interpreting aggregate stack percentages as CPU-time shares.
+It checks matching ELF symbol build IDs and uploads `prediction-native-profile` with raw stacks,
 workload validation, and a summary of Unity frame-wait samples. Missing frame-wait symbols
 produce an unavailable percentage. These sampled runs carry a diagnostic marker and have
 their own artifact; they do not produce a comparative performance report.
