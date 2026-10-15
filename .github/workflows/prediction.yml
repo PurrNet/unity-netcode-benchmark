@@ -51,7 +51,7 @@ on:
         description: "Detailed pass telemetry: auto enables it in development players only"
         type: choice
         options: ["auto", "on", "off"]
-        default: "auto"
+        default: "off"
       runner:
         description: "Runner for sequential measurements; all processes share its hardware"
         default: "ubuntu-latest"

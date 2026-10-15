@@ -166,7 +166,8 @@ window. That verifies integration and convergence, not comparative performance. 
 gets a unique results folder and preserves earlier runs. The default workflow runs 108 cases.
 
 Detailed native pass telemetry defaults to on in development players and off in release
-players. Use `--diagnostics on|off|auto` (or the workflow's `diagnostics` input) to override
+players when launched with `auto`. The workflow defaults to `off` for comparisons.
+Use `--diagnostics on|off|auto` (or the workflow's `diagnostics` input) to override
 it. The player records the effective mode; explicit requests fail validation if an older
 player ignores them. Reports keep on, off, and unrecorded legacy modes in separate groups.
 Gameplay counters and final-state validation remain active in every mode. Use diagnostics
