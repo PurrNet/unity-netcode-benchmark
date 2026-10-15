@@ -38,9 +38,15 @@ def make_plan(solutions, clients, ticks, objects, repeats, seconds, warmup):
         raise ValueError('Each object count must give every client at least one owned object')
     if not 1 <= repeats <= 20 or not math.isfinite(seconds) or not 0.1 <= seconds <= 600 or not math.isfinite(warmup) or not 0 <= warmup <= 60:
         raise ValueError('Invalid measurement duration, warmup or repeat count')
-    return [dict(id=i, solution=s, clients=n, tickRate=t, objects=o, repeat=r,
-                 seconds=seconds, warmupSeconds=warmup, workload=WORKLOAD)
-            for i, (s, n, t, o, r) in enumerate(itertools.product(selected, counts, rates, populations, range(1, repeats + 1)), 1)]
+    cases = []
+    for n, t, o in itertools.product(counts, rates, populations):
+        for r in range(1, repeats + 1):
+            offset = (r - 1) % len(selected)
+            for s in selected[offset:] + selected[:offset]:
+                cases.append(dict(id=len(cases) + 1, solution=s, clients=n, tickRate=t,
+                                  objects=o, repeat=r, seconds=seconds,
+                                  warmupSeconds=warmup, workload=WORKLOAD))
+    return cases
 
 
 class Barrier:

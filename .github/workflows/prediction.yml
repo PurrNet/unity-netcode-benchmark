@@ -3,6 +3,10 @@ name: Prediction Benchmark
 on:
   workflow_dispatch:
     inputs:
+      reuse_run:
+        description: "Optional existing player run ID; reuse its frozen sources and build settings"
+        default: ""
+        required: false
       baseline_run:
         description: "Optional existing PurrDiction run ID for revision A/B mode"
         default: ""
@@ -98,7 +102,7 @@ jobs:
           PY
       - name: Resolve PurrDiction once
         id: pin
-        if: contains(inputs.solutions, 'purrdiction')
+        if: inputs.reuse_run == '' && contains(inputs.solutions, 'purrdiction')
         env:
           PREDICTION_REF: ${{ inputs.purrdiction_ref }}
         run: |
@@ -116,6 +120,7 @@ jobs:
           PY
 
   build:
+    if: inputs.reuse_run == ''
     needs: plan
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -183,6 +188,7 @@ jobs:
       cancel-in-progress: false
       queue: max
     needs: [plan, build]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && (needs.build.result == 'success' || inputs.reuse_run != '') }}
     runs-on: ${{ inputs.runner }}
     timeout-minutes: 120
     steps:
@@ -191,6 +197,8 @@ jobs:
         with:
           pattern: prediction-player-*
           path: downloaded-players
+          run-id: ${{ inputs.reuse_run || github.run_id }}
+          github-token: ${{ github.token }}
       - name: Arrange independent players
         env:
           SOLUTIONS: ${{ inputs.solutions }}

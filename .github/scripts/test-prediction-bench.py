@@ -125,6 +125,21 @@ def fixture():
 
 
 class Matrix(unittest.TestCase):
+    def test_repeats_rotate_adapter_positions_and_preserve_every_case(self):
+        solutions = ['purrdiction', 'purrdiction-owned', 'fishnet', 'fusion']
+        cases = bench.make_plan(','.join(solutions), '2,4', '20,60', '32,128', 4, 20, 20)
+        self.assertEqual([case['id'] for case in cases], list(range(1, 129)))
+        keys = {(c['solution'], c['clients'], c['tickRate'], c['objects'], c['repeat']) for c in cases}
+        self.assertEqual(len(keys), 128)
+        for start in range(0, len(cases), 16):
+            block = cases[start:start + 16]
+            for position in range(4):
+                self.assertEqual({block[r * 4 + position]['solution'] for r in range(4)}, set(solutions))
+            for r in range(4):
+                repeat = block[r * 4:r * 4 + 4]
+                self.assertEqual([c['solution'] for c in repeat], solutions[r:] + solutions[:r])
+                self.assertTrue(all(c['repeat'] == r + 1 for c in repeat))
+
     def test_owned_and_full_world_variants_are_separate_cases(self):
         cases = bench.make_plan('purrdiction,purrdiction-owned', '4', '60', '128', 1, 20, 20)
         self.assertEqual([case['solution'] for case in cases], ['purrdiction', 'purrdiction-owned'])

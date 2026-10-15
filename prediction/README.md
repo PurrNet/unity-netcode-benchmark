@@ -18,6 +18,13 @@ Both revisions use identical sampling parameters and fresh processes. Separate r
 the original build provenance and runtime hashes. This helps distinguish code changes from
 differences between hosted runners; the source artifacts expire after three days.
 
+To repeat an adapter comparison without rebuilding, set `reuse_run` to an existing prediction
+run ID that contains every selected player. Sources, Unity version and build settings come
+from those frozen artifacts; `purrdiction_ref` and `profiling` do not rebuild them in this mode.
+Runtime sampling and diagnostics inputs still apply. Within each workload, repeats rotate
+adapter order to distribute early and late positions. Use a repeat count divisible by the
+number of adapters for balanced positions.
+
 Hosted builds may run while another revision is being measured. Measurement jobs share
 the replication scaling runner lock and queue in order, so multiple requested comparisons
 can wait without replacing one another.
