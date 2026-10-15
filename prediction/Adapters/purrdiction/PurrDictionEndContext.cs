@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
-using PurrNet.Modules;
+using PurrNet;
 using PurrNet.Prediction;
 using UnityEngine;
 
