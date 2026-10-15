@@ -30,7 +30,7 @@ ab = module('prediction_ab', 'prediction-ab.py')
 class RevisionComparisonTests(unittest.TestCase):
     def args(self, **overrides):
         values = dict(baseline=Path('baseline'), candidate=Path('candidate'), output=Path('results'),
-                      clients='4', ticks='60', objects='128', repeats=3, seconds=20, warmup=20, dry_run=False, diagnostics='auto')
+                      solution='purrdiction', clients='4', ticks='60', objects='128', repeats=3, seconds=20, warmup=20, dry_run=False, diagnostics='auto')
         values.update(overrides)
         return SimpleNamespace(**values)
 
@@ -47,6 +47,20 @@ class RevisionComparisonTests(unittest.TestCase):
         execute = Mock(side_effect=[SimpleNamespace(returncode=1), SimpleNamespace(returncode=0)])
         self.assertEqual(ab.run(self.args(repeats=1), execute), 1)
         self.assertEqual(execute.call_count, 2)
+
+    def test_owned_policy_is_identical_for_both_revisions(self):
+        commands = ab.commands(self.args(solution='purrdiction-owned'))
+        self.assertEqual([c[c.index('--solutions') + 1] for c in commands],
+                         ['purrdiction-owned'] * 6)
+        self.assertEqual([c[c.index('--players') + 1] for c in commands],
+                         ['baseline', 'candidate', 'candidate', 'baseline', 'baseline', 'candidate'])
+
+    def test_mixed_or_unrelated_adapters_never_start_a_player(self):
+        for solution in ('purrdiction,purrdiction-owned', 'fishnet', 'fusion', ''):
+            execute = Mock()
+            with self.assertRaises(ValueError):
+                ab.run(self.args(solution=solution), execute)
+            execute.assert_not_called()
 
     def test_diagnostics_mode_applies_to_both_revisions(self):
         for mode in ('on', 'off', 'auto'):

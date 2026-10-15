@@ -16,14 +16,17 @@ SPEC.loader.exec_module(BENCH)
 def commands(args):
     if args.diagnostics not in ('auto', 'on', 'off'):
         raise ValueError('Invalid detailed diagnostics mode')
-    BENCH.make_plan('purrdiction', args.clients, args.ticks, args.objects,
+    solution = args.solution
+    if solution not in ('purrdiction', 'purrdiction-owned'):
+        raise ValueError('Revision comparisons require one PurrDiction adapter')
+    BENCH.make_plan(solution, args.clients, args.ticks, args.objects,
                     args.repeats, args.seconds, args.warmup)
     builds = {'baseline': args.baseline, 'candidate': args.candidate}
     planned = []
     for repeat in range(args.repeats):
         order = ('baseline', 'candidate') if repeat % 2 == 0 else ('candidate', 'baseline')
         for variant in order:
-            planned.append([sys.executable, str(SCRIPT), '--solutions', 'purrdiction',
+            planned.append([sys.executable, str(SCRIPT), '--solutions', solution,
                 '--players', str(builds[variant]), '--output', str(args.output / variant),
                 '--clients', args.clients, '--ticks', args.ticks, '--objects', args.objects,
                 '--repeats', '1', '--seconds', str(args.seconds), '--warmup', str(args.warmup),
@@ -48,6 +51,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--baseline', type=Path, required=True)
     parser.add_argument('--candidate', type=Path, required=True)
+    parser.add_argument('--solution', choices=('purrdiction', 'purrdiction-owned'), default='purrdiction')
     parser.add_argument('--output', type=Path, default=Path('prediction-ab-results'))
     parser.add_argument('--clients', default='4')
     parser.add_argument('--ticks', default='60')

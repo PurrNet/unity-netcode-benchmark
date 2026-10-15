@@ -15,6 +15,11 @@ on:
         description: "Existing candidate run ID when baseline_run selects revision A/B mode"
         default: ""
         required: false
+      revision_solution:
+        description: "Prediction policy for revision A/B mode"
+        type: choice
+        options: ["purrdiction", "purrdiction-owned"]
+        default: "purrdiction"
       profile_run:
         description: "Optional existing player run ID for native sampling; select one adapter and one workload"
         default: ""
@@ -243,18 +248,19 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
-          name: prediction-player-purrdiction
+          name: prediction-player-${{ inputs.revision_solution }}
           run-id: ${{ inputs.baseline_run }}
           github-token: ${{ github.token }}
-          path: prediction-players/baseline/purrdiction
+          path: prediction-players/baseline/${{ inputs.revision_solution }}
       - uses: actions/download-artifact@v8
         with:
-          name: prediction-player-purrdiction
+          name: prediction-player-${{ inputs.revision_solution }}
           run-id: ${{ inputs.candidate_run }}
           github-token: ${{ github.token }}
-          path: prediction-players/candidate/purrdiction
+          path: prediction-players/candidate/${{ inputs.revision_solution }}
       - name: Run alternating revisions
         env:
+          SOLUTION: ${{ inputs.revision_solution }}
           CLIENTS: ${{ inputs.client_counts }}
           TICKS: ${{ inputs.tick_rates }}
           OBJECTS: ${{ inputs.object_counts }}
@@ -263,8 +269,8 @@ jobs:
           REPEATS: ${{ inputs.repeats }}
           DIAGNOSTICS: ${{ inputs.diagnostics }}
         run: |
-          chmod +x prediction-players/{baseline,candidate}/purrdiction/PredictionBench
-          python3 .github/scripts/prediction-ab.py --baseline prediction-players/baseline --candidate prediction-players/candidate --clients "$CLIENTS" --ticks "$TICKS" --objects "$OBJECTS" --seconds "$SECONDS" --warmup "$WARMUP" --repeats "$REPEATS" --diagnostics "$DIAGNOSTICS"
+          chmod +x "prediction-players/baseline/$SOLUTION/PredictionBench" "prediction-players/candidate/$SOLUTION/PredictionBench"
+          python3 .github/scripts/prediction-ab.py --solution "$SOLUTION" --baseline prediction-players/baseline --candidate prediction-players/candidate --clients "$CLIENTS" --ticks "$TICKS" --objects "$OBJECTS" --seconds "$SECONDS" --warmup "$WARMUP" --repeats "$REPEATS" --diagnostics "$DIAGNOSTICS"
       - name: Report both revisions
         if: always()
         run: |
