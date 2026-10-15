@@ -236,6 +236,8 @@ def validate_case(case, reports):
             raise ValueError(f'{peer}: incomplete measurement window')
         if report.get('forwardCalls', 0) + report.get('replayCalls', 0) < 1:
             raise ValueError(f'{peer}: no native prediction callbacks')
+        if role == 'server' and (type(report.get('appliedInputs')) is not int or report['appliedInputs'] < 1):
+            raise ValueError(f'{peer}: no new input commands during sampling')
         if role == 'client' and report.get('ownedForwardCalls', 0) < 1:
             raise ValueError(f'{peer}: no owned forward prediction callbacks')
         entries = report.get('finalState', [])

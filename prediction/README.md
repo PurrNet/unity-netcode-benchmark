@@ -10,6 +10,10 @@ promotional charts, or the existing benchmark-history upload.
 The first suite answers how much input/state prediction costs, how that changes with object
 population and client count, and how much native replay work is performed. It is a diagnostic
 baseline. It does not yet establish an overall winner or cover all prediction architectures.
+Each accepted case must process at least one new input command on the server during sampling.
+State changes from warmup and continuing simulation callbacks cannot validate a stalled input
+stream; final convergence is checked separately. This rejects inactive work without adjusting
+CPU scores or requiring interchangeable replay counts across adapters.
 The [retained release baseline](results/README.md) includes CPU samples and frozen source/build
 fingerprints from a completed comparison, independently of CI artifact retention.
 
