@@ -37,3 +37,53 @@ the workflow artifact contains those validation records during its retention per
 
 This historical player predates the work-counter harness. New revision A/B comparisons must
 build both revisions with the same current harness. See the [suite methodology](../README.md).
+
+## Matched original/current release comparison (2026-10-16)
+
+The original PurrDiction `1.4.1-beta.2` revision (`29d0ced3`, PurrNet `52ce233c`)
+and the accepted performance revision (`a3489811`, PurrNet `fd4b1fbe`) were rebuilt with
+the same benchmark C# sources at benchmark commit `1cd3eb6`. This measures the combined
+PurrDiction and PurrNet changes, including their declared dependencies.
+
+Each population uses six alternating fresh-process pairs on one hosted VM: four clients,
+60 Hz, 20 seconds warmup and 60 seconds sampling. The 128- and 512-object comparisons
+use separate VMs. Players use release IL2CPP with detailed diagnostics off; convergence
+and input-activity validation remain enabled. CPU is the unadjusted percentage of one
+core across all process threads. Client peers are averaged within each run before pairing.
+The paired median percentage uses six pair ratios, rather than the ratio of the two medians.
+
+The [retention audit](../../.github/scripts/prediction-start-current.py) validates all peer
+reports, source/dependency revisions, identical benchmark source hashes, fixed runtime
+files per revision, one VM boot per population and the alternating execution order. It
+retains unrounded peer samples, work counters, source provenance, runtime inventories,
+host metadata and report hashes. Full final states and logs remain in the CI artifacts
+for their retention period. These results describe this workload and host cohort;
+they do not establish a universal performance ranking or isolate individual changes.
+
+| Objects | Role | Original CPU % | Current CPU % | Paired median CPU change |
+|---|---|---:|---:|---:|
+| 128 | Client | 4.74 | 2.91 | -38.1% |
+| 128 | Server | 6.41 | 3.68 | -43.0% |
+| 512 | Client | 18.44 | 9.60 | -45.3% |
+| 512 | Server | 24.51 | 13.13 | -41.9% |
+
+The current revision used less CPU in all six pairs for each role and population.
+All 120 peer reports passed validation. Measured server simulation rates stayed between
+59.99 and 60.03 Hz, and sampled server input-application rates remained comparable;
+these samples did not exhibit the previously reproduced stalled-input failure. Client
+replay counts varied and were neither equalized nor used to normalize CPU.
+
+Retained data and successful workflow runs:
+
+- [128 objects](2026-10-16-start-current-128.json), [comparison run 38869092008](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/38869092008).
+- [512 objects](2026-10-16-start-current-512.json), [comparison run 38869099801](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/38869099801).
+- Release builds: [original 38866770742](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/38866770742), [current 38866794558](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/38866794558).
+
+To reproduce an extract after downloading `prediction-revision-comparison-results`:
+
+```sh
+python .github/scripts/prediction-start-current.py <download>/prediction-ab-results <output.json>
+```
+
+This loopback comparison does not resolve the separate high-latency server-backlog/input-stall
+issue. That failure remains an open investigation.
