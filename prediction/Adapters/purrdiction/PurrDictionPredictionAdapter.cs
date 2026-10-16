@@ -10,9 +10,17 @@ namespace PredictionBench
     {
         public NetworkManager manager;
         public PredictionManager world;
+        private readonly PurrDictionWorkCounters _workCounters = new PurrDictionWorkCounters();
         private GameObject[] _prefabs;
+#if PURRDICTION_OWNED_ONLY
+        private const PredictionPolicy PawnPolicy = PredictionPolicy.PredictedIfOwned;
+        public override string Solution => "purrdiction-owned";
+        public override string PredictionScope => "PredictedIfOwned: owned objects predict and replay; remote objects run verified ServerRelay ticks";
+#else
+        private const PredictionPolicy PawnPolicy = PredictionPolicy.FullPrediction;
         public override string Solution => "purrdiction";
         public override string PredictionScope => "FullPrediction for every object; world rollback";
+#endif
         public override string ReplayDefinition => "PredictionManager.isReplaying (verified + gap + speculative); diagnosticJson separates passes";
         public override bool Connected => (Server ? manager.isServer : manager.isClient) && world.isSpawned;
         public override int ConnectedClients => manager.playerCount;
@@ -36,7 +44,7 @@ namespace PredictionBench
                 pawn.SetActive(false);
                 var component = pawn.AddComponent<PurrDictionPredictionPawn>();
                 component.Index = i;
-                component.SetPredictionPolicyOverride(PredictionPolicy.FullPrediction);
+                component.SetPredictionPolicyOverride(PawnPolicy);
                 _prefabs[i] = pawn;
                 prefabs.prefabs.Add(new PredictedPrefab { prefab = pawn, pooled = false });
             }
@@ -52,7 +60,14 @@ namespace PredictionBench
         public override PawnSnapshot[] Snapshot() => FindObjectsByType<PurrDictionPredictionPawn>(FindObjectsSortMode.None)
             .Where(p => p.predictionManager && p.gameObject.activeInHierarchy)
             .Select(p => new PawnSnapshot { index = p.Index, owned = p.IsOwner(), state = p.currentState.value }).ToArray();
-        public override void BeginDiagnostics() => PredictionPerformanceTelemetry.Begin(world);
-        public override string EndDiagnostics() => JsonUtility.ToJson(PredictionPerformanceTelemetry.End());
+        public override void BeginDiagnostics()
+        {
+            if (Config.detailedDiagnostics) PredictionPerformanceTelemetry.Begin(world);
+        }
+        public override string EndDiagnostics() => Config.detailedDiagnostics
+            ? JsonUtility.ToJson(PredictionPerformanceTelemetry.End()) : "{}";
+        public override void BeginWorkCounters() => _workCounters.Begin(world);
+        public override string EndWorkCounters() => _workCounters.End(world);
+        public override string MemoryDiagnostics() => JsonUtility.ToJson(PurrDictionMemoryDiagnostics.Capture(world));
     }
 }

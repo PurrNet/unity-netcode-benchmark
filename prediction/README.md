@@ -10,6 +10,64 @@ promotional charts, or the existing benchmark-history upload.
 The first suite answers how much input/state prediction costs, how that changes with object
 population and client count, and how much native replay work is performed. It is a diagnostic
 baseline. It does not yet establish an overall winner or cover all prediction architectures.
+Each accepted case must process at least one new input command on the server during sampling.
+State changes from warmup and continuing simulation callbacks cannot validate a stalled input
+stream; final convergence is checked separately. This rejects inactive work without adjusting
+CPU scores or requiring interchangeable replay counts across adapters.
+The [retained release baseline](results/README.md) includes CPU samples and frozen source/build
+fingerprints from a completed comparison, independently of CI artifact retention.
+
+New workflow builds default to release IL2CPP players (`profiling=false`). Enable
+`profiling=true` when development-build allocation counters are needed; compare players with
+matching build settings and check the effective modes recorded in their peer results.
+
+New PurrDiction players also record `workCountersJson` with start/end snapshots of existing
+world counters immediately outside CPU timing. This runs independently of detailed telemetry,
+including release players with `diagnostics=off`; it adds no per-tick instrumentation. Reports
+show counter differences per second without adjusting CPU scores. Raw snapshots retain input
+transmissions, received frames, reconciliation batches, lead changes, and endpoint tick/ACK-lag
+gauges. Input-window ticks include retransmissions, not unique commands; render/tick apply
+counters count batches, not every received frame. Prepared frame/section counts include bodies
+replaced before sending. Frame payload bytes precede RPC compression, headers and fragmentation
+and are not wire bandwidth. The observed prepared section bits exclude full frames and trailing
+event sections.
+
+The additional harness code changes its provenance hash. Rebuild both revisions with this same
+harness for new comparisons; do not compare a newly instrumented player against an older frozen
+player as a code-only change. Legacy artifacts remain readable with work counters unavailable.
+An A/A run can set `baseline_run` and `candidate_run` to the same frozen run to measure apparent
+differences without a binary change. A/A variation is context, not a correction factor or a
+universal noise threshold.
+Set `revision_shared_directory=true` for an additional A/A diagnostic that launches both
+slots from the same extracted player directory. It requires identical frozen run IDs and
+defaults to false. This probes directory placement as a possible source of variation without
+establishing a cause. Manifests record the directory mode, and reports keep modes separate.
+Host snapshots retain raw frequency and scheduler observations; aggregation uses stable host
+identity (including boot ID), rather than changing snapshot timestamps or counters.
+
+For revision comparisons, dispatch **Prediction Benchmark** with `baseline_run` and
+`candidate_run` set to two successful prediction run IDs. This optional mode downloads
+their existing PurrDiction players and alternates baseline/candidate order on one runner.
+Both revisions use identical sampling parameters and fresh processes. Separate reports retain
+the original build provenance and runtime hashes. This helps distinguish code changes from
+differences between hosted runners; the source artifacts expire after three days.
+
+To repeat an adapter comparison without rebuilding, set `reuse_run` to an existing prediction
+run ID that contains every selected player. Sources, Unity version and build settings come
+from those frozen artifacts; `purrdiction_ref` and `profiling` do not rebuild them in this mode.
+Runtime sampling and diagnostics inputs still apply. Within each workload, repeats rotate
+adapter order to distribute early and late positions. Use a repeat count divisible by the
+number of adapters for balanced positions.
+
+When only PurrDiction changes, keep `reuse_run` for the frozen comparison players and set
+`purrdiction_run` to the run containing the new PurrDiction players. Both PurrDiction policies
+use the override; FishNet and Fusion keep their original binaries. The override must contain
+every selected PurrDiction policy. Missing players fail before measurement, and raw results
+retain each selected binary's source provenance and runtime hash.
+
+Hosted builds may run while another revision is being measured. Standard hosted loopback
+comparisons and revision A/B jobs use independent VMs. Fusion comparisons and custom runners
+share the replication scaling runner lock and queue without replacing one another.
 
 ## Workload and adapters
 
@@ -29,6 +87,7 @@ Object populations are fixed independently of connection count.
 | Adapter | Native path | Prediction scope |
 |---|---|---|
 | PurrDiction | `PredictedIdentity<INPUT, STATE>`, `GetFinalInput`, `Simulate`; `FullPrediction` | Every object participates in world prediction/replay |
+| PurrDiction owned (optional `purrdiction-owned`) | Same API and source revision; existing `PredictedIfOwned` policy | Owned objects predict and replay; remote objects run verified `ServerRelay` ticks |
 | FishNet | `TickNetworkBehaviour`, `[Replicate]`, `[Reconcile]`; prediction and state forwarding enabled | Owned objects and spectators process forwarded state/input |
 | Fusion 2 | `INetworkInput`, `OnInput`, `[Networked]` state, `FixedUpdateNetwork`; dedicated `GameMode.Server` | Native input-authority prediction; proxies receive networked state |
 
@@ -37,6 +96,18 @@ exercise this server-authoritative rollback/resimulation path. FishNet's state f
 explicitly enabled in the generated prefab. These scopes are reported alongside results; a
 solution doing less speculative world work cannot be described as performing the same service
 just because its CPU number is smaller.
+
+Input distribution also follows each native API. Fusion collects one 12-byte command per
+player per tick in `OnInput`; all of that player's input-authority pawns consume that stream.
+PurrDiction and FishNet collect a command separately for each owned pawn. Pawns use the same
+command generator, but input record counts are not normalized across adapters. This workload
+does not compare independently controlled objects or establish equal input-processing work.
+
+Include `purrdiction-owned` in the `solutions` input to measure that existing policy separately.
+It has its own player artifact, solution name, policy provenance and report rows, so its results
+cannot be pooled with `purrdiction`. The default matrix keeps the full-world case. The owned
+variant is closer to Fusion's input-authority scope, but still executes verified remote simulation;
+it does not make the adapters identical or measure interactions between predicted objects.
 
 Replay counters also have native meanings: PurrDiction `isReplaying` includes verified, gap,
 and speculative passes; FishNet uses `ContainsReplayed`; Fusion uses `IsResimulation`.
@@ -51,13 +122,17 @@ to listen before starting clients, including waiting for Fusion's cloud room to 
 peers must receive the complete object population before an HTTP readiness barrier releases
 warmup. Control traffic is outside timing; there is no coordinator polling during measurement.
 
-Every process collects its own wall-clock window after three seconds of warmup and a full GC.
-The suite reuses the established load sampler for whole-process CPU, frame distributions,
+Every process collects its own wall-clock window after warmup (three seconds by default) and a full GC.
+The workflow's `warmup_seconds` input can use 20 seconds to measure filled histories separately
+from startup growth; compare all adapters with the same warmup and sampling duration.
+The suite reuses the established load sampler for whole-process CPU (Linux process clock or
+Windows `GetProcessTimes`, summing all threads), frame distributions,
 managed heap, allocations/GC and Linux RSS. Harness and diagnostic overhead is included.
 Development mode and scripting backend are recorded. The frame cap is 60 fps, so frame time
 includes pacing; use process CPU and native work counters to investigate cost. Exact allocation
 counters depend on Unity availability; the sampler marks heap-growth estimates explicitly.
-Linux process CPU/RSS are unavailable in Windows smoke runs.
+Peak RSS and interface counters remain unavailable in Windows runs. Older Windows reports
+without a CPU availability flag keep CPU marked unavailable.
 FishNet's native server/client frame-rate settings are set to 60, and the common harness
 reasserts the cap before warmup and timing. Changing that cap or losing the native connection
 during measurement fails the case.
@@ -95,6 +170,22 @@ profiles, input latency and presentation-error instrumentation, colliding rigidb
 large/history-owning states, spawn churn and outage recovery. PurrDiction's existing full physics
 benchmark is a separate diagnostic source; it must not be scored against this math-only workload.
 
+PurrDiction also exports `memoryDiagnosticJson` after the measured window. It counts the
+benchmark pawns' predicted, verified, and input history slots, live entries, and backing-array
+payload bytes. This excludes array/object headers, owned payloads, framework statics, and
+native memory; it is not a whole-heap census. An unavailable census reports its error instead
+of treating missing reflection metadata or an empty population as zero memory.
+The optional `hierarchy` section separately counts hierarchy history arrays and the unique
+piece/deletion lists retained by those histories, including their list capacities. List slots
+are reported separately from array payload bytes and are not a whole-heap estimate.
+
+For a retained-heap investigation, add `--memory-snapshots` to a local launcher command.
+It captures server and client-1 `.snap` files after measurement, input shutdown, and final
+state capture, with a full collection first. Players keep networking alive until those
+captures finish. Open the files in Unity's Memory Profiler; timing and heap figures in the
+report were recorded before capture. The launcher rejects missing captures and older
+players that ignore the request. Ordinary runs do not request snapshots.
+
 ## Local runs
 
 Generate projects without modifying the replication projects. PurrDiction needs a source checkout;
@@ -126,6 +217,42 @@ python .github/scripts/test-prediction-bench.py
 For a quick functional smoke run use one client, eight objects, one repeat and a two-second
 window. That verifies integration and convergence, not comparative performance. Each invocation
 gets a unique results folder and preserves earlier runs. The default workflow runs 108 cases.
+
+Detailed native pass telemetry defaults to on in development players and off in release
+players when launched with `auto`. The workflow defaults to `off` for comparisons.
+Use `--diagnostics on|off|auto` (or the workflow's `diagnostics` input) to override
+it. The player records the effective mode; explicit requests fail validation if an older
+player ignores them. Reports keep on, off, and unrecorded legacy modes in separate groups.
+Gameplay counters and final-state validation remain active in every mode. Use diagnostics
+off for cross-adapter CPU/memory comparisons, and on for investigating PurrDiction passes.
+
+Counter initialization is outside the CPU/wall measurement window. Raw `load.setupWallSeconds`
+records that setup duration separately. Builds made before this change include setup in
+their sampled clocks, so compare revisions built with the same harness version.
+Warmup, the sample deadline, CPU denominator, and sampled frame intervals use one monotonic
+clock (`CLOCK_MONOTONIC` on Linux, Stopwatch on Windows). Raw `load.wallClock` identifies it;
+`load.unityWallSeconds` and `load.stopwatchWallSeconds` separately record those elapsed times
+to expose clock disagreement.
+The first partial frame interval is excluded from frame distributions.
+
+Each case also saves `host.json` before launching players and after they exit: available CPU
+model names, reported MHz, Linux scheduler counters (including steal), VM boot ID and clock
+source. The manifest includes an initial host snapshot. These optional diagnostics cover the
+whole case, including startup and warmup; they do not represent the player timing window and
+are never used to normalize scores. Missing host counters remain unavailable.
+
+For native CPU investigation, dispatch the same workflow with `profile_run` set to an existing
+player-build run, one `solutions` adapter, one client/tick/object count, `seconds=50`, and
+`warmup_seconds=20`. It samples the server and first client's main threads after warmup.
+Set `profile_all_threads=true` to sample every thread in each process instead. The capture
+also reports per-thread CPU time over the sampling interval, identifies newly observed and
+exited threads, and excludes exited threads from CPU deltas when their final counters are
+unavailable. Per-thread sample counts are reported separately: compare their coverage with
+CPU counters before interpreting aggregate stack percentages as CPU-time shares.
+It checks matching ELF symbol build IDs and uploads `prediction-native-profile` with raw stacks,
+workload validation, and a summary of Unity frame-wait samples. Missing frame-wait symbols
+produce an unavailable percentage. These sampled runs carry a diagnostic marker and have
+their own artifact; they do not produce a comparative performance report.
 
 Primary references: [PurrDiction](https://purrnet.gitbook.io/docs/client-side-prediction),
 [FishNet prediction](https://fish-networking.gitbook.io/docs/guides/features/prediction),

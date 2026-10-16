@@ -15,11 +15,17 @@ namespace PredictionBench
         public int schemaVersion = 1;
         public string suite = "prediction", workload = "sequenced-state-v1";
         public string solution, predictionScope, replayDefinition, unityVersion, peer, role, diagnosticJson, provenanceJson;
+        public string workCountersJson;
         public bool success, restoresAvailable;
         public bool linuxMetricsAvailable, developmentBuild;
+        public bool cpuMetricsAvailable;
+        public bool detailedDiagnostics;
         public string scriptingBackend;
         public string networkCounterScope = "host-wide loopback aggregate; not per-peer bandwidth; excludes Photon Cloud traffic";
         public string error;
+        public string memoryDiagnosticJson;
+        public bool memorySnapshotRequested, memorySnapshotSucceeded;
+        public string memorySnapshotPath;
         public PredictionConfig config;
         public int actualTickRate, observedObjects, ownedObjects;
         public int requestedFrameCap = 60, actualFrameCap;
@@ -54,11 +60,13 @@ namespace PredictionBench
                 region = Arg("-region", "eu"), clients = int.Parse(Arg("-count", "1")),
                 objects = int.Parse(Arg("-benchObjects", "32")), tickRate = int.Parse(Arg("-tickRate", "60")),
                 port = int.Parse(Arg("-port", "17800")), seconds = float.Parse(Arg("-benchSeconds", "10"), System.Globalization.CultureInfo.InvariantCulture),
-                warmupSeconds = float.Parse(Arg("-warmupSeconds", "3"), System.Globalization.CultureInfo.InvariantCulture)
+                warmupSeconds = float.Parse(Arg("-warmupSeconds", "3"), System.Globalization.CultureInfo.InvariantCulture),
+                detailedDiagnostics = bool.Parse(Arg("-predictionDiagnostics", Debug.isDebugBuild ? "true" : "false"))
             };
             _report = new PredictionReport { solution = adapter.Solution, predictionScope = adapter.PredictionScope,
                 replayDefinition = adapter.ReplayDefinition, restoresAvailable = adapter.RestoresAvailable,
-                unityVersion = Application.unityVersion, peer = _config.peer, role = _config.role, config = _config };
+                unityVersion = Application.unityVersion, peer = _config.peer, role = _config.role, config = _config,
+                detailedDiagnostics = _config.detailedDiagnostics };
             _report.provenanceJson = Resources.Load<TextAsset>("PredictionProvenance").text;
             _report.linuxMetricsAvailable = File.Exists("/proc/self/stat");
             _report.developmentBuild = Debug.isDebugBuild;
@@ -111,19 +119,21 @@ namespace PredictionBench
             Application.targetFrameRate = 60;
             QualitySettings.vSyncCount = 0;
             PredictionWorkload.Running = true;
-            yield return new WaitForSecondsRealtime(_config.warmupSeconds);
+            double warmupEnd = LoadSampler.MonotonicSeconds() + _config.warmupSeconds;
+            while (LoadSampler.MonotonicSeconds() < warmupEnd) yield return null;
             GC.Collect();
             Application.targetFrameRate = 60;
             _report.actualFrameCap = Application.targetFrameRate;
             GC.WaitForPendingFinalizers();
             GC.Collect();
             _report.rttMs = adapter.RttMs;
+            adapter.BeginWorkCounters();
             adapter.BeginDiagnostics();
             PredictionWorkload.Begin();
             _sampler.Begin(Arg("-iface", "lo"));
-            double end = Time.realtimeSinceStartupAsDouble + _config.seconds;
+            double end = LoadSampler.MonotonicSeconds() + _config.seconds;
             yield return null; // Exclude the frame that established the measurement window.
-            while (Time.realtimeSinceStartupAsDouble < end && _error == null)
+            while (LoadSampler.MonotonicSeconds() < end && _error == null)
             {
                 if (!adapter.Connected || Application.targetFrameRate != 60)
                 { _error = "Connection or frame-cap changed during measurement"; break; }
@@ -131,8 +141,11 @@ namespace PredictionBench
                 yield return null;
             }
             _report.load = _sampler.End();
+            _report.cpuMetricsAvailable = _report.load.cpuPercent >= 0;
             PredictionWorkload.Sampling = false;
             _report.diagnosticJson = adapter.EndDiagnostics();
+            _report.workCountersJson = adapter.EndWorkCounters();
+            _report.memoryDiagnosticJson = adapter.MemoryDiagnostics();
             _report.forwardCalls = PredictionWorkload.ForwardCalls;
             _report.replayCalls = PredictionWorkload.ReplayCalls;
             _report.ownedForwardCalls = PredictionWorkload.OwnedForwardCalls;
@@ -151,6 +164,30 @@ namespace PredictionBench
             }
             yield return new WaitForSecondsRealtime(5);
             _report.finalState = adapter.Snapshot().OrderBy(p => p.index).ToArray();
+            // Optional retained-heap diagnostic, after timing, input shutdown and final state capture.
+            string snapshotPath = Arg("-predictionMemorySnapshot", "");
+            if (!string.IsNullOrEmpty(snapshotPath))
+            {
+                _report.memorySnapshotRequested = true;
+                _report.memorySnapshotPath = Path.GetFullPath(snapshotPath);
+                bool completed = false;
+                if (File.Exists(_report.memorySnapshotPath))
+                    _error = "Refusing to replace memory snapshot: " + _report.memorySnapshotPath;
+                else
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(_report.memorySnapshotPath));
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers();
+                    GC.Collect();
+                    Unity.Profiling.Memory.MemoryProfiler.TakeSnapshot(_report.memorySnapshotPath,
+                        (_, success) => { _report.memorySnapshotSucceeded = success; completed = true; },
+                        Unity.Profiling.Memory.CaptureFlags.ManagedObjects | Unity.Profiling.Memory.CaptureFlags.NativeObjects);
+                    double snapshotDeadline = Time.realtimeSinceStartupAsDouble + 30;
+                    while (!completed && Time.realtimeSinceStartupAsDouble < snapshotDeadline) yield return null;
+                    if (!completed || !_report.memorySnapshotSucceeded)
+                        _error = "Memory snapshot capture failed or timed out";
+                }
+            }
             bool active = _report.forwardCalls + _report.replayCalls > 0 &&
                 _report.finalState.Length == _config.objects && _report.finalState.All(p => p.state.appliedInputs > 0);
             Finish(active && _error == null, _error ?? (active ? null : "Inactive or incomplete predicted workload"), quit: false);

@@ -18,8 +18,94 @@ import threading
 import time
 import uuid
 
-SOLUTIONS = ('purrdiction', 'fishnet', 'fusion')
+SOLUTIONS = ('purrdiction', 'purrdiction-owned', 'fishnet', 'fusion')
 WORKLOAD = 'sequenced-state-v1'
+WORK_COUNTER_NAMES = (
+    'deltaFramesWrittenTotal', 'fullFramesSentTotal',
+    'deltaSectionDeleteBitsTotal', 'deltaSectionHierarchyBitsTotal',
+    'deltaSectionInputBitsTotal', 'deltaSectionStateBitsTotal',
+    'deltaFrameBytesTotal', 'fullFrameBytesTotal',
+    'inputSendsTotal', 'inputBytesSentTotal', 'inputTicksSentTotal',
+    'framesReceivedTotal', 'fullFramesReceivedTotal',
+    'leadJumpsTotal', 'leadPausesTotal', 'minLeadSnapsTotal', 'starvationJumpsTotal',
+    'renderPhaseFrameAppliesTotal', 'tickPhaseFrameAppliesTotal',
+)
+
+
+def work_counter_delta(report):
+    """Validate optional boundary snapshots; legacy/other adapters remain unavailable."""
+    provenance = json.loads(report.get('provenanceJson') or '{}')
+    if not isinstance(provenance, dict):
+        raise ValueError('Invalid work counter provenance')
+    expected = provenance.get('workCountersSchema')
+    raw = report.get('workCountersJson')
+    if expected is not None and (type(expected) is not int or expected != 1):
+        raise ValueError('Unsupported work counter capability')
+    if not raw:
+        if expected is not None:
+            raise ValueError('Missing promised work counters')
+        return None
+    window = json.loads(raw)
+    if not isinstance(window, dict) or type(window.get('schemaVersion')) is not int or window['schemaVersion'] != 1:
+        raise ValueError('Unsupported work counter window')
+    for name in ('scope', 'sectionScope', 'byteScope'):
+        if not isinstance(window.get(name), str) or not window[name]:
+            raise ValueError('Missing work counter scope')
+    for name in ('localTickStart', 'localTickEnd', 'maxAckLagTicksStart', 'maxAckLagTicksEnd'):
+        value = window.get(name)
+        if type(value) is not int or not 0 <= value <= 2**64 - 1:
+            raise ValueError('Invalid work counter gauge')
+    snapshots = [window.get(name) for name in ('start', 'end')]
+    for snapshot in snapshots:
+        if not isinstance(snapshot, dict) or set(snapshot) != set(WORK_COUNTER_NAMES):
+            raise ValueError('Incomplete work counter snapshot')
+        if any(type(value) is not int or not 0 <= value <= 2**64 - 1 for value in snapshot.values()):
+            raise ValueError('Invalid work counter value')
+    start, end = snapshots
+    if any(end[name] < start[name] for name in WORK_COUNTER_NAMES):
+        raise ValueError('Work counter reset during measurement')
+    return {name: end[name] - start[name] for name in WORK_COUNTER_NAMES}
+
+
+def host_snapshot(proc=Path('/proc'), sysfs=Path('/sys')):
+    """Optional VM-wide context, collected outside player timing; never normalize scores."""
+    def read(path):
+        try:
+            return path.read_text(errors='replace').strip()
+        except OSError:
+            return ''
+    models, mhz = set(), []
+    for line in read(proc / 'cpuinfo').splitlines():
+        key, separator, value = line.partition(':')
+        if not separator:
+            continue
+        key, value = key.strip().lower(), value.strip()
+        if key in ('model name', 'hardware') and value:
+            models.add(value)
+        if key == 'cpu mhz':
+            try:
+                frequency = float(value)
+                if math.isfinite(frequency) and frequency > 0:
+                    mhz.append(frequency)
+            except ValueError:
+                pass
+    ticks = None
+    for line in read(proc / 'stat').splitlines():
+        if line.startswith('cpu '):
+            try:
+                ticks = dict(zip(('user', 'nice', 'system', 'idle', 'iowait', 'irq',
+                                  'softirq', 'steal', 'guest', 'guestNice'), map(int, line.split()[1:])))
+            except ValueError:
+                pass
+            break
+    try:
+        tick_rate = os.sysconf('SC_CLK_TCK')
+    except (AttributeError, OSError, ValueError):
+        tick_rate = None
+    return dict(capturedMonotonic=time.monotonic(), cpuModels=sorted(models), cpuMhz=mhz,
+                schedulerCpuTicks=ticks, schedulerTicksPerSecond=tick_rate,
+                bootId=read(proc / 'sys/kernel/random/boot_id') or None,
+                clockSource=read(sysfs / 'devices/system/clocksource/clocksource0/current_clocksource') or None)
 
 
 def csv_ints(text, minimum, maximum):
@@ -38,9 +124,15 @@ def make_plan(solutions, clients, ticks, objects, repeats, seconds, warmup):
         raise ValueError('Each object count must give every client at least one owned object')
     if not 1 <= repeats <= 20 or not math.isfinite(seconds) or not 0.1 <= seconds <= 600 or not math.isfinite(warmup) or not 0 <= warmup <= 60:
         raise ValueError('Invalid measurement duration, warmup or repeat count')
-    return [dict(id=i, solution=s, clients=n, tickRate=t, objects=o, repeat=r,
-                 seconds=seconds, warmupSeconds=warmup, workload=WORKLOAD)
-            for i, (s, n, t, o, r) in enumerate(itertools.product(selected, counts, rates, populations, range(1, repeats + 1)), 1)]
+    cases = []
+    for n, t, o in itertools.product(counts, rates, populations):
+        for r in range(1, repeats + 1):
+            offset = (r - 1) % len(selected)
+            for s in selected[offset:] + selected[:offset]:
+                cases.append(dict(id=len(cases) + 1, solution=s, clients=n, tickRate=t,
+                                  objects=o, repeat=r, seconds=seconds,
+                                  warmupSeconds=warmup, workload=WORKLOAD))
+    return cases
 
 
 class Barrier:
@@ -114,11 +206,20 @@ def validate_case(case, reports):
         raise ValueError('Missing or unexpected peer reports')
     snapshots = {}
     owners = []
+    modes = [report.get('detailedDiagnostics') for report in reports.values()]
+    if any(mode is not None and type(mode) is not bool for mode in modes) or len(set(modes)) != 1:
+        raise ValueError('Mismatched detailed diagnostics modes')
+    requested = case.get('diagnostics', 'auto')
+    if requested not in ('auto', 'on', 'off'):
+        raise ValueError('Invalid detailed diagnostics mode')
+    if requested in ('on', 'off') and modes[0] is not (requested == 'on'):
+        raise ValueError('Player did not honor the requested detailed diagnostics mode')
     for peer, report in reports.items():
         if not report.get('success') or report.get('schemaVersion') != 1 or report.get('suite') != 'prediction':
             raise ValueError(f'{peer}: failed or unsupported report: {report.get("error")}')
         if report.get('solution') != case['solution'] or report.get('workload') != WORKLOAD or report.get('peer') != peer:
             raise ValueError(f'{peer}: wrong solution, workload or peer')
+        work_counter_delta(report)
         config = report.get('config', {})
         for key in ('clients', 'objects', 'tickRate', 'seconds', 'warmupSeconds'):
             if config.get(key) != case[key]:
@@ -135,6 +236,8 @@ def validate_case(case, reports):
             raise ValueError(f'{peer}: incomplete measurement window')
         if report.get('forwardCalls', 0) + report.get('replayCalls', 0) < 1:
             raise ValueError(f'{peer}: no native prediction callbacks')
+        if role == 'server' and (type(report.get('appliedInputs')) is not int or report['appliedInputs'] < 1):
+            raise ValueError(f'{peer}: no new input commands during sampling')
         if role == 'client' and report.get('ownedForwardCalls', 0) < 1:
             raise ValueError(f'{peer}: no owned forward prediction callbacks')
         entries = report.get('finalState', [])
@@ -185,8 +288,19 @@ def stop_process(process):
     process.wait(timeout=10)
 
 
-def run_case(case, binary, directory, timeout, region):
+def validate_memory_snapshots(reports, directory):
+    for peer in ('server', 'client-1'):
+        report = reports[peer]
+        expected = directory / (peer + '.snap')
+        if not report.get('memorySnapshotRequested') or not report.get('memorySnapshotSucceeded'):
+            raise ValueError(f'{peer}: memory snapshot was not captured')
+        if Path(report.get('memorySnapshotPath', '')).resolve() != expected.resolve() or not expected.is_file() or expected.stat().st_size == 0:
+            raise ValueError(f'{peer}: missing or mismatched memory snapshot artifact')
+
+
+def run_case(case, binary, directory, timeout, region, memory_snapshots=False):
     directory.mkdir()
+    host_before = host_snapshot()
     deadline = time.monotonic() + timeout
     peers = ['server', *(f'client-{i}' for i in range(1, case['clients'] + 1))]
     commands, processes, streams = {}, {}, []
@@ -201,6 +315,10 @@ def run_case(case, binary, directory, timeout, region):
                     '-serverHost', '127.0.0.1', '-port', '17800', '-session', session, '-region', region,
                     '-predictionResults', str(directory / (peer + '.json')), '-logFile', str(directory / (peer + '.log')),
                     '-job-worker-count', '2']
+                if memory_snapshots and peer in ('server', 'client-1'):
+                    commands[peer] += ['-predictionMemorySnapshot', str(directory / (peer + '.snap'))]
+                if case.get('diagnostics', 'auto') != 'auto':
+                    commands[peer] += ['-predictionDiagnostics', str(case['diagnostics'] == 'on').lower()]
                 stream = (directory / (peer + '.stdout.log')).open('wb')
                 streams.append(stream)
                 command = commands[peer]
@@ -226,12 +344,18 @@ def run_case(case, binary, directory, timeout, region):
                 time.sleep(.2)
             reports = {peer: json.loads((directory / (peer + '.json')).read_text(encoding='utf-8-sig')) for peer in peers}
             validate_case(case, reports)
+            if memory_snapshots:
+                validate_memory_snapshots(reports, directory)
             return reports
     finally:
         for process in processes.values():
             stop_process(process)
         for stream in streams:
             stream.close()
+        host_after = host_snapshot()
+        (directory / 'host.json').write_text(json.dumps(dict(before=host_before, after=host_after,
+            intervalSeconds=host_after['capturedMonotonic'] - host_before['capturedMonotonic'],
+            scope='VM-wide whole-case context including startup, warmup and shutdown; not the player measurement window. Not used to normalize scores.'), indent=2))
 
 
 def inventory(root):
@@ -257,8 +381,14 @@ def main():
     parser.add_argument('--output', type=Path, default=Path('prediction-results'))
     parser.add_argument('--region', default='eu')
     parser.add_argument('--dry-run', action='store_true')
+    parser.add_argument('--diagnostics', choices=('auto', 'on', 'off'), default='auto',
+                        help='Detailed native pass telemetry: auto enables it only in development players')
+    parser.add_argument('--memory-snapshots', action='store_true',
+                        help='Capture server/client-1 retained heaps after sampling and final state capture')
     args = parser.parse_args()
     plan = make_plan(args.solutions, args.clients, args.ticks, args.objects, args.repeats, args.seconds, args.warmup)
+    for case in plan:
+        case['diagnostics'] = args.diagnostics
     if not math.isfinite(args.timeout) or args.timeout < args.seconds + args.warmup + 15:
         parser.error('--timeout must leave at least 15 seconds outside sampling and warmup')
     run = args.output.resolve() / (time.strftime('%Y%m%d-%H%M%S') + '-' + uuid.uuid4().hex[:8])
@@ -267,7 +397,9 @@ def main():
         'execution': 'Sequential cases; one dedicated server plus N clients sharing one machine',
         'network': 'Direct loopback for PurrDiction/FishNet; Photon Cloud Server mode for Fusion; no artificial delay/loss',
         'comparison': 'Diagnostic baseline, not an overall ranking. Prediction scopes and transport routes differ.',
-        'machine': {'platform': platform.platform(), 'processor': platform.processor(), 'logicalProcessors': os.cpu_count()},
+        'machine': {'platform': platform.platform(), 'processor': platform.processor(), 'logicalProcessors': os.cpu_count(),
+                    'hostSnapshot': host_snapshot(),
+                    'executionDirectoryMode': os.environ.get('PREDICTION_EXECUTION_DIRECTORY_MODE', 'adapter-default')},
         'workflowRun': os.environ.get('GITHUB_RUN_ID'), 'benchmarkCommit': os.environ.get('GITHUB_SHA'), 'region': args.region, 'players': {}}
     for solution in {case['solution'] for case in plan}:
         binary = args.players.resolve() / solution / ('PredictionBench.exe' if os.name == 'nt' else 'PredictionBench')
@@ -282,7 +414,7 @@ def main():
     for case in plan:
         print(f'Case {case["id"]}/{len(plan)}: {case}', flush=True)
         try:
-            run_case(case, Path(manifest['players'][case['solution']]['path']), run / f'case-{case["id"]:04d}', args.timeout, args.region)
+            run_case(case, Path(manifest['players'][case['solution']]['path']), run / f'case-{case["id"]:04d}', args.timeout, args.region, args.memory_snapshots)
         except Exception as error:
             failures.append({'id': case['id'], 'error': str(error)})
             print(f'Failed: {error}', flush=True)

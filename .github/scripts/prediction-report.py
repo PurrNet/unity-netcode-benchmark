@@ -13,6 +13,16 @@ BENCH = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(BENCH)
 
 
+def stable_machine(machine):
+    """Keep host identity and capture modes; retain transient observations only in raw data."""
+    result = dict(machine)
+    snapshot = result.get('hostSnapshot')
+    if isinstance(snapshot, dict):
+        result['hostSnapshot'] = {key: snapshot[key] for key in
+                                  ('cpuModels', 'bootId', 'clockSource') if key in snapshot}
+    return result
+
+
 def render(source, output):
     output.mkdir(parents=True, exist_ok=True)
     groups, failures, raw = {}, [], []
@@ -40,19 +50,27 @@ def render(source, output):
             for role in ('server', 'client'):
                 peers = [report for report in reports.values() if report['role'] == role]
                 # Never silently pool different binaries, build modes, or hardware.
-                build_inputs = [peers[0].get('provenanceJson'), manifest.get('players', {}).get(case['solution'], {}).get('runtimeSha256')]
+                build_inputs = [peers[0].get('provenanceJson'), manifest.get('players', {}).get(case['solution'], {}).get('runtimeSha256'),
+                                peers[0].get('detailedDiagnostics')]
                 build = hashlib.sha256(json.dumps(build_inputs, sort_keys=True).encode()).hexdigest()[:12]
-                environment = json.dumps([manifest['machine'], peers[0].get('unityVersion'), peers[0].get('scriptingBackend'), peers[0].get('developmentBuild')], sort_keys=True)
+                environment = json.dumps([stable_machine(manifest['machine']), peers[0].get('unityVersion'), peers[0].get('scriptingBackend'), peers[0].get('developmentBuild')], sort_keys=True)
                 hardware = hashlib.sha256(environment.encode()).hexdigest()[:12]
                 key = (case['solution'], case['clients'], case['tickRate'], case['objects'], role, build, hardware)
                 item = groups.setdefault(key, {'samples': [], 'predictionScope': peers[0]['predictionScope'],
-                                              'replayDefinition': peers[0]['replayDefinition']})
+                                              'replayDefinition': peers[0]['replayDefinition'],
+                                              'detailedDiagnostics': peers[0].get('detailedDiagnostics'),
+                                              'workSamples': []})
                 # One datapoint per repeat; clients on the same case are averaged before
                 # taking the median across independent runs.
                 sample = {}
                 for metric in ('cpuPercent', 'p95FrameMs', 'p99FrameMs', 'managedHeapBytes', 'peakRssBytes'):
                     values = [peer['load'][metric] for peer in peers]
-                    available = metric not in ('cpuPercent', 'peakRssBytes') or all(peer.get('linuxMetricsAvailable') for peer in peers)
+                    if metric == 'cpuPercent':
+                        available = all(peer.get('cpuMetricsAvailable', peer.get('linuxMetricsAvailable')) for peer in peers)
+                    elif metric == 'peakRssBytes':
+                        available = all(peer.get('linuxMetricsAvailable') for peer in peers)
+                    else:
+                        available = True
                     sample[metric] = statistics.mean(values) if available and all(v >= 0 for v in values) else None
                 sample['callbacksPerSecond'] = statistics.mean(
                     (peer['forwardCalls'] + peer['replayCalls']) / peer['load']['wallSeconds'] for peer in peers)
@@ -60,13 +78,21 @@ def render(source, output):
                 sample['gcBytesPerSecond'] = statistics.mean(peer['load']['gcAllocBytes'] / peer['load']['wallSeconds'] for peer in peers)
                 sample['gcEstimated'] = any(peer['load']['gcAllocEstimated'] for peer in peers)
                 item['samples'].append(sample)
+                counters = [BENCH.work_counter_delta(peer) for peer in peers]
+                item['workSamples'].append({name: statistics.mean(
+                    count[name] / peer['load']['wallSeconds'] for count, peer in zip(counters, peers))
+                    for name in BENCH.WORK_COUNTER_NAMES} if all(count is not None for count in counters) else None)
     aggregates = []
     for key, group in sorted(groups.items()):
         row = dict(zip(('solution', 'clients', 'tickRate', 'objects', 'role', 'buildFingerprint', 'environmentFingerprint'), key))
-        row.update(predictionScope=group['predictionScope'], replayDefinition=group['replayDefinition'], repeats=len(group['samples']))
+        row.update(predictionScope=group['predictionScope'], replayDefinition=group['replayDefinition'],
+                   detailedDiagnostics=group['detailedDiagnostics'], repeats=len(group['samples']))
         for metric in group['samples'][0]:
             values = [sample[metric] for sample in group['samples']]
             row[metric] = any(values) if metric == 'gcEstimated' else statistics.median(values) if all(v is not None for v in values) else None
+        row['workCountersPerSecond'] = {name: statistics.median(sample[name] for sample in group['workSamples'])
+                                       for name in BENCH.WORK_COUNTER_NAMES} if all(
+                                           sample is not None for sample in group['workSamples']) else None
         aggregates.append(row)
     data = {'schemaVersion': 1, 'suite': 'prediction', 'complete': not failures and bool(raw),
             'groups': aggregates, 'failures': failures, 'raw': raw}
@@ -76,19 +102,36 @@ def render(source, output):
         'Cases run sequentially. Server and clients share one machine; this is a diagnostic baseline, not a ranking. Fusion uses Photon Cloud; PurrDiction/FishNet use loopback. No artificial latency or loss is applied.', '',
         'Client figures average peers within a run, then take the median across repeats. CPU is whole-process, all threads, as a percentage of one core. Frame time includes the 60 fps cap. RSS is the process-lifetime high-water mark. Estimated GC allocation is marked with `~`.', '',
         '**Native replay counts have different definitions and prediction scopes.** They explain work within an adapter; they are not interchangeable amounts of service.', '',
+        'Input distribution is native: Fusion collects one 12-byte command per player per tick, shared by that player\'s pawns; PurrDiction/FishNet collect commands per owned pawn. Input record counts are not normalized. This workload does not compare independently controlled objects.', '',
+        'Detailed telemetry is optional: development players enable it by default; release players disable it. On, off and unrecorded legacy modes are never pooled.', '',
         f'Validated cases: {len(raw)} / {len(raw) + len(failures)}.', '',
-        '| Solution | Clients | Hz | Objects | Role | Repeats | CPU % | Frame p95 ms | Heap MiB | Peak RSS MiB | GC bytes/s | Calls/s | Native replay calls/s |',
-        '|---|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|']
+        '| Solution | Clients | Hz | Objects | Role | Details | Repeats | CPU % | Frame p95 ms | Heap MiB | Peak RSS MiB | GC bytes/s | Calls/s | Native replay calls/s |',
+        '|---|---:|---:|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|']
     def number(value, divisor=1):
         return 'unavailable' if value is None or value < 0 else f'{value / divisor:.2f}'
     for row in aggregates:
-        lines.append('| ' + ' | '.join([row['solution'], str(row['clients']), str(row['tickRate']), str(row['objects']), row['role'], str(row['repeats']),
+        details = 'legacy' if row['detailedDiagnostics'] is None else 'on' if row['detailedDiagnostics'] else 'off'
+        lines.append('| ' + ' | '.join([row['solution'], str(row['clients']), str(row['tickRate']), str(row['objects']), row['role'], details, str(row['repeats']),
             number(row['cpuPercent']), number(row['p95FrameMs']), number(row['managedHeapBytes'], 1048576), number(row['peakRssBytes'], 1048576),
             ('~' if row['gcEstimated'] else '') + number(row['gcBytesPerSecond']), number(row['callbacksPerSecond']), number(row['replayCallbacksPerSecond'])]) + ' |')
     lines += ['', '## Adapter semantics', '']
     for solution in sorted({row['solution'] for row in aggregates}):
         row = next(row for row in aggregates if row['solution'] == solution)
         lines.append(f'- **{solution}**: {row["predictionScope"]}. Replay classification: {row["replayDefinition"]}.')
+    work_rows = [row for row in aggregates if row['workCountersPerSecond'] is not None]
+    if work_rows:
+        lines += ['', '## PurrDiction work counters', '',
+                  'Existing per-world counters are read outside CPU timing, including release runs with detailed diagnostics off. Client peers are averaged before repeat medians. These describe work; CPU scores are not normalized.', '',
+                  'Prepared delta frames/section bits include bodies replaced before sending. State/input sections exclude full frames and trailing event sections. Frame body bytes are before RPC compression, headers and fragmentation; they are not wire bandwidth. Start/end snapshots and lead-adjustment counters remain in raw JSON.', '',
+                  '| Policy | Clients | Hz | Objects | Role | Prepared deltas/s | Prepared state kbit/s | Prepared input kbit/s | Frame body KiB/s | Received frames/s | Input sends/s |',
+                  '|---|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|']
+        for row in work_rows:
+            work = row['workCountersPerSecond']
+            lines.append('| ' + ' | '.join([row['solution'], str(row['clients']), str(row['tickRate']), str(row['objects']), row['role'],
+                number(work['deltaFramesWrittenTotal']), number(work['deltaSectionStateBitsTotal'], 1000),
+                number(work['deltaSectionInputBitsTotal'], 1000),
+                number(work['deltaFrameBytesTotal'] + work['fullFrameBytesTotal'], 1024),
+                number(work['framesReceivedTotal']), number(work['inputSendsTotal'])]) + ' |')
     if failures:
         lines += ['', '## Incomplete cases', '']
         lines += [f'- {item["case"]["solution"]}, case {item["case"]["id"]}: {item["error"]}' for item in failures]

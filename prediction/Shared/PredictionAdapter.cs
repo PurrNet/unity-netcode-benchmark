@@ -9,6 +9,7 @@ namespace PredictionBench
         public string role, peer, coordinator, serverHost, session, region;
         public int clients, objects, tickRate, port;
         public float seconds, warmupSeconds;
+        public bool detailedDiagnostics;
     }
 
     [Serializable]
@@ -36,7 +37,10 @@ namespace PredictionBench
         protected abstract void Connect();
         public abstract void Spawn();
         public abstract PawnSnapshot[] Snapshot();
+        public virtual void BeginWorkCounters() { }
+        public virtual string EndWorkCounters() => null;
         public virtual void BeginDiagnostics() { }
         public virtual string EndDiagnostics() => "{}";
+        public virtual string MemoryDiagnostics() => null;
     }
 }

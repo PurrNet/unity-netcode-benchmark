@@ -36,18 +36,27 @@ namespace PurrNet.NetBench
         /// <summary>Process-lifetime RSS high-water mark, not a per-window peak.</summary>
         public long peakRssBytes;
         public double wallSeconds;
+        /// <summary>Counter initialization excluded from the sampled CPU/wall window.</summary>
+        public double setupWallSeconds;
+        public double unityWallSeconds;
+        public double stopwatchWallSeconds;
+        public string wallClock;
         public IfaceCounters ifaceDelta;
     }
 
     /// <summary>
     /// Process CPU time (all threads, from /proc/self/stat), main-thread frame times, GC pressure,
-    /// peak RSS and on-wire interface counters (/proc/net/dev) over a measurement window. Linux only
-    /// for CPU/RSS/iface; frame stats work everywhere.
+    /// peak RSS and on-wire interface counters (/proc/net/dev) over a measurement window.
+    /// CPU supports Linux and Windows; RSS/iface are Linux only. Frame stats work everywhere.
     /// </summary>
     public class LoadSampler
     {
         private double _startCpuSeconds;
         private double _startWallSeconds;
+        private double _setupWallSeconds;
+        private double _startUnitySeconds;
+        private double _startStopwatchSeconds;
+        private double _lastFrameSeconds;
         private int _startGcCollections;
         private ProfilerRecorder _gcAlloc;
         private long _gcAllocBytes;
@@ -60,10 +69,8 @@ namespace PurrNet.NetBench
 
         public void Begin(string iface)
         {
+            double setupStarted = NowSeconds();
             _iface = iface;
-            _startCpuSeconds = ReadProcessCpuSeconds();
-            _startWallSeconds = NowSeconds();
-            _startGcCollections = GC.CollectionCount(0);
             // Bytes handed out by the managed allocator per frame; collection counts only say when the
             // collector ran, this says how much garbage was made, however the collections happen to fall.
             _gcAllocBytes = 0;
@@ -71,16 +78,27 @@ namespace PurrNet.NetBench
             // The counter above only reports in development players; release builds fall back to the
             // managed heap's growth between frames, with the running average standing in for frames
             // where a collection shrank it. Heap growth covers every thread.
-            _lastHeap = GC.GetTotalMemory(false);
             _heapGrowth = 0;
             _growthFrames = 0;
             _startIface = ReadIface(iface);
             _frameMs.Clear();
+            // Recorder and counter initialization are outside the sampled workload.
+            _lastHeap = GC.GetTotalMemory(false);
+            _startGcCollections = GC.CollectionCount(0);
+            _startCpuSeconds = ReadProcessCpuSeconds();
+            _startWallSeconds = NowSeconds();
+            _startUnitySeconds = Time.realtimeSinceStartupAsDouble;
+            _startStopwatchSeconds = StopwatchSeconds();
+            _lastFrameSeconds = -1;
+            _setupWallSeconds = _startWallSeconds - setupStarted;
         }
 
         public void SampleFrame()
         {
-            _frameMs.Add(Time.unscaledDeltaTime * 1000f);
+            double now = NowSeconds();
+            if (_lastFrameSeconds >= 0)
+                _frameMs.Add((float)((now - _lastFrameSeconds) * 1000));
+            _lastFrameSeconds = now;
             if (_gcAlloc.Valid)
                 _gcAllocBytes += _gcAlloc.LastValue;
 
@@ -100,14 +118,17 @@ namespace PurrNet.NetBench
 
         public LoadStats End()
         {
-            double cpu = ReadProcessCpuSeconds() - _startCpuSeconds;
+            double endCpu = ReadProcessCpuSeconds();
+            double cpu = endCpu - _startCpuSeconds;
             double wall = NowSeconds() - _startWallSeconds;
+            double unityWall = Time.realtimeSinceStartupAsDouble - _startUnitySeconds;
+            double stopwatchWall = StopwatchSeconds() - _startStopwatchSeconds;
             var endIface = ReadIface(_iface);
             _gcAlloc.Dispose();
 
             var stats = new LoadStats
             {
-                cpuPercent = wall > 0 ? cpu / wall * 100.0 : 0,
+                cpuPercent = wall > 0 && _startCpuSeconds >= 0 && endCpu >= _startCpuSeconds ? cpu / wall * 100.0 : -1,
                 peakRssBytes = ReadPeakResidentBytes(),
                 frameCount = _frameMs.Count,
                 gcCollections = GC.CollectionCount(0) - _startGcCollections,
@@ -115,6 +136,10 @@ namespace PurrNet.NetBench
                 gcAllocEstimated = _gcAllocBytes <= 0,
                 managedHeapBytes = GC.GetTotalMemory(false),
                 wallSeconds = wall,
+                setupWallSeconds = _setupWallSeconds,
+                unityWallSeconds = unityWall,
+                stopwatchWallSeconds = stopwatchWall,
+                wallClock = ClockName,
                 ifaceDelta = new IfaceCounters
                 {
                     valid = _startIface.valid && endIface.valid,
@@ -177,7 +202,41 @@ namespace PurrNet.NetBench
             return sorted[lo] + (sorted[hi] - sorted[lo]) * (rank - lo);
         }
 
-        private static double NowSeconds() => DateTime.UtcNow.Ticks / (double)TimeSpan.TicksPerSecond;
+        private static double NowSeconds() => MonotonicSeconds();
+
+        // Share one clock with the workload deadline and frame samples. Unity's
+        // elapsed time remains a diagnostic, rather than a second measurement clock.
+        public static double MonotonicSeconds()
+        {
+#if !UNITY_STANDALONE_WIN && !UNITY_EDITOR_WIN
+            if (!s_wallClockBroken)
+            {
+                try
+                {
+                    if (clock_gettime(1, out var ts) == 0)
+                        return ts.tv_sec + ts.tv_nsec / 1e9;
+                }
+                catch (Exception) { }
+                s_wallClockBroken = true;
+            }
+#endif
+            return StopwatchSeconds();
+        }
+
+        private static double StopwatchSeconds() => System.Diagnostics.Stopwatch.GetTimestamp() /
+            (double)System.Diagnostics.Stopwatch.Frequency;
+
+        private static string ClockName
+        {
+            get
+            {
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+                return "Stopwatch";
+#else
+                return s_wallClockBroken ? "Stopwatch" : "CLOCK_MONOTONIC";
+#endif
+            }
+        }
 
         [StructLayout(LayoutKind.Sequential)]
         private struct Timespec
@@ -192,6 +251,16 @@ namespace PurrNet.NetBench
         private static extern int clock_gettime(int clockId, out Timespec ts);
 
         private static bool s_cpuClockBroken;
+        private static bool s_wallClockBroken;
+
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr GetCurrentProcess();
+
+        [DllImport("kernel32.dll")]
+        private static extern bool GetProcessTimes(IntPtr process, out ulong creation, out ulong exit,
+            out ulong kernel, out ulong user);
+#endif
 
         /// <summary>
         /// CPU time of the whole process, all threads. The process CPU clock has nanosecond resolution;
@@ -199,6 +268,10 @@ namespace PurrNet.NetBench
         /// </summary>
         private static double ReadProcessCpuSeconds()
         {
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+            return GetProcessTimes(GetCurrentProcess(), out _, out _, out ulong kernel, out ulong user)
+                ? (kernel + user) / 1e7 : -1;
+#else
             if (!s_cpuClockBroken)
             {
                 try
@@ -224,8 +297,9 @@ namespace PurrNet.NetBench
             }
             catch
             {
-                return 0;
+                return -1;
             }
+#endif
         }
 
         private static long ReadPeakResidentBytes()

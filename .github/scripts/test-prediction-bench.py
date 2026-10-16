@@ -6,6 +6,7 @@ import json
 import signal
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
@@ -22,6 +23,207 @@ def module(name, file):
 bench = module('prediction_bench', 'prediction-bench.py')
 reporter = module('prediction_report', 'prediction-report.py')
 prepare = module('prediction_prepare', 'prediction-prepare.py')
+arranger = module('prediction_arrange', 'prediction-arrange.py')
+ab = module('prediction_ab', 'prediction-ab.py')
+
+
+class HostSnapshotTests(unittest.TestCase):
+    def test_linux_snapshot_preserves_models_frequency_and_raw_scheduler_counters(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            proc, sysfs = root / 'proc', root / 'sys'
+            files = {
+                proc / 'cpuinfo': 'processor: 0\nmodel name: Example CPU\ncpu MHz: 3000\n\n'
+                                  'processor: 1\nmodel name: Example CPU\ncpu MHz: 2900.5\n',
+                proc / 'stat': 'cpu 1 2 3 4 5 6 7 8 9 10\ncpu0 1 2 3\n',
+                proc / 'sys/kernel/random/boot_id': 'example-boot\n',
+                sysfs / 'devices/system/clocksource/clocksource0/current_clocksource': 'tsc\n',
+            }
+            for path, value in files.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(value)
+            snapshot = bench.host_snapshot(proc, sysfs)
+            self.assertEqual(snapshot['cpuModels'], ['Example CPU'])
+            self.assertEqual(snapshot['cpuMhz'], [3000, 2900.5])
+            self.assertEqual(snapshot['schedulerCpuTicks']['steal'], 8)
+            self.assertEqual(snapshot['schedulerCpuTicks']['guestNice'], 10)
+            self.assertEqual(snapshot['bootId'], 'example-boot')
+            self.assertEqual(snapshot['clockSource'], 'tsc')
+
+    def test_unavailable_host_files_do_not_prevent_a_benchmark(self):
+        with tempfile.TemporaryDirectory() as directory:
+            snapshot = bench.host_snapshot(Path(directory) / 'proc', Path(directory) / 'sys')
+            self.assertEqual(snapshot['cpuModels'], [])
+            self.assertEqual(snapshot['cpuMhz'], [])
+            self.assertIsNone(snapshot['schedulerCpuTicks'])
+            self.assertIsNone(snapshot['clockSource'])
+            self.assertIsNone(snapshot['bootId'])
+
+    def test_malformed_optional_counters_stay_unavailable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'cpuinfo').write_text('cpu MHz: unavailable\ncpu MHz: nan\ncpu MHz: -1\n')
+            (root / 'stat').write_text('cpu invalid\n')
+            snapshot = bench.host_snapshot(root, root)
+            self.assertEqual(snapshot['cpuMhz'], [])
+            self.assertIsNone(snapshot['schedulerCpuTicks'])
+
+
+class RevisionComparisonTests(unittest.TestCase):
+    def args(self, **overrides):
+        values = dict(baseline=Path('baseline'), candidate=Path('candidate'), output=Path('results'),
+                      solution='purrdiction', clients='4', ticks='60', objects='128', repeats=3, seconds=20, warmup=20, dry_run=False, diagnostics='auto')
+        values.update(overrides)
+        return SimpleNamespace(**values)
+
+    def test_order_alternates_and_sampling_is_identical(self):
+        commands = ab.commands(self.args())
+        self.assertEqual([c[c.index('--players') + 1] for c in commands],
+                         ['baseline', 'candidate', 'candidate', 'baseline', 'baseline', 'candidate'])
+        for command in commands:
+            self.assertEqual(command[command.index('--repeats') + 1], '1')
+            self.assertEqual(command[command.index('--seconds') + 1], '20')
+            self.assertEqual(command[command.index('--warmup') + 1], '20')
+
+    def test_failure_is_reported_and_remaining_revisions_are_measured(self):
+        execute = Mock(side_effect=[SimpleNamespace(returncode=1), SimpleNamespace(returncode=0)])
+        self.assertEqual(ab.run(self.args(repeats=1), execute), 1)
+        self.assertEqual(execute.call_count, 2)
+
+    def test_directory_mode_is_inherited_by_every_fresh_process(self):
+        for candidate, mode in ((Path('candidate'), 'separate-directories'),
+                                (Path('baseline') / '.', 'shared-directory')):
+            execute = Mock(return_value=SimpleNamespace(returncode=0))
+            with patch.dict('os.environ', {'PREDICTION_TEST_INHERITED': 'yes'}):
+                self.assertEqual(ab.run(self.args(candidate=candidate, repeats=1), execute), 0)
+            for call in execute.call_args_list:
+                self.assertEqual(call.kwargs['env']['PREDICTION_EXECUTION_DIRECTORY_MODE'], mode)
+                self.assertEqual(call.kwargs['env']['PREDICTION_TEST_INHERITED'], 'yes')
+            self.assertEqual([call.args[0][call.args[0].index('--output') + 1]
+                              for call in execute.call_args_list],
+                             [str(Path('results/baseline')), str(Path('results/candidate'))])
+
+    def test_owned_policy_is_identical_for_both_revisions(self):
+        commands = ab.commands(self.args(solution='purrdiction-owned'))
+        self.assertEqual([c[c.index('--solutions') + 1] for c in commands],
+                         ['purrdiction-owned'] * 6)
+        self.assertEqual([c[c.index('--players') + 1] for c in commands],
+                         ['baseline', 'candidate', 'candidate', 'baseline', 'baseline', 'candidate'])
+
+    def test_mixed_or_unrelated_adapters_never_start_a_player(self):
+        for solution in ('purrdiction,purrdiction-owned', 'fishnet', 'fusion', ''):
+            execute = Mock()
+            with self.assertRaises(ValueError):
+                ab.run(self.args(solution=solution), execute)
+            execute.assert_not_called()
+
+    def test_diagnostics_mode_applies_to_both_revisions(self):
+        for mode in ('on', 'off', 'auto'):
+            for command in ab.commands(self.args(diagnostics=mode)):
+                self.assertEqual(command[command.index('--diagnostics') + 1], mode)
+
+    def test_invalid_matrix_never_starts_a_player(self):
+        execute = Mock()
+        with self.assertRaises(ValueError):
+            ab.run(self.args(repeats=0), execute)
+        execute.assert_not_called()
+
+    def test_invalid_diagnostics_never_starts_a_player(self):
+        execute = Mock()
+        with self.assertRaises(ValueError):
+            ab.run(self.args(diagnostics='invalid'), execute)
+        execute.assert_not_called()
+
+
+class ArtifactLayoutTests(unittest.TestCase):
+    def test_purrdiction_overrides_keep_other_frozen_players_and_provenance(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, override = root / 'original', root / 'candidate'
+            names = ('purrdiction', 'purrdiction-owned', 'fishnet', 'fusion')
+            for name in names:
+                player = source / ('prediction-player-' + name)
+                player.mkdir(parents=True)
+                (player / 'PredictionBench').write_text('old-' + name)
+                (player / 'stale-only.txt').write_text('old')
+            for name in names[:2]:
+                player = override / ('prediction-player-' + name)
+                player.mkdir(parents=True)
+                (player / 'PredictionBench').write_text('new-' + name)
+                (player / 'prediction-provenance.json').write_text('candidate-' + name)
+            arranger.arrange(source, root / 'players', ','.join(names), override)
+            for name in names:
+                player = root / 'players' / name
+                self.assertEqual((player / 'PredictionBench').read_text(),
+                                 ('new-' if name in names[:2] else 'old-') + name)
+                self.assertEqual((player / 'stale-only.txt').exists(), name not in names[:2])
+                if name in names[:2]:
+                    self.assertEqual((player / 'prediction-provenance.json').read_text(), 'candidate-' + name)
+
+    def test_flat_sources_are_unambiguous_with_one_adapter_each(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, override = root / 'original', root / 'candidate'
+            source.mkdir(); override.mkdir()
+            (source / 'PredictionBench').write_text('fishnet')
+            (override / 'PredictionBench').write_text('purrdiction')
+            arranger.arrange(source, root / 'players', 'purrdiction,fishnet', override)
+            for name in ('purrdiction', 'fishnet'):
+                self.assertEqual((root / 'players' / name / 'PredictionBench').read_text(), name)
+
+    def test_missing_override_never_falls_back_to_original_purrdiction(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, override = root / 'original', root / 'candidate'
+            player = source / 'prediction-player-purrdiction'
+            player.mkdir(parents=True)
+            (player / 'PredictionBench').write_text('old')
+            with self.assertRaises(FileNotFoundError):
+                arranger.arrange(source, root / 'players', 'purrdiction', override)
+            self.assertFalse((root / 'players').exists())
+
+    def test_unused_override_fails_before_copying(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with self.assertRaises(ValueError):
+                arranger.arrange(root / 'original', root / 'players', 'fishnet', root / 'candidate')
+            self.assertFalse((root / 'players').exists())
+
+    def test_single_artifact_flat_layout(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'downloaded'
+            source.mkdir()
+            (source / 'PredictionBench').write_bytes(b'player')
+            (source / 'PredictionBench_Data').mkdir()
+            (source / 'PredictionBench_Data/data').write_bytes(b'data')
+            arranger.arrange(source, root / 'players', 'purrdiction')
+            self.assertEqual((root / 'players/purrdiction/PredictionBench').read_bytes(), b'player')
+            self.assertEqual((root / 'players/purrdiction/PredictionBench_Data/data').read_bytes(), b'data')
+
+    def test_multi_artifact_layout(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'downloaded'
+            for name in ('purrdiction', 'purrdiction-owned', 'fishnet'):
+                player = source / ('prediction-player-' + name)
+                player.mkdir(parents=True)
+                (player / 'PredictionBench').write_text(name)
+            arranger.arrange(source, root / 'players', 'purrdiction,purrdiction-owned,fishnet')
+            for name in ('purrdiction', 'purrdiction-owned', 'fishnet'):
+                self.assertEqual((root / 'players' / name / 'PredictionBench').read_text(), name)
+
+    def test_ambiguous_flat_layout_and_missing_players_fail_before_copying(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'downloaded'
+            source.mkdir()
+            with self.assertRaises(FileNotFoundError):
+                arranger.arrange(source, root / 'players', 'purrdiction')
+            (source / 'PredictionBench').write_bytes(b'player')
+            with self.assertRaises(ValueError):
+                arranger.arrange(source, root / 'players', 'purrdiction,fishnet')
+            self.assertFalse((root / 'players').exists())
 
 
 def fixture():
@@ -35,7 +237,8 @@ def fixture():
             'config': {key: case[key] for key in ('clients', 'objects', 'tickRate', 'seconds', 'warmupSeconds')},
             'actualTickRate': 60, 'observedObjects': 2, 'ownedObjects': 2 if role == 'client' else 0,
             'requestedFrameCap': 60, 'actualFrameCap': 60,
-            'forwardCalls': 120, 'replayCalls': 60, 'ownedForwardCalls': 120 if role == 'client' else 0,
+            'forwardCalls': 120, 'replayCalls': 60, 'appliedInputs': 100,
+            'ownedForwardCalls': 120 if role == 'client' else 0,
             'load': {'wallSeconds': 2, 'frameCount': 120, 'cpuPercent': 10, 'p95FrameMs': 17,
                 'p99FrameMs': 18, 'managedHeapBytes': 1048576, 'peakRssBytes': 2097152,
                 'gcAllocBytes': 100, 'gcAllocEstimated': False},
@@ -44,7 +247,85 @@ def fixture():
     return case, reports
 
 
+def work_window(amount=10):
+    return dict(schemaVersion=1, scope='outside timing', sectionScope='prepared ordinary sections',
+                byteScope='before RPC framing', localTickStart=20, localTickEnd=30,
+                maxAckLagTicksStart=4, maxAckLagTicksEnd=2,
+                start={name: 100 for name in bench.WORK_COUNTER_NAMES},
+                end={name: 100 + amount for name in bench.WORK_COUNTER_NAMES})
+
+
+class WorkCounters(unittest.TestCase):
+    def report(self, window=None):
+        return dict(provenanceJson='{"workCountersSchema":1}',
+                    workCountersJson=json.dumps(work_window() if window is None else window))
+
+    def test_release_off_window_excludes_warmup_and_gauges_are_not_deltas(self):
+        case, reports = fixture()
+        case['diagnostics'] = 'off'
+        for report in reports.values():
+            report.update(self.report(), detailedDiagnostics=False, developmentBuild=False)
+        self.assertTrue(bench.validate_case(case, reports))
+        self.assertEqual(bench.work_counter_delta(reports['server']),
+                         {name: 10 for name in bench.WORK_COUNTER_NAMES})
+
+    def test_legacy_and_other_adapters_remain_explicitly_unavailable(self):
+        self.assertIsNone(bench.work_counter_delta(dict(provenanceJson='{}')))
+        self.assertIsNone(bench.work_counter_delta(dict(provenanceJson='{}', workCountersJson=None)))
+
+    def test_promised_or_partial_window_cannot_silently_become_unavailable(self):
+        with self.assertRaisesRegex(ValueError, 'Missing promised'):
+            bench.work_counter_delta(dict(provenanceJson='{"workCountersSchema":1}'))
+        window = work_window()
+        window['end'].pop('deltaFramesWrittenTotal')
+        with self.assertRaisesRegex(ValueError, 'Incomplete'):
+            bench.work_counter_delta(self.report(window))
+
+    def test_reset_and_invalid_counter_values_are_rejected(self):
+        for value in (99, -1, 2**64, True, '101', 101.5):
+            window = work_window()
+            window['end']['inputSendsTotal'] = value
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                bench.work_counter_delta(self.report(window))
+
+    def test_unsigned_64_bit_counts_keep_integer_precision(self):
+        window = work_window()
+        window['start']['inputBytesSentTotal'] = 2**63 + 5
+        window['end']['inputBytesSentTotal'] = 2**63 + 9
+        self.assertEqual(bench.work_counter_delta(self.report(window))['inputBytesSentTotal'], 4)
+
+    def test_unknown_schema_and_malformed_json_are_rejected(self):
+        for value in (2, True):
+            report = self.report()
+            report['provenanceJson'] = json.dumps(dict(workCountersSchema=value))
+            with self.assertRaises(ValueError):
+                bench.work_counter_delta(report)
+        report = self.report()
+        report['workCountersJson'] = '{'
+        with self.assertRaises(ValueError):
+            bench.work_counter_delta(report)
+
+
 class Matrix(unittest.TestCase):
+    def test_repeats_rotate_adapter_positions_and_preserve_every_case(self):
+        solutions = ['purrdiction', 'purrdiction-owned', 'fishnet', 'fusion']
+        cases = bench.make_plan(','.join(solutions), '2,4', '20,60', '32,128', 4, 20, 20)
+        self.assertEqual([case['id'] for case in cases], list(range(1, 129)))
+        keys = {(c['solution'], c['clients'], c['tickRate'], c['objects'], c['repeat']) for c in cases}
+        self.assertEqual(len(keys), 128)
+        for start in range(0, len(cases), 16):
+            block = cases[start:start + 16]
+            for position in range(4):
+                self.assertEqual({block[r * 4 + position]['solution'] for r in range(4)}, set(solutions))
+            for r in range(4):
+                repeat = block[r * 4:r * 4 + 4]
+                self.assertEqual([c['solution'] for c in repeat], solutions[r:] + solutions[:r])
+                self.assertTrue(all(c['repeat'] == r + 1 for c in repeat))
+
+    def test_owned_and_full_world_variants_are_separate_cases(self):
+        cases = bench.make_plan('purrdiction,purrdiction-owned', '4', '60', '128', 1, 20, 20)
+        self.assertEqual([case['solution'] for case in cases], ['purrdiction', 'purrdiction-owned'])
+
     def test_independent_dimensions_and_fixed_population(self):
         cases = bench.make_plan('purrdiction,fishnet,fusion', '1,2,4', '20,60', '32,128', 3, 10, 3)
         self.assertEqual(len(cases), 108)
@@ -61,6 +342,28 @@ class Matrix(unittest.TestCase):
                         ('fishnet', '1', '0', '32', 1, 10, 3),
                         ('fishnet', '1', '60', '32', 1, float('nan'), 3)]:
             with self.subTest(options=options), self.assertRaises(ValueError): bench.make_plan(*options)
+
+
+class SnapshotValidation(unittest.TestCase):
+    def test_old_players_cannot_silently_ignore_snapshot_requests(self):
+        with tempfile.TemporaryDirectory() as temp:
+            with self.assertRaisesRegex(ValueError, 'not captured'):
+                bench.validate_memory_snapshots({'server': {}, 'client-1': {}}, Path(temp))
+
+    def test_both_nonempty_artifacts_and_matching_paths_are_required(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            reports = {peer: {'memorySnapshotRequested': True, 'memorySnapshotSucceeded': True,
+                'memorySnapshotPath': str(root / (peer + '.snap'))} for peer in ('server', 'client-1')}
+            for peer in reports: (root / (peer + '.snap')).write_bytes(b'example artifact')
+            bench.validate_memory_snapshots(reports, root)
+            (root / 'client-1.snap').write_bytes(b'')
+            with self.assertRaisesRegex(ValueError, 'artifact'):
+                bench.validate_memory_snapshots(reports, root)
+            (root / 'client-1.snap').write_bytes(b'example artifact')
+            reports['client-1']['memorySnapshotPath'] = str(root / 'unrelated.snap')
+            with self.assertRaisesRegex(ValueError, 'artifact'):
+                bench.validate_memory_snapshots(reports, root)
 
 
 class Barriers(unittest.TestCase):
@@ -89,8 +392,41 @@ class Barriers(unittest.TestCase):
 
 
 class Validation(unittest.TestCase):
+    def test_explicit_diagnostics_modes_must_be_honored_by_every_peer(self):
+        for mode in ('on', 'off'):
+            case, reports = fixture()
+            case['diagnostics'] = mode
+            with self.assertRaisesRegex(ValueError, 'honor'):
+                bench.validate_case(case, reports)
+            for peer in reports.values():
+                peer['detailedDiagnostics'] = mode == 'on'
+            self.assertTrue(bench.validate_case(case, reports))
+            reports['client-1']['detailedDiagnostics'] = mode != 'on'
+            with self.assertRaisesRegex(ValueError, 'Mismatched'):
+                bench.validate_case(case, reports)
+
+    def test_diagnostics_flags_require_real_booleans(self):
+        for value in ('false', 0, 1):
+            case, reports = fixture()
+            reports['client-1']['detailedDiagnostics'] = value
+            with self.assertRaisesRegex(ValueError, 'Mismatched'):
+                bench.validate_case(case, reports)
+
     def test_complete_authoritative_convergence(self):
         self.assertTrue(bench.validate_case(*fixture()))
+
+    def test_warmup_progress_does_not_hide_stalled_server_inputs_during_sampling(self):
+        for count in (0, -1, None, True):
+            case, reports = fixture()
+            reports['server']['appliedInputs'] = count
+            with self.assertRaisesRegex(ValueError, 'no new input commands during sampling'):
+                bench.validate_case(case, reports)
+
+    def test_missing_sampled_input_activity_cannot_be_scored(self):
+        case, reports = fixture()
+        del reports['server']['appliedInputs']
+        with self.assertRaisesRegex(ValueError, 'no new input commands during sampling'):
+            bench.validate_case(case, reports)
 
     def test_missing_peer_rejected(self):
         case, reports = fixture()
@@ -132,6 +468,73 @@ class Validation(unittest.TestCase):
 
 
 class Reports(unittest.TestCase):
+    def test_work_rates_average_clients_before_repeat_medians(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for index, amount in enumerate((0, 100, 20)):
+                parent = root / str(index)
+                parent.mkdir()
+                self.make_run(parent)
+                run = parent / 'run'
+                manifest = json.loads((run / 'manifest.json').read_text())
+                manifest['cases'][0]['clients'] = 2
+                (run / 'manifest.json').write_text(json.dumps(manifest))
+                folder = run / 'case-0001'
+                client = json.loads((folder / 'client-1.json').read_text())
+                client['peer'] = 'client-2'
+                client['load']['wallSeconds'] = 4
+                (folder / 'client-2.json').write_text(json.dumps(client))
+                for path in folder.glob('*.json'):
+                    report = json.loads(path.read_text())
+                    report['config']['clients'] = 2
+                    role = report['role']
+                    owned_index = 0 if report['peer'] == 'client-1' else 1
+                    report['ownedObjects'] = 0 if role == 'server' else 1
+                    for pawn in report['finalState']:
+                        pawn['owned'] = role == 'client' and pawn['index'] == owned_index
+                    report.update(WorkCounters().report(work_window(amount)))
+                    path.write_text(json.dumps(report))
+            data = reporter.render(root, root / 'report')
+            self.assertTrue(data['complete'], data['failures'])
+            client = next(row for row in data['groups'] if row['role'] == 'client')
+            self.assertEqual(client['repeats'], 3)
+            # Per-repeat means: 0, (100/2 + 100/4)/2, (20/2 + 20/4)/2.
+            self.assertEqual(client['workCountersPerSecond']['inputSendsTotal'], 7.5)
+
+    def test_work_rates_use_window_differences_and_preserve_cpu_scores(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.make_run(root)
+            original = reporter.render(root, root / 'old-report')
+            for path in (root / 'run/case-0001').glob('*.json'):
+                report = json.loads(path.read_text())
+                report.update(WorkCounters().report(work_window(40)))
+                path.write_text(json.dumps(report))
+            data = reporter.render(root / 'run', root / 'report')
+            self.assertTrue(data['complete'])
+            for before, after in zip(original['groups'], data['groups']):
+                self.assertEqual(before['cpuPercent'], after['cpuPercent'])
+                self.assertEqual(after['workCountersPerSecond']['inputSendsTotal'], 20)
+            self.assertIn('PurrDiction work counters', (root / 'report/latest.md').read_text())
+
+    def test_diagnostics_modes_and_legacy_reports_are_never_pooled(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for index, mode in enumerate((True, False, None)):
+                parent = root / str(index)
+                parent.mkdir()
+                self.make_run(parent)
+                if mode is not None:
+                    for path in (parent / 'run/case-0001').glob('*.json'):
+                        peer = json.loads(path.read_text())
+                        peer['detailedDiagnostics'] = mode
+                        path.write_text(json.dumps(peer))
+            data = reporter.render(root, root / 'report')
+            self.assertTrue(data['complete'])
+            self.assertEqual(len(data['groups']), 6)
+            self.assertEqual({row['detailedDiagnostics'] for row in data['groups']}, {True, False, None})
+            self.assertTrue(all(row['repeats'] == 1 for row in data['groups']))
+
     def make_run(self, root, failed=False, linux=True):
         case, reports = fixture()
         run = root / 'run'
@@ -152,6 +555,28 @@ class Reports(unittest.TestCase):
             self.assertFalse(data['complete'])
             self.assertEqual(data['groups'], [])
 
+    def test_owned_and_full_world_results_are_never_pooled(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for solution in ('purrdiction', 'purrdiction-owned'):
+                variant = root / solution
+                variant.mkdir()
+                self.make_run(variant)
+                path = variant / 'run/manifest.json'
+                manifest = json.loads(path.read_text())
+                manifest['cases'][0]['solution'] = solution
+                path.write_text(json.dumps(manifest))
+                for path in (variant / 'run/case-0001').glob('*.json'):
+                    peer = json.loads(path.read_text())
+                    peer['solution'] = solution
+                    peer['predictionScope'] = solution
+                    path.write_text(json.dumps(peer))
+            data = reporter.render(root, root / 'report')
+            self.assertTrue(data['complete'])
+            self.assertEqual(len(data['groups']), 4)
+            self.assertEqual({row['solution'] for row in data['groups']}, {'purrdiction', 'purrdiction-owned'})
+            self.assertTrue(all(row['repeats'] == 1 for row in data['groups']))
+
     def test_windows_missing_cpu_is_not_reported_as_zero(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -160,6 +585,19 @@ class Reports(unittest.TestCase):
             self.assertTrue(data['complete'])
             self.assertTrue(all(row['cpuPercent'] is None for row in data['groups']))
             self.assertIn('unavailable', (root / 'report/latest.md').read_text())
+
+    def test_windows_cpu_clock_is_scored_while_rss_stays_unavailable(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.make_run(root, linux=False)
+            for path in (root / 'run/case-0001').glob('*.json'):
+                peer = json.loads(path.read_text())
+                peer['cpuMetricsAvailable'] = True
+                path.write_text(json.dumps(peer))
+            data = reporter.render(root, root / 'report')
+            self.assertTrue(data['complete'])
+            self.assertTrue(all(row['cpuPercent'] == 10 for row in data['groups']))
+            self.assertTrue(all(row['peakRssBytes'] is None for row in data['groups']))
 
     def test_different_source_hashes_are_not_pooled(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -191,8 +629,73 @@ class Reports(unittest.TestCase):
             result = reporter.render(root, root / 'report')
             self.assertEqual(len(result['groups']), 4)
 
+    def test_transient_host_snapshots_aggregate_but_boots_and_capture_modes_do_not(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for index, (boot, mode) in enumerate((('boot-a', 'shared-directory'),
+                                                 ('boot-a', 'shared-directory'),
+                                                 ('boot-b', 'shared-directory'),
+                                                 ('boot-a', 'separate-directories'))):
+                parent = root / str(index)
+                parent.mkdir()
+                self.make_run(parent)
+                path = parent / 'run/manifest.json'
+                manifest = json.loads(path.read_text())
+                manifest['machine'].update(executionDirectoryMode=mode, hostSnapshot={
+                    'bootId': boot, 'cpuModels': ['Example CPU'], 'clockSource': 'tsc',
+                    'capturedMonotonic': index, 'cpuMhz': [2000 + index * 500],
+                    'schedulerCpuTicks': {'idle': index * 100}, 'ticksPerSecond': 100})
+                path.write_text(json.dumps(manifest))
+            result = reporter.render(root, root / 'report')
+            self.assertTrue(result['complete'])
+            self.assertEqual(len(result['groups']), 6)
+            self.assertEqual(sorted(row['repeats'] for row in result['groups']), [1, 1, 1, 1, 2, 2])
+            self.assertTrue(all(row['cpuPercent'] == 10 for row in result['groups']))
+            self.assertEqual(len({row['manifest']['machine']['hostSnapshot']['capturedMonotonic']
+                                  for row in result['raw']}), 4)
+
+    def test_legacy_machine_fingerprint_preserves_all_fields(self):
+        machine = {'cpu': 'legacy', 'diagnosticCapture': 'sampled'}
+        self.assertEqual(reporter.stable_machine(machine), machine)
+
 
 class Preparation(unittest.TestCase):
+    def test_owned_variant_reuses_pinned_source_but_has_distinct_policy_and_adapter_hash(self):
+        adapter_source = (prepare.ROOT / 'prediction/Adapters/purrdiction/PurrDictionPredictionAdapter.cs').read_text()
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            files = {
+                'purrnet/Assets/_Benchmark/Prefabs/NetworkManager.prefab': 'manager',
+                'purrnet/Packages/manifest.json': '{"dependencies": {}}',
+                'purrnet/Packages/packages-lock.json': '{"dependencies": {}}',
+                'purrnet/ProjectSettings/ProjectVersion.txt': 'm_EditorVersion: test',
+                'source/Assets/PurrDiction/package.json': '{"version": "test"}',
+                'source/Packages/manifest.json': '{"dependencies": {"dev.purrnet.purrnet": "https://example.com/purrnet.git#pinned"}}',
+                'prediction/Shared/Runner.cs': 'shared harness',
+                'prediction/Adapters/purrdiction/PurrDictionPredictionAdapter.cs': adapter_source,
+                'Shared/com.purrnet.netbench/Runtime/LoadSampler.cs': '    public struct LoadStats {}',
+            }
+            for directory in ('Runtime', 'Codegen', 'Editor'):
+                files[f'source/Assets/PurrDiction/{directory}/Code.cs'] = 'package code'
+                files[f'source/Assets/PurrDiction/{directory}.meta'] = 'guid: package'
+            for name, content in files.items():
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content)
+            with patch.object(prepare, 'ROOT', root), patch.object(prepare, 'git', side_effect=lambda root, *args: '' if args[0] == 'status' else 'b' * 40):
+                full = prepare.prepare('purrdiction', root / 'full', root / 'source')
+                owned = prepare.prepare('purrdiction-owned', root / 'owned', root / 'source')
+            self.assertEqual(full['predictionCommit'], owned['predictionCommit'])
+            self.assertEqual(full['purrnetDependency'], owned['purrnetDependency'])
+            self.assertEqual(full['predictionPolicy'], 'FullPrediction')
+            self.assertEqual(owned['predictionPolicy'], 'PredictedIfOwned')
+            self.assertEqual(full['workCountersSchema'], 1)
+            self.assertEqual(owned['workCountersSchema'], 1)
+            adapter_path = 'Adapter/PurrDictionPredictionAdapter.cs'
+            self.assertNotEqual(full['adapterSha256'][adapter_path], owned['adapterSha256'][adapter_path])
+            self.assertTrue((root / 'owned/Assets/PredictionBench' / adapter_path).read_text().startswith('#define PURRDICTION_OWNED_ONLY\n'))
+            self.assertFalse((root / 'full/Assets/PredictionBench' / adapter_path).read_text().startswith('#define'))
+
     def test_isolated_project_preserves_manager_guid_and_pins_git_dependencies(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
