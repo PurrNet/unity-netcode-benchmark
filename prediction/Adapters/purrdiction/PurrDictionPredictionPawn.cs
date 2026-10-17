@@ -6,6 +6,18 @@ using UnityEngine;
 
 namespace PredictionBench
 {
+#if PURRDICTION_PLAYER_INPUT
+    // Pawns read their owner's single input identity, as Fusion pawns read their input authority's
+    // per-player input, instead of each pawn collecting its own command.
+    public class PurrDictionPredictionPawn : PredictedIdentity<PurrDictionPredictionPawn.State>
+    {
+        public int Index;
+        public struct State : IPredictedData<State> { public DriveState value; public void Dispose() { } }
+        protected override void Simulate(ref State state, float delta)
+            => PredictionWorkload.Simulate(PurrDictionPlayerInput.For(owner).value, ref state.value,
+                predictionManager.isReplaying, IsOwner());
+    }
+#else
     public class PurrDictionPredictionPawn : PredictedIdentity<PurrDictionPredictionPawn.Input, PurrDictionPredictionPawn.State>
     {
         public int Index;
@@ -16,4 +28,5 @@ namespace PredictionBench
         protected override void Simulate(Input input, ref State state, float delta)
             => PredictionWorkload.Simulate(input.value, ref state.value, predictionManager.isReplaying, IsOwner());
     }
+#endif
 }

@@ -22,7 +22,7 @@ on:
       revision_solution:
         description: "Prediction policy for revision A/B mode"
         type: choice
-        options: ["purrdiction", "purrdiction-owned"]
+        options: ["purrdiction", "purrdiction-owned", "purrdiction-player-input"]
         default: "purrdiction"
       revision_shared_directory:
         description: "A/A diagnostic: run both slots from one directory; requires equal frozen run IDs"

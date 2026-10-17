@@ -57,8 +57,15 @@ namespace PredictionBench
                     result.activePawns++;
                     Add(pawn, "_stateHistory", result.predicted);
                     Add(pawn, "_verifiedHistory", result.verified);
+#if !PURRDICTION_PLAYER_INPUT
                     Add(pawn, "_inputHistory", result.inputs);
+#endif
                 }
+#if PURRDICTION_PLAYER_INPUT
+                foreach (var input in UnityEngine.Object.FindObjectsByType<PurrDictionPlayerInput>(FindObjectsSortMode.None))
+                    if (input.predictionManager == world)
+                        Add(input, "_inputHistory", result.inputs);
+#endif
                 if (result.activePawns == 0)
                     throw new InvalidOperationException("No benchmark pawns belong to the prediction world.");
                 if (world.hierarchy)

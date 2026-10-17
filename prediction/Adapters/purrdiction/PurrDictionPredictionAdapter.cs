@@ -12,7 +12,12 @@ namespace PredictionBench
         public PredictionManager world;
         private readonly PurrDictionWorkCounters _workCounters = new PurrDictionWorkCounters();
         private GameObject[] _prefabs;
-#if PURRDICTION_OWNED_ONLY
+#if PURRDICTION_PLAYER_INPUT
+        private GameObject _inputPrefab;
+        private const PredictionPolicy PawnPolicy = PredictionPolicy.PredictedIfOwned;
+        public override string Solution => "purrdiction-player-input";
+        public override string PredictionScope => "PredictedIfOwned; one input identity per player, read by that player's pawns";
+#elif PURRDICTION_OWNED_ONLY
         private const PredictionPolicy PawnPolicy = PredictionPolicy.PredictedIfOwned;
         public override string Solution => "purrdiction-owned";
         public override string PredictionScope => "PredictedIfOwned: owned objects predict and replay; remote objects run verified ServerRelay ticks";
@@ -48,12 +53,22 @@ namespace PredictionBench
                 _prefabs[i] = pawn;
                 prefabs.prefabs.Add(new PredictedPrefab { prefab = pawn, pooled = false });
             }
+#if PURRDICTION_PLAYER_INPUT
+            _inputPrefab = new GameObject("Player input template");
+            _inputPrefab.SetActive(false);
+            _inputPrefab.AddComponent<PurrDictionPlayerInput>().SetPredictionPolicyOverride(PawnPolicy);
+            prefabs.prefabs.Add(new PredictedPrefab { prefab = _inputPrefab, pooled = false });
+#endif
             world.predictedPrefabs = prefabs;
             if (Server) manager.StartServer(); else manager.StartClient();
         }
         public override void Spawn()
         {
             var players = manager.players.OrderBy(p => p.id.value).ToArray();
+#if PURRDICTION_PLAYER_INPUT
+            foreach (var player in players)
+                world.hierarchy.Create(_inputPrefab, Vector3.zero, Quaternion.identity, player);
+#endif
             for (int i = 0; i < Config.objects; i++)
                 world.hierarchy.Create(_prefabs[i], Vector3.zero, Quaternion.identity, players[i % players.Length]);
         }

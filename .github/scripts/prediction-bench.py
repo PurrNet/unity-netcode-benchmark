@@ -18,7 +18,7 @@ import threading
 import time
 import uuid
 
-SOLUTIONS = ('purrdiction', 'purrdiction-owned', 'fishnet', 'fusion')
+SOLUTIONS = ('purrdiction', 'purrdiction-owned', 'purrdiction-player-input', 'fishnet', 'fusion')
 WORKLOAD = 'sequenced-state-v1'
 WORK_COUNTER_NAMES = (
     'deltaFramesWrittenTotal', 'fullFramesSentTotal',

@@ -9,7 +9,9 @@ import shutil
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
-SOLUTIONS = ('purrdiction', 'purrdiction-owned', 'fishnet', 'fusion')
+SOLUTIONS = ('purrdiction', 'purrdiction-owned', 'purrdiction-player-input', 'fishnet', 'fusion')
+# PurrDiction variants share one adapter directory and select their behaviour with a define.
+PURRDICTION_DEFINES = {'purrdiction-owned': 'PURRDICTION_OWNED_ONLY', 'purrdiction-player-input': 'PURRDICTION_PLAYER_INPUT'}
 
 
 def git(path, *args):
@@ -21,7 +23,7 @@ def prepare(solution, output, prediction_source=None):
         raise ValueError(f'Unknown prediction solution: {solution}')
     if output.exists():
         raise ValueError(f'Refusing to overwrite generated project: {output}')
-    is_prediction = solution in ('purrdiction', 'purrdiction-owned')
+    is_prediction = solution.startswith('purrdiction')
     if is_prediction and (prediction_source is None or not (prediction_source / 'Assets/PurrDiction/package.json').is_file()):
         raise ValueError('PurrDiction requires --prediction-source pointing to a source checkout')
     base = ROOT / ('purrnet' if is_prediction else solution)
@@ -65,7 +67,7 @@ def prepare(solution, output, prediction_source=None):
                           predictionDirty=bool(git(prediction_source, 'status', '--porcelain')),
                           predictionVersion=json.loads((package / 'package.json').read_text())['version'],
                           purrnetDependency=manifest['dependencies']['dev.purrnet.purrnet'])
-        provenance['predictionPolicy'] = 'PredictedIfOwned' if solution == 'purrdiction-owned' else 'FullPrediction'
+        provenance['predictionPolicy'] = 'FullPrediction' if solution == 'purrdiction' else 'PredictedIfOwned'
         provenance['workCountersSchema'] = 1
     else:
         provenance['vendoredSourceCommit'] = provenance['benchmarkCommit']
@@ -75,9 +77,10 @@ def prepare(solution, output, prediction_source=None):
     target = output / 'Assets/PredictionBench'
     shutil.copytree(ROOT / 'prediction/Shared', target)
     shutil.copytree(ROOT / 'prediction/Adapters' / ('purrdiction' if is_prediction else solution), target / 'Adapter')
-    if solution == 'purrdiction-owned':
-        adapter = target / 'Adapter/PurrDictionPredictionAdapter.cs'
-        adapter.write_text('#define PURRDICTION_OWNED_ONLY\n' + adapter.read_text(encoding='utf-8-sig'), encoding='utf-8')
+    if solution in PURRDICTION_DEFINES:
+        # C# defines are per file, so every adapter source sees the variant.
+        for source in sorted((target / 'Adapter').rglob('*.cs')):
+            source.write_text(f'#define {PURRDICTION_DEFINES[solution]}\n' + source.read_text(encoding='utf-8-sig'), encoding='utf-8')
     # Reuse the established load counter implementation, without activating BenchRunner.
     shutil.copy2(ROOT / 'Shared/com.purrnet.netbench/Runtime/LoadSampler.cs', target / 'LoadSampler.cs')
     sampler = target / 'LoadSampler.cs'

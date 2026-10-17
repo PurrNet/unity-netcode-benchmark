@@ -7,7 +7,7 @@ import shutil
 
 def arrange(source, output, solutions, purrdiction_source=None):
     names = [name.strip() for name in solutions.split(',')]
-    if not names or len(set(names)) != len(names) or any(name not in ('purrdiction', 'purrdiction-owned', 'fishnet', 'fusion') for name in names):
+    if not names or len(set(names)) != len(names) or any(name not in ('purrdiction', 'purrdiction-owned', 'purrdiction-player-input', 'fishnet', 'fusion') for name in names):
         raise ValueError('Invalid prediction solutions')
     source, output = source.resolve(), output.resolve()
     if output.exists():
