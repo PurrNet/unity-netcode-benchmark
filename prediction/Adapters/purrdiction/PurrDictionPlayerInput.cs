@@ -1,5 +1,5 @@
 #if PURRDICTION_PLAYER_INPUT
-using System.Collections.Generic;
+using System;
 using PurrNet;
 using PurrNet.Prediction;
 
@@ -12,24 +12,42 @@ namespace PredictionBench
         public struct Input : IPredictedData { public DriveInput value; public void Dispose() { } }
         public struct State : IPredictedData<State> { public int unused; public void Dispose() { } }
 
-        private static readonly Dictionary<PlayerID, PurrDictionPlayerInput> s_byOwner = new Dictionary<PlayerID, PurrDictionPlayerInput>();
+        // Indexed by player id, like a per-player input table; every pawn reads it each tick.
+        private static PurrDictionPlayerInput[] s_byOwner = new PurrDictionPlayerInput[16];
         private int _sequence;
 
         public static Input For(PlayerID? owner)
-            => owner.HasValue && s_byOwner.TryGetValue(owner.Value, out var input) && input ? input.currentInput : default;
+        {
+            if (!owner.HasValue)
+                return default;
+            ulong id = owner.Value.id.value;
+            var input = id < (ulong)s_byOwner.Length ? s_byOwner[id] : null;
+            return input is null ? default : input.currentInput;
+        }
 
         protected override void OnOwnerAssigned(PlayerID? player)
         {
             base.OnOwnerAssigned(player);
-            if (player.HasValue)
-                s_byOwner[player.Value] = this;
+            if (!player.HasValue)
+                return;
+            Unregister();
+            ulong id = player.Value.id.value;
+            if (id >= (ulong)s_byOwner.Length)
+                Array.Resize(ref s_byOwner, (int)Math.Max(id + 1, (ulong)s_byOwner.Length * 2));
+            s_byOwner[id] = this;
         }
 
         protected override void OnDestroy()
         {
             base.OnDestroy();
-            if (owner.HasValue && s_byOwner.TryGetValue(owner.Value, out var input) && input == this)
-                s_byOwner.Remove(owner.Value);
+            Unregister();
+        }
+
+        private void Unregister()
+        {
+            for (int i = 0; i < s_byOwner.Length; i++)
+                if (ReferenceEquals(s_byOwner[i], this))
+                    s_byOwner[i] = null;
         }
 
         protected override void GetFinalInput(ref Input input) => input.value = PredictionWorkload.Next(ref _sequence);
