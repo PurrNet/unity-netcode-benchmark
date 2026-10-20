@@ -56,7 +56,6 @@ namespace PurrNet.NetBench
         private double _setupWallSeconds;
         private double _startUnitySeconds;
         private double _startStopwatchSeconds;
-        private double _lastFrameSeconds;
         private int _startGcCollections;
         private ProfilerRecorder _gcAlloc;
         private long _gcAllocBytes;
@@ -89,16 +88,12 @@ namespace PurrNet.NetBench
             _startWallSeconds = NowSeconds();
             _startUnitySeconds = Time.realtimeSinceStartupAsDouble;
             _startStopwatchSeconds = StopwatchSeconds();
-            _lastFrameSeconds = -1;
             _setupWallSeconds = _startWallSeconds - setupStarted;
         }
 
         public void SampleFrame()
         {
-            double now = NowSeconds();
-            if (_lastFrameSeconds >= 0)
-                _frameMs.Add((float)((now - _lastFrameSeconds) * 1000));
-            _lastFrameSeconds = now;
+            _frameMs.Add(Time.unscaledDeltaTime * 1000f);
             if (_gcAlloc.Valid)
                 _gcAllocBytes += _gcAlloc.LastValue;
 

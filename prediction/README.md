@@ -229,11 +229,12 @@ off for cross-adapter CPU/memory comparisons, and on for investigating PurrDicti
 Counter initialization is outside the CPU/wall measurement window. Raw `load.setupWallSeconds`
 records that setup duration separately. Builds made before this change include setup in
 their sampled clocks, so compare revisions built with the same harness version.
-Warmup, the sample deadline, CPU denominator, and sampled frame intervals use one monotonic
+Warmup, the sample deadline, and CPU denominator use one monotonic
 clock (`CLOCK_MONOTONIC` on Linux, Stopwatch on Windows). Raw `load.wallClock` identifies it;
 `load.unityWallSeconds` and `load.stopwatchWallSeconds` separately record those elapsed times
 to expose clock disagreement.
-The first partial frame interval is excluded from frame distributions.
+Frame intervals are Unity's unscaled frame-start deltas, so work placement within a frame does
+not register as frame time.
 
 Each case also saves `host.json` before launching players and after they exit: available CPU
 model names, reported MHz, Linux scheduler counters (including steal), VM boot ID and clock
