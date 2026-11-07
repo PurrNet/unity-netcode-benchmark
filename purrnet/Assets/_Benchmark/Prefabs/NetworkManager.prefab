@@ -75,5 +75,5 @@ MonoBehaviour:
   _serverPort: 25565
   _maxConnections: 100
   _address: 127.0.0.1
-  _timeoutInSeconds: 5
+  _timeoutInSeconds: 15
   _pollEventsInUpdate: 0
