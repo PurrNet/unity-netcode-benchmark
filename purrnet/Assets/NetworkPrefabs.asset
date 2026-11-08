@@ -20,17 +20,17 @@ MonoBehaviour:
   prefabs:
   - guid: 296e7798207e69a40a871087348da0c3
     prefab: {fileID: 2997158864174378348, guid: 296e7798207e69a40a871087348da0c3, type: 3}
-    pooled: 0
+    pooled: 1
     warmupCount: 5
   - guid: 9925ea7d66c38ac48a88a572a9236cbe
     prefab: {fileID: 6660102892434074099, guid: 9925ea7d66c38ac48a88a572a9236cbe, type: 3}
-    pooled: 0
+    pooled: 1
     warmupCount: 5
   - guid: a4f436fa88b861b4fa09a90b1036bba2
     prefab: {fileID: 7806808583223607094, guid: a4f436fa88b861b4fa09a90b1036bba2, type: 3}
-    pooled: 0
+    pooled: 1
     warmupCount: 5
   - guid: a7278693f35741148b381178a112e24d
     prefab: {fileID: 6859501204968983109, guid: a7278693f35741148b381178a112e24d, type: 3}
-    pooled: 0
+    pooled: 1
     warmupCount: 5
