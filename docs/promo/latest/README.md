@@ -2,7 +2,7 @@
 
 0 charts, with 1920 × 1080 PNG and matching SVG exports, from **2026-11-09**.
 
-[PurrNet 1.26.0-beta.7 · FishNet 4.7.3](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/42627301789)
+[PurrNet 1.26.0-beta.7 · FishNet 4.7.3](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/42631762809)
 
 These are selected resource comparisons, not an overall netcode ranking. Each chart includes all five netcodes on a linear scale starting at zero. Asterisks and hatching mark overload. Relative percentages use unrounded values and round to the nearest whole percent.
 
@@ -17,12 +17,12 @@ Unavailable charts are omitted from this bundle; images from earlier runs are no
 
 ## Source and calculation
 
-- [Workflow run](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/42627301789)
+- [Workflow run](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/42631762809)
 - [Exact raw data used for these images](source-data.json)
 - [Run metadata and original summary](source-summary.md)
 - [Plotted values, claims and skipped charts](chart-data.json)
-- Raw data SHA-256: `3161ce85a23b8269daacea5732d02c504b6d3a8ac60daec03dd1bf4423a5ba88`
-- Renderer checkout revision: `64ae32e5ff7f1f6f4c15717f0e0860488455719f`. This identifies the code checkout, not the data snapshot.
+- Raw data SHA-256: `afa987d267447c92abdb4693231950498500f76ce7ecdf1c88e8d49df5d821ac`
+- Renderer checkout revision: `2cad35fa15cd06eb89cc02443878c894751018ee`. This identifies the code checkout, not the data snapshot.
 - Lower/higher comparisons use `100 × (PurrNet / named competitor − 1)`. Zero baselines and overloaded comparators receive neutral text.
 - Bandwidth and CPU categories use arithmetic means. General GC uses the six active workloads. Scaling averages their per-test `(100 connections − 10 connections) / 90` bandwidth deltas.
 - Idle and Static are excluded. Missing or incomplete workloads are not treated as zero.
