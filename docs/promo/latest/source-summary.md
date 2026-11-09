@@ -13,30 +13,30 @@ _Last run 2026-11-09: PurrNet 1.26.0-beta.7 · FishNet 4.7.3 · Unity 6000.5.4f1
 |---|---:|---:|---:|
 | State replication | PurrNet | PurrNet | PurrNet |
 | Messaging | – | – | – |
-| Spawn / despawn | FishNet | PurrNet | PurrNet |
+| Spawn / despawn | FishNet | tie | PurrNet |
 
 **State replication** (50 connections @ 30 Hz · MoveY, MoveWander, SyncVars)
 
 | Netcode | Status | Bandwidth | Server CPU | GC alloc | Collections | Frame p99 |
 |---|---:|---:|---:|---:|---:|---:|
-| PurrNet | Completed | **23.00 MB/s** | **37.8%** | **5.86 MB/s** | **4** | **18.1 ms** |
-| FishNet | Completed | 26.46 MB/s | 56.4% | 109.35 MB/s | 209 | 32.9 ms |
+| PurrNet | Completed | **22.17 MB/s** | **38.4%** | **6.40 MB/s** | **4** | **19.0 ms** |
+| FishNet | Completed | 26.93 MB/s | 56.5% | 108.73 MB/s | 208 | 32.7 ms |
 
 **Messaging** (50 connections @ 30 Hz · SendRPC, ClientInput)
 
 | Netcode | Status | Bandwidth | Server CPU | GC alloc | Collections | Frame p99 |
 |---|---:|---:|---:|---:|---:|---:|
-| PurrNet | Overloaded (1/2) | 18.74 MB/s | 71.3% | 3.49 MB/s | 1 | 46.9 ms |
-| FishNet | Overloaded (1/2) | 10.06 MB/s | 58.1% | 24.72 MB/s | 27 | 72.7 ms |
+| PurrNet | Overloaded (1/2) | 21.25 MB/s | 71.8% | 4.97 MB/s | 1 | 46.7 ms |
+| FishNet | Overloaded (1/2) | 10.10 MB/s | 58.5% | 24.94 MB/s | 26 | 69.8 ms |
 
 **Spawn / despawn** (50 connections @ 30 Hz · SpawnChurn)
 
 | Netcode | Status | Bandwidth | Server CPU | GC alloc | Collections | Frame p99 |
 |---|---:|---:|---:|---:|---:|---:|
-| PurrNet | Completed | 12.62 MB/s | **59.8%** | **1.60 MB/s** | **0** | **16.7 ms** |
-| FishNet | Completed | **8.30 MB/s** | 65.5% | 108.63 MB/s | 125 | 25.4 ms |
+| PurrNet | Completed | 14.80 MB/s | 65.5% | **1.44 MB/s** | **0** | **16.7 ms** |
+| FishNet | Completed | **8.30 MB/s** | 64.9% | 107.44 MB/s | 125 | 23.5 ms |
 
 </details>
 
 Categories are reported separately, with no combined ranking. Bandwidth, CPU and allocation: averages; collections: total; frame p99: maximum. Categories that did not complete have no averages. Completed means the test finished. Overloaded means it finished but the server could not hold the 60 fps budget in that many tests (frame p99 past 33 ms or a sixth of frames dropped); its numbers are shown but never marked best, since they describe a saturated server. Idle and Static remain baselines; scaling requires the full suite.
-Full results: [interactive report](https://purrnet.github.io/unity-netcode-benchmark/) · [workflow run](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/42638700836) · [raw datapoints](latest.json).
+Full results: [interactive report](https://purrnet.github.io/unity-netcode-benchmark/) · [workflow run](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/42642262967) · [raw datapoints](latest.json).
