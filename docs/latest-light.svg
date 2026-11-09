@@ -12,21 +12,21 @@
 <line x1="8" y1="68" x2="848" y2="68" stroke="#d0d7de" stroke-width="1"/>
 <rect x="8" y="77" width="9" height="9" rx="2" fill="#eb6834"/>
 <text x="23" y="86" fill="#1f2328" font-weight="600">PurrNet</text>
-<text x="222" y="86" text-anchor="end" fill="#1f2328" font-weight="400">Overloaded (3/3)</text>
-<text x="346" y="86" text-anchor="end" fill="#1f2328" font-weight="400">38.53 MB/s</text>
-<text x="470" y="86" text-anchor="end" fill="#1f2328" font-weight="400">69.1%</text>
-<text x="594" y="86" text-anchor="end" fill="#1f2328" font-weight="400">37.75 MB/s</text>
-<text x="718" y="86" text-anchor="end" fill="#1f2328" font-weight="400">10</text>
-<text x="842" y="86" text-anchor="end" fill="#1f2328" font-weight="400">125.5 ms</text>
+<text x="222" y="86" text-anchor="end" fill="#1f2328" font-weight="400">Overloaded (2/3)</text>
+<text x="346" y="86" text-anchor="end" fill="#1f2328" font-weight="400">42.10 MB/s</text>
+<text x="470" y="86" text-anchor="end" fill="#1f2328" font-weight="400">81.0%</text>
+<text x="594" y="86" text-anchor="end" fill="#1f2328" font-weight="400">32.93 MB/s</text>
+<text x="718" y="86" text-anchor="end" fill="#1f2328" font-weight="400">14</text>
+<text x="842" y="86" text-anchor="end" fill="#1f2328" font-weight="400">41.0 ms</text>
 <line x1="8" y1="95" x2="848" y2="95" stroke="#d0d7de" stroke-width="0.5"/>
 <rect x="8" y="104" width="9" height="9" rx="2" fill="#2a78d6"/>
 <text x="23" y="113" fill="#1f2328" font-weight="600">FishNet</text>
 <text x="222" y="113" text-anchor="end" fill="#1f2328" font-weight="400">Overloaded (2/3)</text>
-<text x="346" y="113" text-anchor="end" fill="#1f2328" font-weight="400">51.58 MB/s</text>
-<text x="470" y="113" text-anchor="end" fill="#1f2328" font-weight="400">109.6%</text>
-<text x="594" y="113" text-anchor="end" fill="#1f2328" font-weight="400">215.69 MB/s</text>
-<text x="718" y="113" text-anchor="end" fill="#1f2328" font-weight="400">367</text>
-<text x="842" y="113" text-anchor="end" fill="#1f2328" font-weight="400">936.9 ms</text>
+<text x="346" y="113" text-anchor="end" fill="#1f2328" font-weight="400">50.98 MB/s</text>
+<text x="470" y="113" text-anchor="end" fill="#1f2328" font-weight="400">104.1%</text>
+<text x="594" y="113" text-anchor="end" fill="#1f2328" font-weight="400">177.48 MB/s</text>
+<text x="718" y="113" text-anchor="end" fill="#1f2328" font-weight="400">369</text>
+<text x="842" y="113" text-anchor="end" fill="#1f2328" font-weight="400">671.6 ms</text>
 <line x1="8" y1="122" x2="848" y2="122" stroke="#d0d7de" stroke-width="0.5"/>
 <text x="8" y="161" font-weight="600" fill="#1f2328">Messaging</text>
 <text x="848" y="161" text-anchor="end" fill="#656d76" font-size="12">100 connections @ 30 Hz · SendRPC, ClientInput</text>
@@ -41,20 +41,20 @@
 <rect x="8" y="213" width="9" height="9" rx="2" fill="#eb6834"/>
 <text x="23" y="222" fill="#1f2328" font-weight="600">PurrNet</text>
 <text x="222" y="222" text-anchor="end" fill="#1f2328" font-weight="400">Overloaded (1/2)</text>
-<text x="346" y="222" text-anchor="end" fill="#1f2328" font-weight="400">10.60 MB/s</text>
-<text x="470" y="222" text-anchor="end" fill="#1f2328" font-weight="400">53.2%</text>
-<text x="594" y="222" text-anchor="end" fill="#1f2328" font-weight="400">12.53 MB/s</text>
+<text x="346" y="222" text-anchor="end" fill="#1f2328" font-weight="400">20.57 MB/s</text>
+<text x="470" y="222" text-anchor="end" fill="#1f2328" font-weight="400">77.6%</text>
+<text x="594" y="222" text-anchor="end" fill="#1f2328" font-weight="400">3.94 MB/s</text>
 <text x="718" y="222" text-anchor="end" fill="#1f2328" font-weight="400">1</text>
-<text x="842" y="222" text-anchor="end" fill="#1f2328" font-weight="400">205.2 ms</text>
+<text x="842" y="222" text-anchor="end" fill="#1f2328" font-weight="400">53.3 ms</text>
 <line x1="8" y1="231" x2="848" y2="231" stroke="#d0d7de" stroke-width="0.5"/>
 <rect x="8" y="240" width="9" height="9" rx="2" fill="#2a78d6"/>
 <text x="23" y="249" fill="#1f2328" font-weight="600">FishNet</text>
 <text x="222" y="249" text-anchor="end" fill="#1f2328" font-weight="400">Overloaded (1/2)</text>
-<text x="346" y="249" text-anchor="end" fill="#1f2328" font-weight="400">19.33 MB/s</text>
-<text x="470" y="249" text-anchor="end" fill="#1f2328" font-weight="400">65.5%</text>
-<text x="594" y="249" text-anchor="end" fill="#1f2328" font-weight="400">51.93 MB/s</text>
-<text x="718" y="249" text-anchor="end" fill="#1f2328" font-weight="400">48</text>
-<text x="842" y="249" text-anchor="end" fill="#1f2328" font-weight="400">566.3 ms</text>
+<text x="346" y="249" text-anchor="end" fill="#1f2328" font-weight="400">19.88 MB/s</text>
+<text x="470" y="249" text-anchor="end" fill="#1f2328" font-weight="400">64.7%</text>
+<text x="594" y="249" text-anchor="end" fill="#1f2328" font-weight="400">95.61 MB/s</text>
+<text x="718" y="249" text-anchor="end" fill="#1f2328" font-weight="400">50</text>
+<text x="842" y="249" text-anchor="end" fill="#1f2328" font-weight="400">205.8 ms</text>
 <line x1="8" y1="258" x2="848" y2="258" stroke="#d0d7de" stroke-width="0.5"/>
 <text x="8" y="297" font-weight="600" fill="#1f2328">Spawn / despawn</text>
 <text x="848" y="297" text-anchor="end" fill="#656d76" font-size="12">100 connections @ 30 Hz · SpawnChurn</text>
@@ -68,20 +68,20 @@
 <line x1="8" y1="340" x2="848" y2="340" stroke="#d0d7de" stroke-width="1"/>
 <rect x="8" y="349" width="9" height="9" rx="2" fill="#eb6834"/>
 <text x="23" y="358" fill="#1f2328" font-weight="600">PurrNet</text>
-<text x="222" y="358" text-anchor="end" fill="#1f2328" font-weight="400">Overloaded (1/1)</text>
-<text x="346" y="358" text-anchor="end" fill="#1f2328" font-weight="400">22.03 MB/s</text>
-<text x="470" y="358" text-anchor="end" fill="#1f2328" font-weight="400">99.4%</text>
-<text x="594" y="358" text-anchor="end" fill="#1f2328" font-weight="400">16.03 MB/s</text>
+<text x="222" y="358" text-anchor="end" fill="#1f2328" font-weight="400">Completed</text>
+<text x="346" y="358" text-anchor="end" fill="#1f2328" font-weight="400">34.48 MB/s</text>
+<text x="470" y="358" text-anchor="end" fill="#1f2328" font-weight="400">139.8%</text>
+<text x="594" y="358" text-anchor="end" fill="#1f2328" font-weight="400">3.36 MB/s</text>
 <text x="718" y="358" text-anchor="end" fill="#1f2328" font-weight="400">1</text>
-<text x="842" y="358" text-anchor="end" fill="#1f2328" font-weight="400">241.1 ms</text>
+<text x="842" y="358" text-anchor="end" fill="#1f2328" font-weight="400">16.9 ms</text>
 <line x1="8" y1="367" x2="848" y2="367" stroke="#d0d7de" stroke-width="0.5"/>
 <rect x="8" y="376" width="9" height="9" rx="2" fill="#2a78d6"/>
 <text x="23" y="385" fill="#1f2328" font-weight="600">FishNet</text>
 <text x="222" y="385" text-anchor="end" fill="#1f2328" font-weight="400">Overloaded (1/1)</text>
-<text x="346" y="385" text-anchor="end" fill="#1f2328" font-weight="400">16.63 MB/s</text>
-<text x="470" y="385" text-anchor="end" fill="#1f2328" font-weight="400">113.4%</text>
-<text x="594" y="385" text-anchor="end" fill="#1f2328" font-weight="400">160.71 MB/s</text>
-<text x="718" y="385" text-anchor="end" fill="#1f2328" font-weight="400">127</text>
-<text x="842" y="385" text-anchor="end" fill="#1f2328" font-weight="400">43.3 ms</text>
+<text x="346" y="385" text-anchor="end" fill="#1f2328" font-weight="400">16.59 MB/s</text>
+<text x="470" y="385" text-anchor="end" fill="#1f2328" font-weight="400">97.9%</text>
+<text x="594" y="385" text-anchor="end" fill="#1f2328" font-weight="400">162.62 MB/s</text>
+<text x="718" y="385" text-anchor="end" fill="#1f2328" font-weight="400">124</text>
+<text x="842" y="385" text-anchor="end" fill="#1f2328" font-weight="400">37.0 ms</text>
 <line x1="8" y1="394" x2="848" y2="394" stroke="#d0d7de" stroke-width="0.5"/>
 </svg>
