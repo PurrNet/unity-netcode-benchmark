@@ -1,22 +1,22 @@
 [
   {
     "netcode": "fishnet",
-    "connections": 50,
-    "size": 50,
+    "connections": 100,
+    "size": 100,
     "tick": 30,
-    "tag": "c50t30",
+    "tag": "c100t30",
     "meta": {
       "cpuModel": "AMD Ryzen 5 3600 6-Core Processor",
       "cpuCount": 6,
-      "devBuild": false,
+      "devBuild": true,
       "targetFps": 60,
       "benchObjects": 2000,
       "benchSeconds": 10.0,
       "tickRate": 30,
       "requestedTickRate": 30,
       "unityVersion": "6000.5.4f1",
-      "connectedAtStart": 50,
-      "expectedClients": 50,
+      "connectedAtStart": 100,
+      "expectedClients": 100,
       "process": {
         "exitCode": 0,
         "status": "exited",
@@ -31,7 +31,7 @@
           "oom_kill": 0,
           "oom_group_kill": 0
         },
-        "cgroupPeakBytes": 921587712,
+        "cgroupPeakBytes": 1713430528,
         "harnessMaxSeconds": 780.0
       },
       "serverError": null,
@@ -42,30 +42,30 @@
         "test": 0,
         "name": "Idle",
         "objects": 0,
-        "windowSeconds": 4.998658875003457,
-        "connections": 50,
+        "windowSeconds": 4.9993281392380599,
+        "connections": 100,
         "truncated": false,
-        "cpuPercent": 1.3397145649382545,
-        "avgFrameMs": 16.66847709019979,
-        "minFrameMs": 16.666624069213868,
-        "maxFrameMs": 16.959693908691408,
-        "p95FrameMs": 16.666778564453126,
-        "p99FrameMs": 16.66679397583008,
-        "avgFps": 59.99348318317267,
+        "cpuPercent": 3.315667193337371,
+        "avgFrameMs": 16.671570510864258,
+        "minFrameMs": 16.666397094726564,
+        "maxFrameMs": 17.07672882080078,
+        "p95FrameMs": 16.66695785522461,
+        "p99FrameMs": 16.956668968200686,
+        "avgFps": 59.98235135366139,
         "frameCount": 300,
-        "gcCollections": 2,
-        "gcAllocBytes": 792423,
-        "gcAllocBytesPerSec": 158527.1209369037,
-        "gcAllocEstimated": true,
-        "managedHeapBytes": 3964928,
-        "peakRssBytes": 131485696,
+        "gcCollections": 5,
+        "gcAllocBytes": 2676029,
+        "gcAllocBytesPerSec": 535277.7264202245,
+        "gcAllocEstimated": false,
+        "managedHeapBytes": 6086656,
+        "peakRssBytes": 180277248,
         "iface": "tailscale0",
-        "txBytes": 57600,
-        "rxBytes": 53225,
-        "txBytesPerSec": 11523.090781016772,
-        "rxBytesPerSec": 10647.856021173917,
-        "txPacketsPerSec": 247.86648398749618,
-        "rxPacketsPerSec": 268.2719572455467,
+        "txBytes": 245792,
+        "rxBytes": 123804,
+        "txBytesPerSec": 49165.006407733184,
+        "rxBytesPerSec": 24764.127609128853,
+        "txPacketsPerSec": 590.4793439803914,
+        "rxPacketsPerSec": 611.682193052858,
         "inputsReceived": 0,
         "inputsPerSec": 0.0,
         "rpcsSentPerSec": 0.0,
@@ -88,36 +88,103 @@
         "rttP50Ms": 0.0,
         "rttP95Ms": 0.0,
         "rttP99Ms": 0.0,
-        "cpuMarkers": []
+        "cpuMarkers": [
+          {
+            "name": "PlayerLoop",
+            "totalMs": 4983.485917,
+            "perFrameMs": 16.611619723333335,
+            "calls": 299
+          },
+          {
+            "name": "TimeManager.OnUpdate()",
+            "totalMs": 0.85577,
+            "perFrameMs": 0.0028525666666666669,
+            "calls": 299
+          },
+          {
+            "name": "TimeManager.Update",
+            "totalMs": 0.1402,
+            "perFrameMs": 0.0004673333333333333,
+            "calls": 300
+          },
+          {
+            "name": "TimeManager.OnPostTick()",
+            "totalMs": 0.1137,
+            "perFrameMs": 0.000379,
+            "calls": 150
+          },
+          {
+            "name": "TimeManager.OnLateUpdate(float)",
+            "totalMs": 0.092951,
+            "perFrameMs": 0.00030983666666666666,
+            "calls": 300
+          },
+          {
+            "name": "ServerManager.TimeManager_OnPostTick()",
+            "totalMs": 0.04129,
+            "perFrameMs": 0.00013763333333333334,
+            "calls": 150
+          },
+          {
+            "name": "TimeManager.OnFixedUpdate()",
+            "totalMs": 0.03716,
+            "perFrameMs": 0.00012386666666666665,
+            "calls": 249
+          },
+          {
+            "name": "ClientManager.TransportManager_OnIterateIncomingEnd(bool)",
+            "totalMs": 0.03125,
+            "perFrameMs": 0.00010416666666666667,
+            "calls": 300
+          },
+          {
+            "name": "ClientManager.TimeManager_OnPostTick()",
+            "totalMs": 0.01744,
+            "perFrameMs": 0.000058133333333333335,
+            "calls": 150
+          },
+          {
+            "name": "TimeManager.OnTick()",
+            "totalMs": 0.01513,
+            "perFrameMs": 0.00005043333333333333,
+            "calls": 150
+          },
+          {
+            "name": "TimeManager.OnPreTick()",
+            "totalMs": 0.01495,
+            "perFrameMs": 0.00004983333333333333,
+            "calls": 150
+          }
+        ]
       },
       "MoveY": {
         "test": 1,
         "name": "MoveY",
         "objects": 2000,
-        "windowSeconds": 10.000679710879922,
-        "connections": 50,
+        "windowSeconds": 10.010031352750957,
+        "connections": 100,
         "truncated": false,
-        "cpuPercent": 42.57116433164329,
-        "avgFrameMs": 16.668179966608684,
-        "minFrameMs": 16.66634750366211,
-        "maxFrameMs": 17.261125564575197,
-        "p95FrameMs": 16.66683006286621,
-        "p99FrameMs": 16.666952362060547,
-        "avgFps": 59.9945526148204,
-        "frameCount": 600,
-        "gcCollections": 40,
-        "gcAllocBytes": 389672790,
-        "gcAllocBytesPerSec": 38964630.53166955,
-        "gcAllocEstimated": true,
-        "managedHeapBytes": 79642624,
-        "peakRssBytes": 273952768,
+        "cpuPercent": 83.78145703504922,
+        "avgFrameMs": 18.304062158141755,
+        "minFrameMs": 16.666589736938478,
+        "maxFrameMs": 33.420413970947269,
+        "p95FrameMs": 22.583295059204067,
+        "p99FrameMs": 28.470431137084956,
+        "avgFps": 54.632681606972919,
+        "frameCount": 547,
+        "gcCollections": 83,
+        "gcAllocBytes": 824280702,
+        "gcAllocBytesPerSec": 82345466.5577517,
+        "gcAllocEstimated": false,
+        "managedHeapBytes": 128864256,
+        "peakRssBytes": 398368768,
         "iface": "tailscale0",
-        "txBytes": 183583268,
-        "rxBytes": 575759,
-        "txBytesPerSec": 18357079.049364658,
-        "rxBytesPerSec": 57571.98676942141,
-        "txPacketsPerSec": 17912.782448687994,
-        "rxPacketsPerSec": 1413.20394299044,
+        "txBytes": 366767346,
+        "rxBytes": 1155955,
+        "txBytesPerSec": 36639979.743840169,
+        "rxBytesPerSec": 115479.6582812221,
+        "txPacketsPerSec": 35862.824735443304,
+        "rxPacketsPerSec": 2841.449641632071,
         "inputsReceived": 0,
         "inputsPerSec": 0.0,
         "rpcsSentPerSec": 0.0,
@@ -140,36 +207,127 @@
         "rttP50Ms": 0.0,
         "rttP95Ms": 0.0,
         "rttP99Ms": 0.0,
-        "cpuMarkers": []
+        "cpuMarkers": [
+          {
+            "name": "PlayerLoop",
+            "totalMs": 9979.854349,
+            "perFrameMs": 18.244706305301646,
+            "calls": 546
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Transporting::NetworkReaderLoop.Update() [Invoke]",
+            "totalMs": 5686.751051,
+            "perFrameMs": 10.396254206581354,
+            "calls": 546
+          },
+          {
+            "name": "TimeManager.OnPostTick()",
+            "totalMs": 4624.116439,
+            "perFrameMs": 8.453594952468008,
+            "calls": 299
+          },
+          {
+            "name": "TimeManager.OnTick()",
+            "totalMs": 255.500802,
+            "perFrameMs": 0.4670947020109689,
+            "calls": 299
+          },
+          {
+            "name": "TimeManager.OnUpdate()",
+            "totalMs": 2.77033,
+            "perFrameMs": 0.005064588665447897,
+            "calls": 546
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Transporting::NetworkWriterLoop.LateUpdate() [Invoke]",
+            "totalMs": 0.64599,
+            "perFrameMs": 0.0011809689213893966,
+            "calls": 547
+          },
+          {
+            "name": "TimeManager.OnLateUpdate(float)",
+            "totalMs": 0.43893,
+            "perFrameMs": 0.0008024314442413162,
+            "calls": 547
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Transporting::NetworkReaderLoop.FixedUpdate() [Invoke]",
+            "totalMs": 0.425841,
+            "perFrameMs": 0.0007785027422303474,
+            "calls": 500
+          },
+          {
+            "name": "TimeManager.Update",
+            "totalMs": 0.35645,
+            "perFrameMs": 0.0006516453382084095,
+            "calls": 547
+          },
+          {
+            "name": "ServerManager.TimeManager_OnPostTick()",
+            "totalMs": 0.2028,
+            "perFrameMs": 0.0003707495429616088,
+            "calls": 299
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Utility.Performance::ObjectPool.LateUpdate() [Invoke]",
+            "totalMs": 0.13796,
+            "perFrameMs": 0.0002522120658135283,
+            "calls": 547
+          },
+          {
+            "name": "TimeManager.OnFixedUpdate()",
+            "totalMs": 0.08276,
+            "perFrameMs": 0.0001512979890310786,
+            "calls": 500
+          },
+          {
+            "name": "ClientManager.TransportManager_OnIterateIncomingEnd(bool)",
+            "totalMs": 0.06115,
+            "perFrameMs": 0.00011179159049360147,
+            "calls": 598
+          },
+          {
+            "name": "ClientManager.TimeManager_OnPostTick()",
+            "totalMs": 0.04224,
+            "perFrameMs": 0.00007722120658135284,
+            "calls": 299
+          },
+          {
+            "name": "TimeManager.OnPreTick()",
+            "totalMs": 0.02987,
+            "perFrameMs": 0.00005460694698354662,
+            "calls": 299
+          }
+        ]
       },
       "MoveWander": {
         "test": 3,
         "name": "MoveWander",
         "objects": 2000,
-        "windowSeconds": 10.001768912188709,
-        "connections": 50,
+        "windowSeconds": 9.768461485393346,
+        "connections": 100,
         "truncated": false,
-        "cpuPercent": 59.269584161015789,
-        "avgFrameMs": 16.828928461796097,
-        "minFrameMs": 16.666141510009767,
-        "maxFrameMs": 22.620365142822267,
-        "p95FrameMs": 17.310542488098144,
-        "p99FrameMs": 20.408628921508784,
-        "avgFps": 59.421489744289598,
-        "frameCount": 595,
-        "gcCollections": 121,
-        "gcAllocBytes": 1108232899,
-        "gcAllocBytesPerSec": 110803689.70027353,
-        "gcAllocEstimated": true,
-        "managedHeapBytes": 80236544,
-        "peakRssBytes": 273952768,
+        "cpuPercent": 124.09468091905858,
+        "avgFrameMs": 26.988569480710919,
+        "minFrameMs": 16.66665267944336,
+        "maxFrameMs": 277.5927734375,
+        "p95FrameMs": 37.644775390625,
+        "p99FrameMs": 113.73349151611353,
+        "avgFps": 37.052723402576528,
+        "frameCount": 371,
+        "gcCollections": 225,
+        "gcAllocBytes": 2395564815,
+        "gcAllocBytesPerSec": 245234607.16736789,
+        "gcAllocEstimated": false,
+        "managedHeapBytes": 132009984,
+        "peakRssBytes": 440610816,
         "iface": "tailscale0",
-        "txBytes": 430045477,
-        "rxBytes": 47434,
-        "txBytesPerSec": 42996941.91853631,
-        "rxBytesPerSec": 4742.561082589531,
-        "txPacketsPerSec": 37594.64983656738,
-        "rxPacketsPerSec": 131.77668986071178,
+        "txBytes": 848032626,
+        "rxBytes": 70953,
+        "txBytesPerSec": 86813325.44209263,
+        "rxBytesPerSec": 7263.477478628042,
+        "txPacketsPerSec": 75903.8668585326,
+        "rxPacketsPerSec": 206.27608585169768,
         "inputsReceived": 0,
         "inputsPerSec": 0.0,
         "rpcsSentPerSec": 0.0,
@@ -192,39 +350,130 @@
         "rttP50Ms": 0.0,
         "rttP95Ms": 0.0,
         "rttP99Ms": 0.0,
-        "cpuMarkers": []
+        "cpuMarkers": [
+          {
+            "name": "PlayerLoop",
+            "totalMs": 9732.022092,
+            "perFrameMs": 26.231865477088947,
+            "calls": 370
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Transporting::NetworkReaderLoop.Update() [Invoke]",
+            "totalMs": 7881.252963,
+            "perFrameMs": 21.24326944204852,
+            "calls": 370
+          },
+          {
+            "name": "TimeManager.OnPostTick()",
+            "totalMs": 4837.310088,
+            "perFrameMs": 13.038571665768196,
+            "calls": 300
+          },
+          {
+            "name": "TimeManager.OnTick()",
+            "totalMs": 422.209894,
+            "perFrameMs": 1.1380320592991916,
+            "calls": 300
+          },
+          {
+            "name": "TimeManager.OnUpdate()",
+            "totalMs": 2.824351,
+            "perFrameMs": 0.007612805929919138,
+            "calls": 370
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Transporting::NetworkWriterLoop.LateUpdate() [Invoke]",
+            "totalMs": 0.55733,
+            "perFrameMs": 0.0015022371967654987,
+            "calls": 371
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Transporting::NetworkReaderLoop.FixedUpdate() [Invoke]",
+            "totalMs": 0.39429,
+            "perFrameMs": 0.00106277628032345,
+            "calls": 500
+          },
+          {
+            "name": "TimeManager.OnLateUpdate(float)",
+            "totalMs": 0.37415,
+            "perFrameMs": 0.001008490566037736,
+            "calls": 371
+          },
+          {
+            "name": "TimeManager.Update",
+            "totalMs": 0.27611,
+            "perFrameMs": 0.0007442318059299192,
+            "calls": 371
+          },
+          {
+            "name": "ServerManager.TimeManager_OnPostTick()",
+            "totalMs": 0.21086,
+            "perFrameMs": 0.0005683557951482479,
+            "calls": 300
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Utility.Performance::ObjectPool.LateUpdate() [Invoke]",
+            "totalMs": 0.11745,
+            "perFrameMs": 0.00031657681940700807,
+            "calls": 371
+          },
+          {
+            "name": "TimeManager.OnFixedUpdate()",
+            "totalMs": 0.07554,
+            "perFrameMs": 0.00020361185983827493,
+            "calls": 500
+          },
+          {
+            "name": "ClientManager.TransportManager_OnIterateIncomingEnd(bool)",
+            "totalMs": 0.05532,
+            "perFrameMs": 0.00014911051212938007,
+            "calls": 544
+          },
+          {
+            "name": "ClientManager.TimeManager_OnPostTick()",
+            "totalMs": 0.04253,
+            "perFrameMs": 0.00011463611859838275,
+            "calls": 300
+          },
+          {
+            "name": "TimeManager.OnPreTick()",
+            "totalMs": 0.03507,
+            "perFrameMs": 0.00009452830188679245,
+            "calls": 300
+          }
+        ]
       },
       "SendRPC": {
         "test": 4,
         "name": "SendRPC",
         "objects": 2000,
-        "windowSeconds": 10.051671342924238,
-        "connections": 50,
+        "windowSeconds": 9.785420126281679,
+        "connections": 100,
         "truncated": false,
-        "cpuPercent": 111.36699855273386,
-        "avgFrameMs": 51.735638529983997,
-        "minFrameMs": 40.02745819091797,
-        "maxFrameMs": 73.37069702148438,
-        "p95FrameMs": 69.98067321777343,
-        "p99FrameMs": 70.72162925720214,
-        "avgFps": 19.329035620589438,
-        "frameCount": 194,
-        "gcCollections": 24,
-        "gcAllocBytes": 530951781,
-        "gcAllocBytesPerSec": 52822238.50004384,
-        "gcAllocEstimated": true,
-        "managedHeapBytes": 169345024,
-        "peakRssBytes": 352174080,
+        "cpuPercent": 123.08492008075585,
+        "avgFrameMs": 260.3003375713642,
+        "minFrameMs": 181.24998474121095,
+        "maxFrameMs": 600.0739135742188,
+        "p95FrameMs": 450.39810485839856,
+        "p99FrameMs": 566.2583203124998,
+        "avgFps": 3.8417161088999318,
+        "frameCount": 39,
+        "gcCollections": 46,
+        "gcAllocBytes": 1048505697,
+        "gcAllocBytesPerSec": 107149788.50871448,
+        "gcAllocEstimated": false,
+        "managedHeapBytes": 305528832,
+        "peakRssBytes": 565575680,
         "iface": "tailscale0",
-        "txBytes": 203762859,
-        "rxBytes": 370805,
-        "txBytesPerSec": 20271540.129834888,
-        "rxBytesPerSec": 36889.88501012064,
-        "txPacketsPerSec": 18346.89910845705,
-        "rxPacketsPerSec": 913.280954660556,
+        "txBytes": 395568925,
+        "rxBytes": 751854,
+        "txBytesPerSec": 40424316.98334353,
+        "rxBytesPerSec": 76834.10526040377,
+        "txPacketsPerSec": 36586.3698624905,
+        "rxPacketsPerSec": 1902.5243433338612,
         "inputsReceived": 0,
         "inputsPerSec": 0.0,
-        "rpcsSentPerSec": 60089.50943518255,
+        "rpcsSentPerSec": 62337.64029831097,
         "rpcsReceivedPerSec": 0.0,
         "syncMutationsPerSec": 0.0,
         "syncObservationAvailable": false,
@@ -233,7 +482,7 @@
         "syncFieldSamples": 0,
         "syncSilenceAvgMs": 0.0,
         "syncSilenceMaxMs": 0.0,
-        "rpcsSent": 810000,
+        "rpcsSent": 814000,
         "rpcsReceived": 0,
         "syncMutations": 0,
         "deliveryComplete": true,
@@ -244,36 +493,127 @@
         "rttP50Ms": 0.0,
         "rttP95Ms": 0.0,
         "rttP99Ms": 0.0,
-        "cpuMarkers": []
+        "cpuMarkers": [
+          {
+            "name": "PlayerLoop",
+            "totalMs": 9551.252314,
+            "perFrameMs": 244.90390548717947,
+            "calls": 38
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Transporting::NetworkReaderLoop.Update() [Invoke]",
+            "totalMs": 8025.793307,
+            "perFrameMs": 205.78957197435899,
+            "calls": 38
+          },
+          {
+            "name": "TimeManager.OnTick()",
+            "totalMs": 6649.926717,
+            "perFrameMs": 170.51094146153847,
+            "calls": 298
+          },
+          {
+            "name": "TimeManager.OnUpdate()",
+            "totalMs": 0.93194,
+            "perFrameMs": 0.023895897435897437,
+            "calls": 38
+          },
+          {
+            "name": "TimeManager.OnPostTick()",
+            "totalMs": 0.818831,
+            "perFrameMs": 0.020995666666666667,
+            "calls": 298
+          },
+          {
+            "name": "ServerManager.TimeManager_OnPostTick()",
+            "totalMs": 0.26672,
+            "perFrameMs": 0.006838974358974359,
+            "calls": 298
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Transporting::NetworkReaderLoop.FixedUpdate() [Invoke]",
+            "totalMs": 0.16628,
+            "perFrameMs": 0.0042635897435897439,
+            "calls": 463
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Transporting::NetworkWriterLoop.LateUpdate() [Invoke]",
+            "totalMs": 0.08705,
+            "perFrameMs": 0.002232051282051282,
+            "calls": 39
+          },
+          {
+            "name": "ClientManager.TimeManager_OnPostTick()",
+            "totalMs": 0.07649,
+            "perFrameMs": 0.0019612820512820516,
+            "calls": 298
+          },
+          {
+            "name": "TimeManager.OnPreTick()",
+            "totalMs": 0.05837,
+            "perFrameMs": 0.0014966666666666666,
+            "calls": 298
+          },
+          {
+            "name": "TimeManager.OnLateUpdate(float)",
+            "totalMs": 0.05791,
+            "perFrameMs": 0.001484871794871795,
+            "calls": 39
+          },
+          {
+            "name": "TimeManager.OnFixedUpdate()",
+            "totalMs": 0.04969,
+            "perFrameMs": 0.001274102564102564,
+            "calls": 463
+          },
+          {
+            "name": "TimeManager.Update",
+            "totalMs": 0.03108,
+            "perFrameMs": 0.0007969230769230769,
+            "calls": 39
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Utility.Performance::ObjectPool.LateUpdate() [Invoke]",
+            "totalMs": 0.01499,
+            "perFrameMs": 0.00038435897435897437,
+            "calls": 39
+          },
+          {
+            "name": "ClientManager.TransportManager_OnIterateIncomingEnd(bool)",
+            "totalMs": 0.00773,
+            "perFrameMs": 0.0001982051282051282,
+            "calls": 76
+          }
+        ]
       },
       "Static": {
         "test": 5,
         "name": "Static",
         "objects": 2000,
-        "windowSeconds": 4.9998746467754249,
-        "connections": 50,
+        "windowSeconds": 4.9998713275417689,
+        "connections": 100,
         "truncated": false,
-        "cpuPercent": 1.735217083011319,
-        "avgFrameMs": 16.666745045979817,
-        "minFrameMs": 16.666637420654298,
-        "maxFrameMs": 16.66683006286621,
-        "p95FrameMs": 16.666786193847658,
-        "p99FrameMs": 16.666822509765625,
-        "avgFps": 59.999717835799618,
+        "cpuPercent": 4.3879821624902919,
+        "avgFrameMs": 16.666747029622397,
+        "minFrameMs": 16.666412353515626,
+        "maxFrameMs": 16.667070388793947,
+        "p95FrameMs": 16.66682529449463,
+        "p99FrameMs": 16.667049407958986,
+        "avgFps": 59.99971069475434,
         "frameCount": 300,
         "gcCollections": 0,
-        "gcAllocBytes": 303104,
-        "gcAllocBytesPerSec": 60622.31984065466,
-        "gcAllocEstimated": true,
-        "managedHeapBytes": 134070272,
-        "peakRssBytes": 352677888,
+        "gcAllocBytes": 1240195,
+        "gcAllocBytesPerSec": 248045.383321845,
+        "gcAllocEstimated": false,
+        "managedHeapBytes": 171241472,
+        "peakRssBytes": 565448704,
         "iface": "tailscale0",
-        "txBytes": 36337,
-        "rxBytes": 26845,
-        "txBytesPerSec": 7267.582202972802,
-        "rxBytesPerSec": 5369.13460766725,
-        "txPacketsPerSec": 196.20491898385445,
-        "rxPacketsPerSec": 147.80370553421859,
+        "txBytes": 64768,
+        "rxBytes": 45690,
+        "txBytesPerSec": 12953.933362889913,
+        "rxBytesPerSec": 9138.235167836589,
+        "txPacketsPerSec": 352.40906906824406,
+        "rxPacketsPerSec": 254.00653672909756,
         "inputsReceived": 0,
         "inputsPerSec": 0.0,
         "rpcsSentPerSec": 0.0,
@@ -296,36 +636,127 @@
         "rttP50Ms": 0.0,
         "rttP95Ms": 0.0,
         "rttP99Ms": 0.0,
-        "cpuMarkers": []
+        "cpuMarkers": [
+          {
+            "name": "PlayerLoop",
+            "totalMs": 4982.097284,
+            "perFrameMs": 16.606990946666668,
+            "calls": 299
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Transporting::NetworkReaderLoop.Update() [Invoke]",
+            "totalMs": 92.443604,
+            "perFrameMs": 0.30814534666666668,
+            "calls": 299
+          },
+          {
+            "name": "TimeManager.OnPostTick()",
+            "totalMs": 85.066171,
+            "perFrameMs": 0.2835539033333333,
+            "calls": 149
+          },
+          {
+            "name": "TimeManager.OnTick()",
+            "totalMs": 1.99605,
+            "perFrameMs": 0.0066535000000000009,
+            "calls": 149
+          },
+          {
+            "name": "TimeManager.OnUpdate()",
+            "totalMs": 1.32041,
+            "perFrameMs": 0.004401366666666667,
+            "calls": 299
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Transporting::NetworkWriterLoop.LateUpdate() [Invoke]",
+            "totalMs": 0.17108,
+            "perFrameMs": 0.0005702666666666667,
+            "calls": 300
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Transporting::NetworkReaderLoop.FixedUpdate() [Invoke]",
+            "totalMs": 0.16836,
+            "perFrameMs": 0.0005612,
+            "calls": 249
+          },
+          {
+            "name": "TimeManager.Update",
+            "totalMs": 0.13307,
+            "perFrameMs": 0.00044356666666666664,
+            "calls": 300
+          },
+          {
+            "name": "TimeManager.OnLateUpdate(float)",
+            "totalMs": 0.09372,
+            "perFrameMs": 0.0003124,
+            "calls": 300
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Utility.Performance::ObjectPool.LateUpdate() [Invoke]",
+            "totalMs": 0.04954,
+            "perFrameMs": 0.00016513333333333333,
+            "calls": 300
+          },
+          {
+            "name": "ServerManager.TimeManager_OnPostTick()",
+            "totalMs": 0.04613,
+            "perFrameMs": 0.00015376666666666665,
+            "calls": 149
+          },
+          {
+            "name": "TimeManager.OnFixedUpdate()",
+            "totalMs": 0.03659,
+            "perFrameMs": 0.00012196666666666666,
+            "calls": 249
+          },
+          {
+            "name": "ClientManager.TransportManager_OnIterateIncomingEnd(bool)",
+            "totalMs": 0.03065,
+            "perFrameMs": 0.00010216666666666667,
+            "calls": 298
+          },
+          {
+            "name": "ClientManager.TimeManager_OnPostTick()",
+            "totalMs": 0.01785,
+            "perFrameMs": 0.0000595,
+            "calls": 149
+          },
+          {
+            "name": "TimeManager.OnPreTick()",
+            "totalMs": 0.01492,
+            "perFrameMs": 0.000049733333333333334,
+            "calls": 149
+          }
+        ]
       },
       "SpawnChurn": {
         "test": 6,
         "name": "SpawnChurn",
         "objects": 2000,
-        "windowSeconds": 10.024209661409259,
-        "connections": 50,
+        "windowSeconds": 10.040086740627885,
+        "connections": 100,
         "truncated": false,
-        "cpuPercent": 65.34132157286872,
-        "avgFrameMs": 17.80865633614971,
-        "minFrameMs": 16.66617774963379,
-        "maxFrameMs": 28.7097225189209,
-        "p95FrameMs": 22.48053903579712,
-        "p99FrameMs": 25.33223361968994,
-        "avgFps": 56.152467717067718,
-        "frameCount": 562,
-        "gcCollections": 125,
-        "gcAllocBytes": 1128943551,
-        "gcAllocBytesPerSec": 112621701.77327346,
-        "gcAllocEstimated": true,
-        "managedHeapBytes": 83165184,
-        "peakRssBytes": 352206848,
+        "cpuPercent": 113.44822489340045,
+        "avgFrameMs": 30.62217140781041,
+        "minFrameMs": 16.666715621948243,
+        "maxFrameMs": 48.20026779174805,
+        "p95FrameMs": 39.47318305969238,
+        "p99FrameMs": 43.270188980102549,
+        "avgFps": 32.65607741144518,
+        "frameCount": 327,
+        "gcCollections": 127,
+        "gcAllocBytes": 1691879431,
+        "gcAllocBytesPerSec": 168512431.68584357,
+        "gcAllocEstimated": false,
+        "managedHeapBytes": 138960896,
+        "peakRssBytes": 565448704,
         "iface": "tailscale0",
-        "txBytes": 87278201,
-        "rxBytes": 613241,
-        "txBytesPerSec": 8706741.373935903,
-        "rxBytesPerSec": 61175.99498749782,
-        "txPacketsPerSec": 9039.216363244082,
-        "rxPacketsPerSec": 1503.8592077772516,
+        "txBytes": 175082880,
+        "rxBytes": 1117853,
+        "txBytesPerSec": 17438383.205546958,
+        "rxBytesPerSec": 111338.97832540957,
+        "txPacketsPerSec": 18301.63471162488,
+        "rxPacketsPerSec": 2742.605787315933,
         "inputsReceived": 0,
         "inputsPerSec": 0.0,
         "rpcsSentPerSec": 0.0,
@@ -348,38 +779,165 @@
         "rttP50Ms": 0.0,
         "rttP95Ms": 0.0,
         "rttP99Ms": 0.0,
-        "cpuMarkers": []
+        "cpuMarkers": [
+          {
+            "name": "PlayerLoop",
+            "totalMs": 9993.977296,
+            "perFrameMs": 30.562621700305809,
+            "calls": 326
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Transporting::NetworkReaderLoop.Update() [Invoke]",
+            "totalMs": 1143.881123,
+            "perFrameMs": 3.4981074097859325,
+            "calls": 326
+          },
+          {
+            "name": "TimeManager.OnPostTick()",
+            "totalMs": 568.690304,
+            "perFrameMs": 1.7391140795107032,
+            "calls": 300
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Component.Transforming::NetworkTransform.Awake() [Invoke]",
+            "totalMs": 128.11248,
+            "perFrameMs": 0.3917812844036697,
+            "calls": 11960
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Object::NetworkObject.OnDestroy() [Invoke]",
+            "totalMs": 43.981637,
+            "perFrameMs": 0.13450041896024465,
+            "calls": 11960
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Object::NetworkObject.Awake() [Invoke]",
+            "totalMs": 15.789779,
+            "perFrameMs": 0.04828678593272171,
+            "calls": 11960
+          },
+          {
+            "name": "TimeManager.OnTick()",
+            "totalMs": 11.394507,
+            "perFrameMs": 0.0348455871559633,
+            "calls": 300
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Component.Transforming::NetworkTransform.OnDestroy() [Invoke]",
+            "totalMs": 6.567385,
+            "perFrameMs": 0.02008374617737003,
+            "calls": 11960
+          },
+          {
+            "name": "TimeManager.OnUpdate()",
+            "totalMs": 3.868133,
+            "perFrameMs": 0.011829152905198776,
+            "calls": 326
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Object::NetworkObject.OnDisable() [Invoke]",
+            "totalMs": 2.089832,
+            "perFrameMs": 0.0063909235474006119,
+            "calls": 11960
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Object::NetworkObject.Start() [Invoke]",
+            "totalMs": 1.688,
+            "perFrameMs": 0.005162079510703364,
+            "calls": 11960
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Transporting::NetworkWriterLoop.LateUpdate() [Invoke]",
+            "totalMs": 0.76935,
+            "perFrameMs": 0.0023527522935779816,
+            "calls": 327
+          },
+          {
+            "name": "TimeManager.OnLateUpdate(float)",
+            "totalMs": 0.44809,
+            "perFrameMs": 0.0013703058103975536,
+            "calls": 327
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Transporting::NetworkReaderLoop.FixedUpdate() [Invoke]",
+            "totalMs": 0.3453,
+            "perFrameMs": 0.0010559633027522936,
+            "calls": 500
+          },
+          {
+            "name": "TimeManager.Update",
+            "totalMs": 0.23291,
+            "perFrameMs": 0.0007122629969418961,
+            "calls": 327
+          },
+          {
+            "name": "ServerManager.TimeManager_OnPostTick()",
+            "totalMs": 0.17549,
+            "perFrameMs": 0.0005366666666666667,
+            "calls": 300
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Utility.Performance::ObjectPool.LateUpdate() [Invoke]",
+            "totalMs": 0.11247,
+            "perFrameMs": 0.00034394495412844037,
+            "calls": 327
+          },
+          {
+            "name": "TimeManager.OnFixedUpdate()",
+            "totalMs": 0.07823,
+            "perFrameMs": 0.0002392354740061162,
+            "calls": 500
+          },
+          {
+            "name": "ClientManager.TransportManager_OnIterateIncomingEnd(bool)",
+            "totalMs": 0.05773,
+            "perFrameMs": 0.00017654434250764526,
+            "calls": 576
+          },
+          {
+            "name": "ClientManager.TimeManager_OnPostTick()",
+            "totalMs": 0.04526,
+            "perFrameMs": 0.00013840978593272172,
+            "calls": 300
+          },
+          {
+            "name": "TimeManager.OnPreTick()",
+            "totalMs": 0.03027,
+            "perFrameMs": 0.00009256880733944954,
+            "calls": 300
+          }
+        ]
       },
       "ClientInput": {
         "test": 7,
         "name": "ClientInput",
         "objects": 1,
-        "windowSeconds": 10.005842723883689,
-        "connections": 50,
+        "windowSeconds": 10.005875566974283,
+        "connections": 100,
         "truncated": false,
-        "cpuPercent": 3.888375089799464,
-        "avgFrameMs": 16.676616942087809,
-        "minFrameMs": 16.666624069213868,
-        "maxFrameMs": 19.62863540649414,
-        "p95FrameMs": 16.666786193847658,
-        "p99FrameMs": 16.666837692260743,
-        "avgFps": 59.96420038144777,
+        "cpuPercent": 7.881885455412403,
+        "avgFrameMs": 16.676596298217775,
+        "minFrameMs": 16.66619300842285,
+        "maxFrameMs": 19.62957763671875,
+        "p95FrameMs": 16.66695852279663,
+        "p99FrameMs": 16.667057037353517,
+        "avgFps": 59.96427461081311,
         "frameCount": 600,
         "gcCollections": 2,
-        "gcAllocBytes": 7525177,
-        "gcAllocBytesPerSec": 752078.2814262707,
-        "gcAllocEstimated": true,
-        "managedHeapBytes": 73957376,
-        "peakRssBytes": 352206848,
+        "gcAllocBytes": 17655947,
+        "gcAllocBytesPerSec": 1764557.922174826,
+        "gcAllocEstimated": false,
+        "managedHeapBytes": 125825024,
+        "peakRssBytes": 565448704,
         "iface": "tailscale0",
-        "txBytes": 662898,
-        "rxBytes": 940836,
-        "txBytesPerSec": 66251.09131664438,
-        "rxBytesPerSec": 94028.66164928305,
-        "txPacketsPerSec": 1618.6542650066413,
-        "rxPacketsPerSec": 1560.18842498263,
-        "inputsReceived": 14883,
-        "inputsPerSec": 1487.4309351749716,
+        "txBytes": 1202520,
+        "rxBytes": 1743968,
+        "txBytesPerSec": 120181.3866213844,
+        "rxBytesPerSec": 174294.39216256073,
+        "txPacketsPerSec": 2937.074302322826,
+        "rxPacketsPerSec": 2828.8378973474746,
+        "inputsReceived": 28515,
+        "inputsPerSec": 2849.825565902252,
         "rpcsSentPerSec": 0.0,
         "rpcsReceivedPerSec": 0.0,
         "syncMutationsPerSec": 0.0,
@@ -400,41 +958,132 @@
         "rttP50Ms": 0.0,
         "rttP95Ms": 0.0,
         "rttP99Ms": 0.0,
-        "cpuMarkers": []
+        "cpuMarkers": [
+          {
+            "name": "PlayerLoop",
+            "totalMs": 9986.585803,
+            "perFrameMs": 16.644309671666666,
+            "calls": 599
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Transporting::NetworkReaderLoop.Update() [Invoke]",
+            "totalMs": 43.453825,
+            "perFrameMs": 0.07242304166666668,
+            "calls": 599
+          },
+          {
+            "name": "TimeManager.OnUpdate()",
+            "totalMs": 15.747457,
+            "perFrameMs": 0.02624576166666667,
+            "calls": 599
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Transporting::NetworkReaderLoop.FixedUpdate() [Invoke]",
+            "totalMs": 0.332191,
+            "perFrameMs": 0.0005536516666666667,
+            "calls": 500
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Transporting::NetworkWriterLoop.LateUpdate() [Invoke]",
+            "totalMs": 0.33143,
+            "perFrameMs": 0.0005523833333333333,
+            "calls": 600
+          },
+          {
+            "name": "TimeManager.Update",
+            "totalMs": 0.288831,
+            "perFrameMs": 0.000481385,
+            "calls": 600
+          },
+          {
+            "name": "TimeManager.OnPostTick()",
+            "totalMs": 0.23713,
+            "perFrameMs": 0.0003952166666666667,
+            "calls": 299
+          },
+          {
+            "name": "TimeManager.OnLateUpdate(float)",
+            "totalMs": 0.18752,
+            "perFrameMs": 0.0003125333333333333,
+            "calls": 600
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Utility.Performance::ObjectPool.LateUpdate() [Invoke]",
+            "totalMs": 0.10156,
+            "perFrameMs": 0.00016926666666666667,
+            "calls": 600
+          },
+          {
+            "name": "ServerManager.TimeManager_OnPostTick()",
+            "totalMs": 0.08113,
+            "perFrameMs": 0.00013521666666666666,
+            "calls": 299
+          },
+          {
+            "name": "TimeManager.OnFixedUpdate()",
+            "totalMs": 0.07622,
+            "perFrameMs": 0.00012703333333333332,
+            "calls": 500
+          },
+          {
+            "name": "ClientManager.TransportManager_OnIterateIncomingEnd(bool)",
+            "totalMs": 0.06771,
+            "perFrameMs": 0.00011285,
+            "calls": 598
+          },
+          {
+            "name": "TimeManager.OnTick()",
+            "totalMs": 0.04953,
+            "perFrameMs": 0.00008255,
+            "calls": 299
+          },
+          {
+            "name": "ClientManager.TimeManager_OnPostTick()",
+            "totalMs": 0.03473,
+            "perFrameMs": 0.00005788333333333333,
+            "calls": 299
+          },
+          {
+            "name": "TimeManager.OnPreTick()",
+            "totalMs": 0.03012,
+            "perFrameMs": 0.0000502,
+            "calls": 299
+          }
+        ]
       },
       "SyncVars": {
         "test": 8,
         "name": "SyncVars",
         "objects": 2000,
-        "windowSeconds": 10.028044623322785,
-        "connections": 50,
+        "windowSeconds": 9.554225505329669,
+        "connections": 100,
         "truncated": false,
-        "cpuPercent": 65.52986259870257,
-        "avgFrameMs": 17.959885057897929,
-        "minFrameMs": 16.66607093811035,
-        "maxFrameMs": 42.413822174072269,
-        "p95FrameMs": 28.826068878173815,
-        "p99FrameMs": 33.73354003906249,
-        "avgFps": 55.679643648957888,
-        "frameCount": 557,
-        "gcCollections": 45,
-        "gcAllocBytes": 1968129640,
-        "gcAllocBytesPerSec": 196262553.06269885,
-        "gcAllocEstimated": true,
-        "managedHeapBytes": 744697856,
-        "peakRssBytes": 977084416,
+        "cpuPercent": 120.86149236857016,
+        "avgFrameMs": 671.2421997070312,
+        "minFrameMs": 462.17535400390627,
+        "maxFrameMs": 943.044189453125,
+        "p95FrameMs": 912.3060119628906,
+        "p99FrameMs": 936.896553955078,
+        "avgFps": 1.4897752263437217,
+        "frameCount": 15,
+        "gcCollections": 59,
+        "gcAllocBytes": 3352826690,
+        "gcAllocBytesPerSec": 350926057.5992979,
+        "gcAllocEstimated": false,
+        "managedHeapBytes": 1501147136,
+        "peakRssBytes": 1773088768,
         "iface": "tailscale0",
-        "txBytes": 205465353,
-        "rxBytes": 251800,
-        "txBytesPerSec": 20489074.46244682,
-        "rxBytesPerSec": 25109.581125554094,
-        "txPacketsPerSec": 18069.125817268272,
-        "rxPacketsPerSec": 625.4459603632854,
+        "txBytes": 370850518,
+        "rxBytes": 416334,
+        "txBytesPerSec": 38815340.688068028,
+        "rxBytesPerSec": 43575.90259595138,
+        "txPacketsPerSec": 34713.750456799164,
+        "rxPacketsPerSec": 1091.4542465198158,
         "inputsReceived": 0,
         "inputsPerSec": 0.0,
         "rpcsSentPerSec": 0.0,
         "rpcsReceivedPerSec": 0.0,
-        "syncMutationsPerSec": 59832.20284087552,
+        "syncMutationsPerSec": 63218.10173551676,
         "syncObservationAvailable": false,
         "syncObservedChanges": 0,
         "syncObservedChangesPerSec": 0.0,
@@ -443,27 +1092,118 @@
         "syncSilenceMaxMs": 0.0,
         "rpcsSent": 0,
         "rpcsReceived": 0,
-        "syncMutations": 810000,
+        "syncMutations": 784000,
         "deliveryComplete": true,
         "finalStateObjects": 2000,
-        "finalStateHash": "7cc98ff54371f29b",
+        "finalStateHash": "028e26c2967bfd30",
         "rttSamples": 0,
         "rttAvgMs": 0.0,
         "rttP50Ms": 0.0,
         "rttP95Ms": 0.0,
         "rttP99Ms": 0.0,
-        "cpuMarkers": []
+        "cpuMarkers": [
+          {
+            "name": "PlayerLoop",
+            "totalMs": 9125.470601,
+            "perFrameMs": 608.3647067333334,
+            "calls": 14
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Transporting::NetworkReaderLoop.Update() [Invoke]",
+            "totalMs": 9089.996205,
+            "perFrameMs": 605.999747,
+            "calls": 14
+          },
+          {
+            "name": "TimeManager.OnTick()",
+            "totalMs": 284.527358,
+            "perFrameMs": 18.968490533333335,
+            "calls": 288
+          },
+          {
+            "name": "TimeManager.OnUpdate()",
+            "totalMs": 1.2804,
+            "perFrameMs": 0.08536,
+            "calls": 14
+          },
+          {
+            "name": "TimeManager.OnPostTick()",
+            "totalMs": 0.656661,
+            "perFrameMs": 0.0437774,
+            "calls": 288
+          },
+          {
+            "name": "ServerManager.TimeManager_OnPostTick()",
+            "totalMs": 0.11833,
+            "perFrameMs": 0.007888666666666667,
+            "calls": 288
+          },
+          {
+            "name": "TimeManager.OnPreTick()",
+            "totalMs": 0.10429,
+            "perFrameMs": 0.006952666666666666,
+            "calls": 288
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Transporting::NetworkReaderLoop.FixedUpdate() [Invoke]",
+            "totalMs": 0.07168,
+            "perFrameMs": 0.004778666666666666,
+            "calls": 234
+          },
+          {
+            "name": "ClientManager.TimeManager_OnPostTick()",
+            "totalMs": 0.04112,
+            "perFrameMs": 0.002741333333333333,
+            "calls": 288
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Transporting::NetworkWriterLoop.LateUpdate() [Invoke]",
+            "totalMs": 0.0368,
+            "perFrameMs": 0.0024533333333333336,
+            "calls": 15
+          },
+          {
+            "name": "TimeManager.OnFixedUpdate()",
+            "totalMs": 0.02326,
+            "perFrameMs": 0.0015506666666666666,
+            "calls": 234
+          },
+          {
+            "name": "TimeManager.OnLateUpdate(float)",
+            "totalMs": 0.02293,
+            "perFrameMs": 0.0015286666666666667,
+            "calls": 15
+          },
+          {
+            "name": "TimeManager.Update",
+            "totalMs": 0.01105,
+            "perFrameMs": 0.0007366666666666667,
+            "calls": 15
+          },
+          {
+            "name": "FishNet.Runtime.dll!FishNet.Utility.Performance::ObjectPool.LateUpdate() [Invoke]",
+            "totalMs": 0.00546,
+            "perFrameMs": 0.00036399999999999996,
+            "calls": 15
+          },
+          {
+            "name": "ClientManager.TransportManager_OnIterateIncomingEnd(bool)",
+            "totalMs": 0.00286,
+            "perFrameMs": 0.00019066666666666668,
+            "calls": 28
+          }
+        ]
       }
     },
     "clients": {
       "ClientInput": {
         "n": 10,
-        "rxBytesPerSec": 1364.8823539318148,
-        "txBytesPerSec": 1915.2706621133907,
-        "rttAvgMs": 151.13444444444445,
-        "rttP50Ms": 150.5,
-        "rttP95Ms": 155.4,
-        "rttP99Ms": 156.1,
+        "rxBytesPerSec": 1359.2103235932886,
+        "txBytesPerSec": 1914.1168301609887,
+        "rttAvgMs": 155.87568039950065,
+        "rttP50Ms": 156.1,
+        "rttP95Ms": 161.5,
+        "rttP99Ms": 162.8,
         "rpcsReceivedPerSec": 0,
         "syncObservationClients": 0,
         "syncObservedChangesPerSec": null,
@@ -477,12 +1217,12 @@
       },
       "Idle": {
         "n": 10,
-        "rxBytesPerSec": 501.47907331143807,
-        "txBytesPerSec": 242.61050133122654,
-        "rttAvgMs": 148.9621153846154,
-        "rttP50Ms": 149.1,
-        "rttP95Ms": 153.9,
-        "rttP99Ms": 153.9,
+        "rxBytesPerSec": 1086.7896757128067,
+        "txBytesPerSec": 332.61242075258207,
+        "rttAvgMs": 159.71582840938103,
+        "rttP50Ms": 159.6,
+        "rttP95Ms": 166.1,
+        "rttP99Ms": 166.1,
         "rpcsReceivedPerSec": 0,
         "syncObservationClients": 0,
         "syncObservedChangesPerSec": null,
@@ -496,12 +1236,12 @@
       },
       "MoveWander": {
         "n": 10,
-        "rxBytesPerSec": 854104.9893103652,
-        "txBytesPerSec": 106.03493238713217,
-        "rttAvgMs": 162.97222222222223,
-        "rttP50Ms": 164.6,
-        "rttP95Ms": 169.13,
-        "rttP99Ms": 169.4,
+        "rxBytesPerSec": 845363.3374174355,
+        "txBytesPerSec": 101.56966062427612,
+        "rttAvgMs": 188.0949160140733,
+        "rttP50Ms": 182.45,
+        "rttP95Ms": 208,
+        "rttP99Ms": 209.3,
         "rpcsReceivedPerSec": 0,
         "syncObservationClients": 0,
         "syncObservedChangesPerSec": null,
@@ -515,12 +1255,12 @@
       },
       "MoveY": {
         "n": 10,
-        "rxBytesPerSec": 363041.8520405954,
-        "txBytesPerSec": 1185.873285045255,
-        "rttAvgMs": 163.10666666666665,
-        "rttP50Ms": 164.1,
-        "rttP95Ms": 168.8,
-        "rttP99Ms": 168.8,
+        "rxBytesPerSec": 362242.77702902124,
+        "txBytesPerSec": 1203.509563632519,
+        "rttAvgMs": 185.86130234933609,
+        "rttP50Ms": 189.1,
+        "rttP95Ms": 196.1,
+        "rttP99Ms": 196.1,
         "rpcsReceivedPerSec": 0,
         "syncObservationClients": 0,
         "syncObservedChangesPerSec": null,
@@ -534,13 +1274,13 @@
       },
       "SendRPC": {
         "n": 10,
-        "rxBytesPerSec": 434377.7214290765,
-        "txBytesPerSec": 1129.1442480972519,
-        "rttAvgMs": 157.4,
-        "rttP50Ms": 157.4,
-        "rttP95Ms": 157.4,
-        "rttP99Ms": 157.4,
-        "rpcsReceivedPerSec": 60694.827908222294,
+        "rxBytesPerSec": 435287.3337335417,
+        "txBytesPerSec": 873.4747693957619,
+        "rttAvgMs": 179.3,
+        "rttP50Ms": 179.3,
+        "rttP95Ms": 179.3,
+        "rttP99Ms": 179.3,
+        "rpcsReceivedPerSec": 60807.31395437689,
         "syncObservationClients": 0,
         "syncObservedChangesPerSec": null,
         "syncSilenceAvgMs": null,
@@ -553,12 +1293,12 @@
       },
       "SpawnChurn": {
         "n": 10,
-        "rxBytesPerSec": 173444.3467312299,
-        "txBytesPerSec": 1337.3691730235046,
-        "rttAvgMs": 153.74,
-        "rttP50Ms": 153.55,
-        "rttP95Ms": 159.4,
-        "rttP99Ms": 159.4,
+        "rxBytesPerSec": 174018.09351237142,
+        "txBytesPerSec": 1251.9093298447071,
+        "rttAvgMs": 163.80685910832463,
+        "rttP50Ms": 164,
+        "rttP95Ms": 168,
+        "rttP99Ms": 168,
         "rpcsReceivedPerSec": 0,
         "syncObservationClients": 0,
         "syncObservedChangesPerSec": null,
@@ -572,12 +1312,12 @@
       },
       "Static": {
         "n": 10,
-        "rxBytesPerSec": 147.9896338056606,
-        "txBytesPerSec": 108.99236543795271,
-        "rttAvgMs": 148.06,
-        "rttP50Ms": 148.25,
-        "rttP95Ms": 152.7,
-        "rttP99Ms": 152.7,
+        "rxBytesPerSec": 147.02489893644912,
+        "txBytesPerSec": 109.64993291170158,
+        "rttAvgMs": 158.50858974358977,
+        "rttP50Ms": 158,
+        "rttP95Ms": 164.23499999999999,
+        "rttP99Ms": 164.9,
         "rpcsReceivedPerSec": 0,
         "syncObservationClients": 0,
         "syncObservedChangesPerSec": null,
@@ -591,17 +1331,17 @@
       },
       "SyncVars": {
         "n": 10,
-        "rxBytesPerSec": 476604.1506829459,
-        "txBytesPerSec": 584.3605375273864,
-        "rttAvgMs": 164.85333333333332,
-        "rttP50Ms": 165.4,
-        "rttP95Ms": 173.2,
-        "rttP99Ms": 174.6,
+        "rxBytesPerSec": 369389.649596183,
+        "txBytesPerSec": 466.04485811984887,
+        "rttAvgMs": 157.3,
+        "rttP50Ms": 157.3,
+        "rttP95Ms": 157.3,
+        "rttP99Ms": 157.3,
         "rpcsReceivedPerSec": 0,
         "syncObservationClients": 10,
-        "syncObservedChangesPerSec": 25911.240910982386,
-        "syncSilenceAvgMs": 150.81994207116523,
-        "syncSilenceMaxMs": 983.5269345238089,
+        "syncObservedChangesPerSec": 20108.44018314676,
+        "syncSilenceAvgMs": 219.22185363105504,
+        "syncSilenceMaxMs": 1483.3431689342406,
         "rpcDeliveryChecked": 0,
         "rpcDeliveryMatched": 0,
         "syncStateChecked": 10,
@@ -612,22 +1352,22 @@
   },
   {
     "netcode": "purrnet",
-    "connections": 50,
-    "size": 50,
+    "connections": 100,
+    "size": 100,
     "tick": 30,
-    "tag": "c50t30",
+    "tag": "c100t30",
     "meta": {
       "cpuModel": "AMD Ryzen 5 3600 6-Core Processor",
       "cpuCount": 6,
-      "devBuild": false,
+      "devBuild": true,
       "targetFps": 60,
       "benchObjects": 2000,
       "benchSeconds": 10.0,
       "tickRate": 30,
       "requestedTickRate": 30,
       "unityVersion": "6000.5.4f1",
-      "connectedAtStart": 50,
-      "expectedClients": 50,
+      "connectedAtStart": 100,
+      "expectedClients": 100,
       "process": {
         "exitCode": 0,
         "status": "exited",
@@ -642,7 +1382,7 @@
           "oom_kill": 0,
           "oom_group_kill": 0
         },
-        "cgroupPeakBytes": 1000550400,
+        "cgroupPeakBytes": 1467383808,
         "harnessMaxSeconds": 780.0
       },
       "serverError": null,
@@ -653,30 +1393,30 @@
         "test": 0,
         "name": "Idle",
         "objects": 0,
-        "windowSeconds": 4.99705171212554,
-        "connections": 50,
+        "windowSeconds": 4.996153578162193,
+        "connections": 100,
         "truncated": false,
-        "cpuPercent": 1.079840376057416,
-        "avgFrameMs": 16.666743202209476,
-        "minFrameMs": 16.666645050048829,
-        "maxFrameMs": 16.666845321655275,
-        "p95FrameMs": 16.666786193847658,
-        "p99FrameMs": 16.66682243347168,
-        "avgFps": 59.99972447331115,
+        "cpuPercent": 2.5883808209028156,
+        "avgFrameMs": 16.668897012074788,
+        "minFrameMs": 16.6663818359375,
+        "maxFrameMs": 17.311487197875978,
+        "p95FrameMs": 16.667041778564454,
+        "p99FrameMs": 16.66707046508789,
+        "avgFps": 59.99197183086618,
         "frameCount": 300,
         "gcCollections": 0,
-        "gcAllocBytes": 61440,
-        "gcAllocBytesPerSec": 12295.249987290197,
-        "gcAllocEstimated": true,
-        "managedHeapBytes": 6234112,
-        "peakRssBytes": 180719616,
+        "gcAllocBytes": 585042,
+        "gcAllocBytesPerSec": 117098.48203169214,
+        "gcAllocEstimated": false,
+        "managedHeapBytes": 10440704,
+        "peakRssBytes": 232202240,
         "iface": "tailscale0",
-        "txBytes": 86733,
-        "rxBytes": 97961,
-        "txBytesPerSec": 17356.834588991547,
-        "rxBytesPerSec": 19603.759505288654,
-        "txPacketsPerSec": 172.50171694407798,
-        "rxPacketsPerSec": 223.7319252244538,
+        "txBytes": 103395,
+        "rxBytes": 113128,
+        "txBytesPerSec": 20694.9202786583,
+        "rxBytesPerSec": 22643.01892048993,
+        "txPacketsPerSec": 344.06468358251,
+        "rxPacketsPerSec": 438.9376678862387,
         "inputsReceived": 0,
         "inputsPerSec": 0.0,
         "rpcsSentPerSec": 0.0,
@@ -699,36 +1439,199 @@
         "rttP50Ms": 0.0,
         "rttP95Ms": 0.0,
         "rttP99Ms": 0.0,
-        "cpuMarkers": []
+        "cpuMarkers": [
+          {
+            "name": "PlayerLoop",
+            "totalMs": 4981.700326,
+            "perFrameMs": 16.605667753333333,
+            "calls": 299
+          },
+          {
+            "name": "NetworkManager.OnPostBatch",
+            "totalMs": 11.718266,
+            "perFrameMs": 0.03906088666666667,
+            "calls": 149
+          },
+          {
+            "name": "NetworkManager.SendMessages",
+            "totalMs": 11.661815,
+            "perFrameMs": 0.03887271666666667,
+            "calls": 149
+          },
+          {
+            "name": "NetworkTransform.PostFixedUpdate",
+            "totalMs": 11.645036,
+            "perFrameMs": 0.038816786666666668,
+            "calls": 149
+          },
+          {
+            "name": "NetworkManager.ReceiveMessages",
+            "totalMs": 7.021592,
+            "perFrameMs": 0.023405306666666668,
+            "calls": 149
+          },
+          {
+            "name": "NetworkTransform.G.Anchors",
+            "totalMs": 1.502401,
+            "perFrameMs": 0.005008003333333334,
+            "calls": 14900
+          },
+          {
+            "name": "NetworkTransform.G.Prep",
+            "totalMs": 1.425981,
+            "perFrameMs": 0.0047532699999999999,
+            "calls": 149
+          },
+          {
+            "name": "NetworkTransform.G.Replay",
+            "totalMs": 1.41291,
+            "perFrameMs": 0.004709700000000001,
+            "calls": 14900
+          },
+          {
+            "name": "NetworkTransform.G.Patches",
+            "totalMs": 1.370521,
+            "perFrameMs": 0.0045684033333333339,
+            "calls": 14900
+          },
+          {
+            "name": "NetworkTransform.G.Converge",
+            "totalMs": 1.36988,
+            "perFrameMs": 0.0045662666666666669,
+            "calls": 14900
+          },
+          {
+            "name": "NetworkManager.OnFixedUpdate",
+            "totalMs": 0.60233,
+            "perFrameMs": 0.002007766666666667,
+            "calls": 149
+          },
+          {
+            "name": "NetworkTransform.QueueChangedState",
+            "totalMs": 0.40825,
+            "perFrameMs": 0.0013608333333333333,
+            "calls": 149
+          },
+          {
+            "name": "NetworkTransform.G.Inval",
+            "totalMs": 0.39458,
+            "perFrameMs": 0.0013152666666666666,
+            "calls": 149
+          },
+          {
+            "name": "NetworkManager.OnPreFixedUpdate",
+            "totalMs": 0.22829,
+            "perFrameMs": 0.0007609666666666666,
+            "calls": 149
+          },
+          {
+            "name": "NetworkTransform.G.Delay",
+            "totalMs": 0.16976,
+            "perFrameMs": 0.0005658666666666667,
+            "calls": 149
+          },
+          {
+            "name": "NetworkManager.OnPostFixedUpdate",
+            "totalMs": 0.13279,
+            "perFrameMs": 0.0004426333333333333,
+            "calls": 149
+          },
+          {
+            "name": "RPCBatch<UnionRPCHeader>.Flush",
+            "totalMs": 0.08584,
+            "perFrameMs": 0.0002861333333333333,
+            "calls": 447
+          },
+          {
+            "name": "PurrNet.Hierarchy.FlushSpawn",
+            "totalMs": 0.05908,
+            "perFrameMs": 0.00019693333333333334,
+            "calls": 151
+          },
+          {
+            "name": "NetworkManager.OnBatch",
+            "totalMs": 0.0573,
+            "perFrameMs": 0.00019099999999999998,
+            "calls": 149
+          },
+          {
+            "name": "NetworkTransform.G.Render",
+            "totalMs": 0.03603,
+            "perFrameMs": 0.00012009999999999999,
+            "calls": 149
+          },
+          {
+            "name": "NetworkTransform.G.Encode",
+            "totalMs": 0.03172,
+            "perFrameMs": 0.00010573333333333333,
+            "calls": 149
+          },
+          {
+            "name": "NetworkTransform.G.Demote",
+            "totalMs": 0.02927,
+            "perFrameMs": 0.00009756666666666668,
+            "calls": 149
+          },
+          {
+            "name": "PurrNet.Hierarchy.LateObservers",
+            "totalMs": 0.02595,
+            "perFrameMs": 0.0000865,
+            "calls": 149
+          },
+          {
+            "name": "NetworkTransform.G.Adopt",
+            "totalMs": 0.02396,
+            "perFrameMs": 0.00007986666666666667,
+            "calls": 149
+          },
+          {
+            "name": "NetworkTransform.G.Release",
+            "totalMs": 0.02161,
+            "perFrameMs": 0.00007203333333333334,
+            "calls": 149
+          },
+          {
+            "name": "DeltaModule.SendAcks",
+            "totalMs": 0.01969,
+            "perFrameMs": 0.00006563333333333333,
+            "calls": 149
+          },
+          {
+            "name": "NetworkTransform.GatherState",
+            "totalMs": 0.01632,
+            "perFrameMs": 0.0000544,
+            "calls": 149
+          }
+        ]
       },
       "MoveY": {
         "test": 1,
         "name": "MoveY",
         "objects": 2000,
-        "windowSeconds": 9.99983358103782,
-        "connections": 50,
+        "windowSeconds": 9.842109677381814,
+        "connections": 100,
         "truncated": false,
-        "cpuPercent": 24.085897995014748,
-        "avgFrameMs": 16.666740681330365,
-        "minFrameMs": 16.666610717773439,
-        "maxFrameMs": 16.666879653930665,
-        "p95FrameMs": 16.66683006286621,
-        "p99FrameMs": 16.666845321655275,
-        "avgFps": 59.99973354839397,
-        "frameCount": 600,
-        "gcCollections": 0,
-        "gcAllocBytes": 21835776,
-        "gcAllocBytesPerSec": 2183613.9394765614,
-        "gcAllocEstimated": true,
-        "managedHeapBytes": 345661440,
-        "peakRssBytes": 573620224,
+        "cpuPercent": 44.32646261833315,
+        "avgFrameMs": 19.55055968090892,
+        "minFrameMs": 16.66619873046875,
+        "maxFrameMs": 197.69557189941407,
+        "p95FrameMs": 16.66710157394409,
+        "p99FrameMs": 125.50284019470213,
+        "avgFps": 51.14943082557877,
+        "frameCount": 512,
+        "gcCollections": 1,
+        "gcAllocBytes": 182127937,
+        "gcAllocBytesPerSec": 18504969.25659636,
+        "gcAllocEstimated": false,
+        "managedHeapBytes": 573001728,
+        "peakRssBytes": 849248256,
         "iface": "tailscale0",
-        "txBytes": 60359721,
-        "rxBytes": 313014,
-        "txBytesPerSec": 6036072.55169297,
-        "rxBytesPerSec": 31301.92092331943,
-        "txPacketsPerSec": 6682.211204665376,
-        "rxPacketsPerSec": 618.3102898556743,
+        "txBytes": 123196397,
+        "rxBytes": 564796,
+        "txBytesPerSec": 12517275.364561124,
+        "rxBytesPerSec": 57385.664101870316,
+        "txPacketsPerSec": 13602.063418136257,
+        "rxPacketsPerSec": 1285.69995811774,
         "inputsReceived": 0,
         "inputsPerSec": 0.0,
         "rpcsSentPerSec": 0.0,
@@ -751,36 +1654,277 @@
         "rttP50Ms": 0.0,
         "rttP95Ms": 0.0,
         "rttP99Ms": 0.0,
-        "cpuMarkers": []
+        "cpuMarkers": [
+          {
+            "name": "PlayerLoop",
+            "totalMs": 9828.328467,
+            "perFrameMs": 19.195954037109375,
+            "calls": 511
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::NetworkManager.Update() [Invoke]",
+            "totalMs": 3792.276396,
+            "perFrameMs": 7.4067898359375,
+            "calls": 511
+          },
+          {
+            "name": "NetworkManager.OnPostBatch",
+            "totalMs": 2848.663728,
+            "perFrameMs": 5.56379634375,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.PostFixedUpdate",
+            "totalMs": 2848.273968,
+            "perFrameMs": 5.56303509375,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.PrepareState",
+            "totalMs": 1737.261027,
+            "perFrameMs": 3.393087943359375,
+            "calls": 1923
+          },
+          {
+            "name": "NetworkTransform.G.Patches",
+            "totalMs": 1076.1009,
+            "perFrameMs": 2.1017595703125,
+            "calls": 26600
+          },
+          {
+            "name": "NetworkTransform.G.Encode",
+            "totalMs": 762.639593,
+            "perFrameMs": 1.489530455078125,
+            "calls": 266
+          },
+          {
+            "name": "NetworkManager.SendMessages",
+            "totalMs": 632.990222,
+            "perFrameMs": 1.23630902734375,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.G.Replay",
+            "totalMs": 588.048819,
+            "perFrameMs": 1.148532849609375,
+            "calls": 26600
+          },
+          {
+            "name": "NetworkTransform.CommitPacket",
+            "totalMs": 281.512135,
+            "perFrameMs": 0.549828388671875,
+            "calls": 135911
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityUpdate.Update() [Invoke]",
+            "totalMs": 270.438325,
+            "perFrameMs": 0.528199853515625,
+            "calls": 511
+          },
+          {
+            "name": "NetworkTransform.GatherState",
+            "totalMs": 183.41334,
+            "perFrameMs": 0.3582291796875,
+            "calls": 266
+          },
+          {
+            "name": "NetworkTransform.G.Converge",
+            "totalMs": 85.369028,
+            "perFrameMs": 0.1667363828125,
+            "calls": 26600
+          },
+          {
+            "name": "NetworkManager.ReceiveMessages",
+            "totalMs": 77.262363,
+            "perFrameMs": 0.150903052734375,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.G.Demote",
+            "totalMs": 58.100809,
+            "perFrameMs": 0.113478142578125,
+            "calls": 266
+          },
+          {
+            "name": "NetworkTransform.ProcessAck",
+            "totalMs": 36.922723,
+            "perFrameMs": 0.072114693359375,
+            "calls": 12031
+          },
+          {
+            "name": "NetworkTransform.ShareKeys",
+            "totalMs": 36.269626,
+            "perFrameMs": 0.07083911328125,
+            "calls": 266
+          },
+          {
+            "name": "NetworkTransform.G.Anchors",
+            "totalMs": 33.926981,
+            "perFrameMs": 0.066263634765625,
+            "calls": 26600
+          },
+          {
+            "name": "NetworkTransform.QueueChangedState",
+            "totalMs": 16.808124,
+            "perFrameMs": 0.0328283671875,
+            "calls": 266
+          },
+          {
+            "name": "NetworkTransform.G.Render",
+            "totalMs": 15.242567,
+            "perFrameMs": 0.029770638671875,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.G.Adopt",
+            "totalMs": 10.189343,
+            "perFrameMs": 0.019901060546875,
+            "calls": 266
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityLatestUpdate.LateUpdate() [Invoke]",
+            "totalMs": 6.921961,
+            "perFrameMs": 0.013519455078125,
+            "calls": 512
+          },
+          {
+            "name": "PurrNet.NetBench.dll!PurrNet.NetBench::BenchRunner.Window() [Coroutine: MoveNext] [Invoke]",
+            "totalMs": 4.223442,
+            "perFrameMs": 0.00824891015625,
+            "calls": 511
+          },
+          {
+            "name": "NetworkTransform.G.Delay",
+            "totalMs": 3.834422,
+            "perFrameMs": 0.00748910546875,
+            "calls": 299
+          },
+          {
+            "name": "NetworkManager.OnFixedUpdate",
+            "totalMs": 3.360054,
+            "perFrameMs": 0.00656260546875,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.G.Prep",
+            "totalMs": 3.005152,
+            "perFrameMs": 0.0058694375,
+            "calls": 266
+          },
+          {
+            "name": "NetworkManager.OnPreFixedUpdate",
+            "totalMs": 1.15912,
+            "perFrameMs": 0.00226390625,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.G.Inval",
+            "totalMs": 1.119181,
+            "perFrameMs": 0.002185900390625,
+            "calls": 266
+          },
+          {
+            "name": "NetworkManager.OnPostFixedUpdate",
+            "totalMs": 0.666311,
+            "perFrameMs": 0.001301388671875,
+            "calls": 299
+          },
+          {
+            "name": "PurrNet.NetBench.dll!PurrNet.NetBench::BenchRunner.Update() [Invoke]",
+            "totalMs": 0.58409,
+            "perFrameMs": 0.00114080078125,
+            "calls": 511
+          },
+          {
+            "name": "NetworkTransform.G.Release",
+            "totalMs": 0.37319,
+            "perFrameMs": 0.00072888671875,
+            "calls": 266
+          },
+          {
+            "name": "PurrNet.Hierarchy.FlushSpawn",
+            "totalMs": 0.35473,
+            "perFrameMs": 0.00069283203125,
+            "calls": 299
+          },
+          {
+            "name": "RPCBatch<UnionRPCHeader>.Flush",
+            "totalMs": 0.310801,
+            "perFrameMs": 0.000607033203125,
+            "calls": 897
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityLatestUpdate.Update() [Invoke]",
+            "totalMs": 0.31015,
+            "perFrameMs": 0.00060576171875,
+            "calls": 511
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityUpdate.LateUpdate() [Invoke]",
+            "totalMs": 0.17747,
+            "perFrameMs": 0.00034662109375,
+            "calls": 512
+          },
+          {
+            "name": "PurrNet.NetBench.dll!PurrNet.NetBench::BenchRunner.Window() [Coroutine: System.Collections.IEnumerator.get_Current] [Invoke]",
+            "totalMs": 0.17221,
+            "perFrameMs": 0.00033634765625,
+            "calls": 512
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityLatestUpdate.FixedUpdate() [Invoke]",
+            "totalMs": 0.15813,
+            "perFrameMs": 0.00030884765625,
+            "calls": 200
+          },
+          {
+            "name": "NetworkManager.OnBatch",
+            "totalMs": 0.1478,
+            "perFrameMs": 0.000288671875,
+            "calls": 299
+          },
+          {
+            "name": "PurrNet.Hierarchy.LateObservers",
+            "totalMs": 0.1166,
+            "perFrameMs": 0.000227734375,
+            "calls": 299
+          },
+          {
+            "name": "DeltaModule.SendAcks",
+            "totalMs": 0.07774,
+            "perFrameMs": 0.0001518359375,
+            "calls": 299
+          }
+        ]
       },
       "MoveWander": {
         "test": 3,
         "name": "MoveWander",
         "objects": 2000,
-        "windowSeconds": 9.913131582550705,
-        "connections": 50,
+        "windowSeconds": 9.98789915535599,
+        "connections": 100,
         "truncated": false,
-        "cpuPercent": 48.31153550337235,
-        "avgFrameMs": 17.33817471747175,
-        "minFrameMs": 16.666213989257814,
-        "maxFrameMs": 105.70738983154297,
-        "p95FrameMs": 16.66685676574707,
-        "p99FrameMs": 25.81735931396495,
-        "avgFps": 57.67619811745788,
-        "frameCount": 577,
-        "gcCollections": 3,
-        "gcAllocBytes": 166294973,
-        "gcAllocBytesPerSec": 16775220.989976144,
-        "gcAllocEstimated": true,
-        "managedHeapBytes": 573222912,
-        "peakRssBytes": 817197056,
+        "cpuPercent": 88.81374513321097,
+        "avgFrameMs": 29.28976251367937,
+        "minFrameMs": 16.6663761138916,
+        "maxFrameMs": 67.98163604736328,
+        "p95FrameMs": 49.67009391784667,
+        "p99FrameMs": 62.02044292449939,
+        "avgFps": 34.141621992768438,
+        "frameCount": 342,
+        "gcCollections": 6,
+        "gcAllocBytes": 610206357,
+        "gcAllocBytesPerSec": 61094565.28430988,
+        "gcAllocEstimated": false,
+        "managedHeapBytes": 778264576,
+        "peakRssBytes": 1229135872,
         "iface": "tailscale0",
-        "txBytes": 353881549,
-        "rxBytes": 737926,
-        "txBytesPerSec": 35698260.03549771,
-        "rxBytesPerSec": 74439.24191412049,
-        "txPacketsPerSec": 35985.29859403038,
-        "rxPacketsPerSec": 1357.8958261478467,
+        "txBytes": 709702939,
+        "rxBytes": 1790020,
+        "txBytesPerSec": 71056277.99810367,
+        "rxBytesPerSec": 179218.86997027856,
+        "txPacketsPerSec": 71663.81927436355,
+        "rxPacketsPerSec": 2383.183853757243,
         "inputsReceived": 0,
         "inputsPerSec": 0.0,
         "rpcsSentPerSec": 0.0,
@@ -803,39 +1947,280 @@
         "rttP50Ms": 0.0,
         "rttP95Ms": 0.0,
         "rttP99Ms": 0.0,
-        "cpuMarkers": []
+        "cpuMarkers": [
+          {
+            "name": "PlayerLoop",
+            "totalMs": 9949.931893,
+            "perFrameMs": 29.093368108187137,
+            "calls": 341
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::NetworkManager.Update() [Invoke]",
+            "totalMs": 8488.859293,
+            "perFrameMs": 24.821226002923976,
+            "calls": 341
+          },
+          {
+            "name": "NetworkManager.OnPostBatch",
+            "totalMs": 4466.152353,
+            "perFrameMs": 13.058925008771931,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.PostFixedUpdate",
+            "totalMs": 4465.632153,
+            "perFrameMs": 13.05740395614035,
+            "calls": 299
+          },
+          {
+            "name": "NetworkManager.SendMessages",
+            "totalMs": 3369.177816,
+            "perFrameMs": 9.851397122807017,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.G.Replay",
+            "totalMs": 2468.592225,
+            "perFrameMs": 7.218105921052631,
+            "calls": 27800
+          },
+          {
+            "name": "NetworkTransform.CommitPacket",
+            "totalMs": 1787.54895,
+            "perFrameMs": 5.226751315789474,
+            "calls": 727713
+          },
+          {
+            "name": "NetworkTransform.PrepareState",
+            "totalMs": 1464.441493,
+            "perFrameMs": 4.281992669590643,
+            "calls": 10330
+          },
+          {
+            "name": "NetworkTransform.G.Encode",
+            "totalMs": 898.812341,
+            "perFrameMs": 2.628106260233918,
+            "calls": 278
+          },
+          {
+            "name": "NetworkTransform.G.Patches",
+            "totalMs": 651.56468,
+            "perFrameMs": 1.9051598830409356,
+            "calls": 27800
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityUpdate.Update() [Invoke]",
+            "totalMs": 274.290378,
+            "perFrameMs": 0.802018649122807,
+            "calls": 341
+          },
+          {
+            "name": "NetworkTransform.GatherState",
+            "totalMs": 197.868516,
+            "perFrameMs": 0.5785629122807018,
+            "calls": 278
+          },
+          {
+            "name": "NetworkManager.ReceiveMessages",
+            "totalMs": 154.358476,
+            "perFrameMs": 0.45134057309941519,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.G.Anchors",
+            "totalMs": 76.745674,
+            "perFrameMs": 0.22440255555555556,
+            "calls": 27800
+          },
+          {
+            "name": "NetworkTransform.ProcessAck",
+            "totalMs": 50.596044,
+            "perFrameMs": 0.14794164912280703,
+            "calls": 45547
+          },
+          {
+            "name": "NetworkTransform.G.Demote",
+            "totalMs": 50.486131,
+            "perFrameMs": 0.14762026608187135,
+            "calls": 278
+          },
+          {
+            "name": "NetworkTransform.ShareKeys",
+            "totalMs": 48.170887,
+            "perFrameMs": 0.14085054678362575,
+            "calls": 278
+          },
+          {
+            "name": "NetworkTransform.G.Converge",
+            "totalMs": 33.821449,
+            "perFrameMs": 0.09889312573099415,
+            "calls": 27800
+          },
+          {
+            "name": "NetworkTransform.QueueChangedState",
+            "totalMs": 28.066566,
+            "perFrameMs": 0.08206598245614036,
+            "calls": 278
+          },
+          {
+            "name": "NetworkTransform.G.Adopt",
+            "totalMs": 19.638944,
+            "perFrameMs": 0.057423812865497077,
+            "calls": 278
+          },
+          {
+            "name": "NetworkTransform.G.Render",
+            "totalMs": 15.821839,
+            "perFrameMs": 0.046262687134502929,
+            "calls": 299
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityLatestUpdate.LateUpdate() [Invoke]",
+            "totalMs": 8.436178,
+            "perFrameMs": 0.024667187134502924,
+            "calls": 342
+          },
+          {
+            "name": "PurrNet.NetBench.dll!PurrNet.NetBench::BenchRunner.Window() [Coroutine: MoveNext] [Invoke]",
+            "totalMs": 4.328511,
+            "perFrameMs": 0.012656464912280702,
+            "calls": 341
+          },
+          {
+            "name": "NetworkTransform.G.Delay",
+            "totalMs": 3.998562,
+            "perFrameMs": 0.011691701754385966,
+            "calls": 299
+          },
+          {
+            "name": "NetworkManager.OnFixedUpdate",
+            "totalMs": 3.501652,
+            "perFrameMs": 0.010238748538011697,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.G.Prep",
+            "totalMs": 3.184253,
+            "perFrameMs": 0.009310681286549707,
+            "calls": 278
+          },
+          {
+            "name": "NetworkTransform.G.Release",
+            "totalMs": 2.106651,
+            "perFrameMs": 0.0061597982456140349,
+            "calls": 278
+          },
+          {
+            "name": "NetworkManager.OnPreFixedUpdate",
+            "totalMs": 1.395732,
+            "perFrameMs": 0.004081087719298246,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.G.Inval",
+            "totalMs": 1.28212,
+            "perFrameMs": 0.003748888888888889,
+            "calls": 278
+          },
+          {
+            "name": "NetworkManager.OnPostFixedUpdate",
+            "totalMs": 0.763392,
+            "perFrameMs": 0.002232140350877193,
+            "calls": 299
+          },
+          {
+            "name": "PurrNet.NetBench.dll!PurrNet.NetBench::BenchRunner.Update() [Invoke]",
+            "totalMs": 0.64041,
+            "perFrameMs": 0.0018725438596491229,
+            "calls": 341
+          },
+          {
+            "name": "PurrNet.Hierarchy.FlushSpawn",
+            "totalMs": 0.454371,
+            "perFrameMs": 0.0013285701754385967,
+            "calls": 299
+          },
+          {
+            "name": "RPCBatch<UnionRPCHeader>.Flush",
+            "totalMs": 0.317321,
+            "perFrameMs": 0.0009278391812865498,
+            "calls": 897
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityLatestUpdate.Update() [Invoke]",
+            "totalMs": 0.30368,
+            "perFrameMs": 0.000887953216374269,
+            "calls": 341
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityUpdate.LateUpdate() [Invoke]",
+            "totalMs": 0.17041,
+            "perFrameMs": 0.0004982748538011696,
+            "calls": 342
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityLatestUpdate.FixedUpdate() [Invoke]",
+            "totalMs": 0.16704,
+            "perFrameMs": 0.000488421052631579,
+            "calls": 200
+          },
+          {
+            "name": "NetworkManager.OnBatch",
+            "totalMs": 0.15812,
+            "perFrameMs": 0.0004623391812865497,
+            "calls": 299
+          },
+          {
+            "name": "PurrNet.Hierarchy.LateObservers",
+            "totalMs": 0.13654,
+            "perFrameMs": 0.00039923976608187135,
+            "calls": 299
+          },
+          {
+            "name": "PurrNet.NetBench.dll!PurrNet.NetBench::BenchRunner.Window() [Coroutine: System.Collections.IEnumerator.get_Current] [Invoke]",
+            "totalMs": 0.13395,
+            "perFrameMs": 0.0003916666666666667,
+            "calls": 342
+          },
+          {
+            "name": "DeltaModule.SendAcks",
+            "totalMs": 0.08601,
+            "perFrameMs": 0.00025149122807017544,
+            "calls": 299
+          }
+        ]
       },
       "SendRPC": {
         "test": 4,
         "name": "SendRPC",
         "objects": 2000,
-        "windowSeconds": 9.99693897459656,
-        "connections": 50,
+        "windowSeconds": 10.129463421180845,
+        "connections": 100,
         "truncated": false,
-        "cpuPercent": 100.70605422902755,
-        "avgFrameMs": 45.67168825402108,
-        "minFrameMs": 36.43519973754883,
-        "maxFrameMs": 66.88063049316406,
-        "p95FrameMs": 59.723215866088867,
-        "p99FrameMs": 62.221845321655269,
-        "avgFps": 21.895402561825749,
-        "frameCount": 219,
+        "cpuPercent": 100.72966694034958,
+        "avgFrameMs": 174.77807301488418,
+        "minFrameMs": 132.99925231933595,
+        "maxFrameMs": 206.23094177246095,
+        "p95FrameMs": 198.01107940673828,
+        "p99FrameMs": 205.17203735351564,
+        "avgFps": 5.721541511187388,
+        "frameCount": 58,
         "gcCollections": 1,
-        "gcAllocBytes": 135714635,
-        "gcAllocBytesPerSec": 13575619.031472277,
-        "gcAllocEstimated": true,
-        "managedHeapBytes": 743800832,
-        "peakRssBytes": 973844480,
+        "gcAllocBytes": 265771952,
+        "gcAllocBytesPerSec": 26237515.349951045,
+        "gcAllocEstimated": false,
+        "managedHeapBytes": 1108414464,
+        "peakRssBytes": 1399402496,
         "iface": "tailscale0",
-        "txBytes": 130634970,
-        "rxBytes": 124167,
-        "txBytesPerSec": 13067496.99402581,
-        "rxBytesPerSec": 12420.501947198385,
-        "txPacketsPerSec": 11872.134090404377,
-        "rxPacketsPerSec": 318.29743165241379,
+        "txBytes": 223762260,
+        "rxBytes": 224565,
+        "txBytesPerSec": 22090238.218552635,
+        "rxBytesPerSec": 22169.48624647102,
+        "txPacketsPerSec": 19911.32122341855,
+        "rxPacketsPerSec": 551.9542119387236,
         "inputsReceived": 0,
         "inputsPerSec": 0.0,
-        "rpcsSentPerSec": 60018.371776067965,
+        "rpcsSentPerSec": 56074.04621377124,
         "rpcsReceivedPerSec": 0.0,
         "syncMutationsPerSec": 0.0,
         "syncObservationAvailable": false,
@@ -844,7 +2229,7 @@
         "syncFieldSamples": 0,
         "syncSilenceAvgMs": 0.0,
         "syncSilenceMaxMs": 0.0,
-        "rpcsSent": 754000,
+        "rpcsSent": 648000,
         "rpcsReceived": 0,
         "syncMutations": 0,
         "deliveryComplete": true,
@@ -855,36 +2240,271 @@
         "rttP50Ms": 0.0,
         "rttP95Ms": 0.0,
         "rttP99Ms": 0.0,
-        "cpuMarkers": []
+        "cpuMarkers": [
+          {
+            "name": "PlayerLoop",
+            "totalMs": 9939.3354,
+            "perFrameMs": 171.36785172413793,
+            "calls": 57
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::NetworkManager.Update() [Invoke]",
+            "totalMs": 7588.529636,
+            "perFrameMs": 130.83671786206899,
+            "calls": 57
+          },
+          {
+            "name": "NetworkManager.SendMessages",
+            "totalMs": 3097.463199,
+            "perFrameMs": 53.4045379137931,
+            "calls": 279
+          },
+          {
+            "name": "NetworkIdentity.Broadcasting.SendRPC",
+            "totalMs": 1884.37362,
+            "perFrameMs": 32.48920034482759,
+            "calls": 558000
+          },
+          {
+            "name": "RPCBatch<UnionRPCHeader>.QueueMulti",
+            "totalMs": 1700.160491,
+            "perFrameMs": 29.313111913793106,
+            "calls": 558000
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityLatestUpdate.LateUpdate() [Invoke]",
+            "totalMs": 81.189518,
+            "perFrameMs": 1.3998192758620692,
+            "calls": 58
+          },
+          {
+            "name": "NetworkManager.ReceiveMessages",
+            "totalMs": 78.886047,
+            "perFrameMs": 1.3601042586206898,
+            "calls": 279
+          },
+          {
+            "name": "NetworkIdentity.Broadcasting.ValidateSendingRPC",
+            "totalMs": 69.796511,
+            "perFrameMs": 1.203388120689655,
+            "calls": 558000
+          },
+          {
+            "name": "NetworkManager.OnPreFixedUpdate",
+            "totalMs": 60.057074,
+            "perFrameMs": 1.0354667931034483,
+            "calls": 279
+          },
+          {
+            "name": "RPCBatch<UnionRPCHeader>.Flush",
+            "totalMs": 58.968814,
+            "perFrameMs": 1.0167036896551725,
+            "calls": 837
+          },
+          {
+            "name": "NetworkManager.OnPostBatch",
+            "totalMs": 10.048738,
+            "perFrameMs": 0.17325410344827586,
+            "calls": 279
+          },
+          {
+            "name": "NetworkTransform.PostFixedUpdate",
+            "totalMs": 9.637208,
+            "perFrameMs": 0.16615875862068966,
+            "calls": 279
+          },
+          {
+            "name": "NetworkTransform.G.Delay",
+            "totalMs": 3.638771,
+            "perFrameMs": 0.06273743103448276,
+            "calls": 279
+          },
+          {
+            "name": "NetworkManager.OnFixedUpdate",
+            "totalMs": 3.396941,
+            "perFrameMs": 0.05856794827586207,
+            "calls": 279
+          },
+          {
+            "name": "PurrNet.NetBench.dll!PurrNet.NetBench::BenchRunner.Window() [Coroutine: MoveNext] [Invoke]",
+            "totalMs": 0.824851,
+            "perFrameMs": 0.014221568965517242,
+            "calls": 57
+          },
+          {
+            "name": "NetworkManager.OnPostFixedUpdate",
+            "totalMs": 0.77461,
+            "perFrameMs": 0.013355344827586208,
+            "calls": 279
+          },
+          {
+            "name": "NetworkTransform.G.Prep",
+            "totalMs": 0.752482,
+            "perFrameMs": 0.012973827586206896,
+            "calls": 57
+          },
+          {
+            "name": "NetworkTransform.G.Anchors",
+            "totalMs": 0.752161,
+            "perFrameMs": 0.012968293103448275,
+            "calls": 5700
+          },
+          {
+            "name": "NetworkTransform.G.Replay",
+            "totalMs": 0.68411,
+            "perFrameMs": 0.011795,
+            "calls": 5700
+          },
+          {
+            "name": "NetworkTransform.G.Converge",
+            "totalMs": 0.58996,
+            "perFrameMs": 0.010171724137931035,
+            "calls": 5700
+          },
+          {
+            "name": "NetworkTransform.G.Patches",
+            "totalMs": 0.536931,
+            "perFrameMs": 0.009257431034482759,
+            "calls": 5700
+          },
+          {
+            "name": "PurrNet.Hierarchy.FlushSpawn",
+            "totalMs": 0.41976,
+            "perFrameMs": 0.0072372413793103458,
+            "calls": 279
+          },
+          {
+            "name": "NetworkTransform.G.Inval",
+            "totalMs": 0.33741,
+            "perFrameMs": 0.005817413793103448,
+            "calls": 57
+          },
+          {
+            "name": "NetworkTransform.QueueChangedState",
+            "totalMs": 0.24019,
+            "perFrameMs": 0.004141206896551724,
+            "calls": 57
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityLatestUpdate.FixedUpdate() [Invoke]",
+            "totalMs": 0.22164,
+            "perFrameMs": 0.0038213793103448279,
+            "calls": 199
+          },
+          {
+            "name": "NetworkTransform.G.Render",
+            "totalMs": 0.19827,
+            "perFrameMs": 0.003418448275862069,
+            "calls": 279
+          },
+          {
+            "name": "PurrNet.NetBench.dll!PurrNet.NetBench::BenchRunner.Update() [Invoke]",
+            "totalMs": 0.15433,
+            "perFrameMs": 0.0026608620689655174,
+            "calls": 57
+          },
+          {
+            "name": "NetworkManager.OnBatch",
+            "totalMs": 0.136011,
+            "perFrameMs": 0.0023450172413793104,
+            "calls": 279
+          },
+          {
+            "name": "PurrNet.Hierarchy.LateObservers",
+            "totalMs": 0.12154,
+            "perFrameMs": 0.00209551724137931,
+            "calls": 279
+          },
+          {
+            "name": "DeltaModule.SendAcks",
+            "totalMs": 0.08036,
+            "perFrameMs": 0.0013855172413793104,
+            "calls": 279
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityLatestUpdate.Update() [Invoke]",
+            "totalMs": 0.05715,
+            "perFrameMs": 0.0009853448275862068,
+            "calls": 57
+          },
+          {
+            "name": "NetworkTransform.G.Encode",
+            "totalMs": 0.04768,
+            "perFrameMs": 0.0008220689655172414,
+            "calls": 57
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityUpdate.Update() [Invoke]",
+            "totalMs": 0.03224,
+            "perFrameMs": 0.0005558620689655172,
+            "calls": 57
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityUpdate.LateUpdate() [Invoke]",
+            "totalMs": 0.02809,
+            "perFrameMs": 0.0004843103448275862,
+            "calls": 58
+          },
+          {
+            "name": "PurrNet.NetBench.dll!PurrNet.NetBench::BenchRunner.Window() [Coroutine: System.Collections.IEnumerator.get_Current] [Invoke]",
+            "totalMs": 0.0264,
+            "perFrameMs": 0.00045517241379310346,
+            "calls": 58
+          },
+          {
+            "name": "NetworkTransform.G.Demote",
+            "totalMs": 0.02451,
+            "perFrameMs": 0.0004225862068965517,
+            "calls": 57
+          },
+          {
+            "name": "NetworkTransform.G.Adopt",
+            "totalMs": 0.02268,
+            "perFrameMs": 0.0003910344827586207,
+            "calls": 57
+          },
+          {
+            "name": "NetworkTransform.G.Release",
+            "totalMs": 0.01391,
+            "perFrameMs": 0.00023982758620689655,
+            "calls": 57
+          },
+          {
+            "name": "NetworkTransform.GatherState",
+            "totalMs": 0.00626,
+            "perFrameMs": 0.00010793103448275862,
+            "calls": 57
+          }
+        ]
       },
       "Static": {
         "test": 5,
         "name": "Static",
         "objects": 2000,
-        "windowSeconds": 4.999813744798303,
-        "connections": 50,
+        "windowSeconds": 4.998442592099309,
+        "connections": 100,
         "truncated": false,
-        "cpuPercent": 9.73909741151055,
-        "avgFrameMs": 16.666740856170656,
-        "minFrameMs": 16.666637420654298,
-        "maxFrameMs": 16.666845321655275,
-        "p95FrameMs": 16.66680908203125,
-        "p99FrameMs": 16.66683006286621,
-        "avgFps": 59.999732918974519,
+        "cpuPercent": 27.77196127438127,
+        "avgFrameMs": 16.67305871963501,
+        "minFrameMs": 16.666149139404298,
+        "maxFrameMs": 18.559926986694337,
+        "p95FrameMs": 16.66699438095093,
+        "p99FrameMs": 16.667099647521974,
+        "avgFps": 59.97699743133221,
         "frameCount": 300,
         "gcCollections": 0,
-        "gcAllocBytes": 1261568,
-        "gcAllocBytesPerSec": 252322.99929422528,
-        "gcAllocEstimated": true,
-        "managedHeapBytes": 749924352,
-        "peakRssBytes": 981946368,
+        "gcAllocBytes": 2121169,
+        "gcAllocBytesPerSec": 424365.9821866884,
+        "gcAllocEstimated": false,
+        "managedHeapBytes": 1116905472,
+        "peakRssBytes": 1410076672,
         "iface": "tailscale0",
-        "txBytes": 39303030,
-        "rxBytes": 53324,
-        "txBytesPerSec": 7860898.826659297,
-        "rxBytesPerSec": 10665.197289694466,
-        "txPacketsPerSec": 7227.469230747867,
-        "rxPacketsPerSec": 276.0102816701366,
+        "txBytes": 85303219,
+        "rxBytes": 107383,
+        "txBytesPerSec": 17065959.532041618,
+        "rxBytesPerSec": 21483.291649629595,
+        "txPacketsPerSec": 15556.445546240077,
+        "rxPacketsPerSec": 540.3683147765432,
         "inputsReceived": 0,
         "inputsPerSec": 0.0,
         "rpcsSentPerSec": 0.0,
@@ -907,36 +2527,253 @@
         "rttP50Ms": 0.0,
         "rttP95Ms": 0.0,
         "rttP99Ms": 0.0,
-        "cpuMarkers": []
+        "cpuMarkers": [
+          {
+            "name": "PlayerLoop",
+            "totalMs": 4981.318425,
+            "perFrameMs": 16.60439475,
+            "calls": 299
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::NetworkManager.Update() [Invoke]",
+            "totalMs": 1147.281786,
+            "perFrameMs": 3.82427262,
+            "calls": 299
+          },
+          {
+            "name": "NetworkManager.SendMessages",
+            "totalMs": 999.775338,
+            "perFrameMs": 3.33258446,
+            "calls": 149
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityUpdate.Update() [Invoke]",
+            "totalMs": 90.632273,
+            "perFrameMs": 0.30210757666666668,
+            "calls": 299
+          },
+          {
+            "name": "NetworkManager.OnPostBatch",
+            "totalMs": 80.192705,
+            "perFrameMs": 0.2673090166666667,
+            "calls": 149
+          },
+          {
+            "name": "NetworkTransform.PostFixedUpdate",
+            "totalMs": 80.062135,
+            "perFrameMs": 0.26687378333333336,
+            "calls": 149
+          },
+          {
+            "name": "NetworkTransform.GatherState",
+            "totalMs": 57.520186,
+            "perFrameMs": 0.19173395333333335,
+            "calls": 149
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityLatestUpdate.LateUpdate() [Invoke]",
+            "totalMs": 35.390008,
+            "perFrameMs": 0.11796669333333335,
+            "calls": 300
+          },
+          {
+            "name": "NetworkManager.ReceiveMessages",
+            "totalMs": 20.268892,
+            "perFrameMs": 0.06756297333333333,
+            "calls": 149
+          },
+          {
+            "name": "NetworkTransform.G.Render",
+            "totalMs": 7.472271,
+            "perFrameMs": 0.02490757,
+            "calls": 149
+          },
+          {
+            "name": "PurrNet.NetBench.dll!PurrNet.NetBench::BenchRunner.Window() [Coroutine: MoveNext] [Invoke]",
+            "totalMs": 2.177031,
+            "perFrameMs": 0.00725677,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.G.Prep",
+            "totalMs": 1.911292,
+            "perFrameMs": 0.006370973333333333,
+            "calls": 149
+          },
+          {
+            "name": "NetworkTransform.G.Anchors",
+            "totalMs": 1.774592,
+            "perFrameMs": 0.005915306666666667,
+            "calls": 14900
+          },
+          {
+            "name": "NetworkTransform.G.Replay",
+            "totalMs": 1.62351,
+            "perFrameMs": 0.0054117,
+            "calls": 14900
+          },
+          {
+            "name": "NetworkTransform.G.Delay",
+            "totalMs": 1.560482,
+            "perFrameMs": 0.005201606666666666,
+            "calls": 149
+          },
+          {
+            "name": "NetworkTransform.G.Converge",
+            "totalMs": 1.453481,
+            "perFrameMs": 0.0048449366666666669,
+            "calls": 14900
+          },
+          {
+            "name": "NetworkManager.OnFixedUpdate",
+            "totalMs": 1.447281,
+            "perFrameMs": 0.00482427,
+            "calls": 149
+          },
+          {
+            "name": "NetworkTransform.G.Patches",
+            "totalMs": 1.35435,
+            "perFrameMs": 0.004514499999999999,
+            "calls": 14900
+          },
+          {
+            "name": "NetworkTransform.G.Inval",
+            "totalMs": 0.70672,
+            "perFrameMs": 0.002355733333333333,
+            "calls": 149
+          },
+          {
+            "name": "NetworkTransform.QueueChangedState",
+            "totalMs": 0.58925,
+            "perFrameMs": 0.001964166666666667,
+            "calls": 149
+          },
+          {
+            "name": "NetworkManager.OnPreFixedUpdate",
+            "totalMs": 0.53089,
+            "perFrameMs": 0.0017696333333333333,
+            "calls": 149
+          },
+          {
+            "name": "PurrNet.NetBench.dll!PurrNet.NetBench::BenchRunner.Update() [Invoke]",
+            "totalMs": 0.240751,
+            "perFrameMs": 0.0008025033333333334,
+            "calls": 299
+          },
+          {
+            "name": "NetworkManager.OnPostFixedUpdate",
+            "totalMs": 0.22698,
+            "perFrameMs": 0.0007566,
+            "calls": 149
+          },
+          {
+            "name": "PurrNet.Hierarchy.FlushSpawn",
+            "totalMs": 0.14201,
+            "perFrameMs": 0.00047336666666666666,
+            "calls": 149
+          },
+          {
+            "name": "RPCBatch<UnionRPCHeader>.Flush",
+            "totalMs": 0.14,
+            "perFrameMs": 0.0004666666666666667,
+            "calls": 447
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityLatestUpdate.Update() [Invoke]",
+            "totalMs": 0.12731,
+            "perFrameMs": 0.00042436666666666666,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.G.Encode",
+            "totalMs": 0.12224,
+            "perFrameMs": 0.0004074666666666667,
+            "calls": 149
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityLatestUpdate.FixedUpdate() [Invoke]",
+            "totalMs": 0.0804,
+            "perFrameMs": 0.000268,
+            "calls": 100
+          },
+          {
+            "name": "PurrNet.NetBench.dll!PurrNet.NetBench::BenchRunner.Window() [Coroutine: System.Collections.IEnumerator.get_Current] [Invoke]",
+            "totalMs": 0.07892,
+            "perFrameMs": 0.0002630666666666667,
+            "calls": 300
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityUpdate.LateUpdate() [Invoke]",
+            "totalMs": 0.07055,
+            "perFrameMs": 0.00023516666666666667,
+            "calls": 300
+          },
+          {
+            "name": "NetworkManager.OnBatch",
+            "totalMs": 0.062451,
+            "perFrameMs": 0.00020817,
+            "calls": 149
+          },
+          {
+            "name": "NetworkTransform.G.Demote",
+            "totalMs": 0.05822,
+            "perFrameMs": 0.00019406666666666668,
+            "calls": 149
+          },
+          {
+            "name": "PurrNet.Hierarchy.LateObservers",
+            "totalMs": 0.04949,
+            "perFrameMs": 0.00016496666666666667,
+            "calls": 149
+          },
+          {
+            "name": "NetworkTransform.G.Release",
+            "totalMs": 0.04056,
+            "perFrameMs": 0.0001352,
+            "calls": 149
+          },
+          {
+            "name": "NetworkTransform.G.Adopt",
+            "totalMs": 0.0362,
+            "perFrameMs": 0.00012066666666666668,
+            "calls": 149
+          },
+          {
+            "name": "DeltaModule.SendAcks",
+            "totalMs": 0.02533,
+            "perFrameMs": 0.00008443333333333333,
+            "calls": 149
+          }
+        ]
       },
       "SpawnChurn": {
         "test": 6,
         "name": "SpawnChurn",
-        "objects": 1960,
-        "windowSeconds": 10.007044325582683,
-        "connections": 50,
+        "objects": 1800,
+        "windowSeconds": 10.267465695738793,
+        "connections": 100,
         "truncated": false,
-        "cpuPercent": 50.965682943580137,
-        "avgFrameMs": 16.666754846572876,
-        "minFrameMs": 16.66617774963379,
-        "maxFrameMs": 16.670839309692384,
-        "p95FrameMs": 16.66682243347168,
-        "p99FrameMs": 16.66697883605957,
-        "avgFps": 59.99968255401719,
-        "frameCount": 600,
-        "gcCollections": 0,
-        "gcAllocBytes": 6258688,
-        "gcAllocBytesPerSec": 625428.2279933414,
-        "gcAllocEstimated": true,
-        "managedHeapBytes": 679698432,
-        "peakRssBytes": 982781952,
+        "cpuPercent": 99.38817297665905,
+        "avgFrameMs": 142.23961497024752,
+        "minFrameMs": 16.66668128967285,
+        "maxFrameMs": 245.7099609375,
+        "p95FrameMs": 220.83740234375,
+        "p99FrameMs": 241.0660415649414,
+        "avgFps": 7.030390234177529,
+        "frameCount": 71,
+        "gcCollections": 1,
+        "gcAllocBytes": 172614741,
+        "gcAllocBytesPerSec": 16811815.701671997,
+        "gcAllocEstimated": false,
+        "managedHeapBytes": 1031610368,
+        "peakRssBytes": 1416110080,
         "iface": "tailscale0",
-        "txBytes": 104342124,
-        "rxBytes": 706205,
-        "txBytesPerSec": 10426867.375140205,
-        "rxBytesPerSec": 70570.78763952408,
-        "txPacketsPerSec": 11564.053903924505,
-        "rxPacketsPerSec": 1581.0862313811854,
+        "txBytes": 237231731,
+        "rxBytes": 627172,
+        "txBytesPerSec": 23105188.566488808,
+        "rxBytesPerSec": 61083.42784727191,
+        "txPacketsPerSec": 21973.582058680167,
+        "rxPacketsPerSec": 1376.0942007202248,
         "inputsReceived": 0,
         "inputsPerSec": 0.0,
         "rpcsSentPerSec": 0.0,
@@ -959,38 +2796,417 @@
         "rttP50Ms": 0.0,
         "rttP95Ms": 0.0,
         "rttP99Ms": 0.0,
-        "cpuMarkers": []
+        "cpuMarkers": [
+          {
+            "name": "PlayerLoop",
+            "totalMs": 10081.568608,
+            "perFrameMs": 141.99392405633803,
+            "calls": 70
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::NetworkManager.Update() [Invoke]",
+            "totalMs": 5559.655271,
+            "perFrameMs": 78.3050038169014,
+            "calls": 70
+          },
+          {
+            "name": "PurrNet.NetBench.dll!PurrNet.NetBench::BenchRunner.Window() [Coroutine: MoveNext] [Invoke]",
+            "totalMs": 4379.983438,
+            "perFrameMs": 61.689907577464797,
+            "calls": 70
+          },
+          {
+            "name": "NetworkManager.OnFixedUpdate",
+            "totalMs": 2411.466239,
+            "perFrameMs": 33.96431322535211,
+            "calls": 265
+          },
+          {
+            "name": "PurrNet.Hierarchy.InternalSpawn",
+            "totalMs": 2354.428546,
+            "perFrameMs": 33.16096543661972,
+            "calls": 11880
+          },
+          {
+            "name": "NetworkManager.SendMessages",
+            "totalMs": 2129.821234,
+            "perFrameMs": 29.997482169014086,
+            "calls": 265
+          },
+          {
+            "name": "PurrNet.Destroy.DespawnLoop",
+            "totalMs": 1770.001699,
+            "perFrameMs": 24.929601394366196,
+            "calls": 11880
+          },
+          {
+            "name": "PurrNet.Despawn.ClearVisibility",
+            "totalMs": 1551.016361,
+            "perFrameMs": 21.84530085915493,
+            "calls": 11880
+          },
+          {
+            "name": "PurrNet.VisibilityV2.Clear",
+            "totalMs": 1548.743169,
+            "perFrameMs": 21.813284070422538,
+            "calls": 11880
+          },
+          {
+            "name": "PurrNet.VisibilityV2.Notify",
+            "totalMs": 1461.387684,
+            "perFrameMs": 20.582925126760565,
+            "calls": 11880
+          },
+          {
+            "name": "PurrNet.Hierarchy.VisibilityLost",
+            "totalMs": 1399.785755,
+            "perFrameMs": 19.715292323943666,
+            "calls": 1188000
+          },
+          {
+            "name": "PurrNet.Hierarchy.LateObservers",
+            "totalMs": 934.985634,
+            "perFrameMs": 13.168811746478874,
+            "calls": 265
+          },
+          {
+            "name": "PurrNet.Hierarchy.FlushSpawn",
+            "totalMs": 891.660305,
+            "perFrameMs": 12.558595845070423,
+            "calls": 265
+          },
+          {
+            "name": "NetworkManager.OnPostBatch",
+            "totalMs": 883.981132,
+            "perFrameMs": 12.45043847887324,
+            "calls": 265
+          },
+          {
+            "name": "NetworkTransform.PostFixedUpdate",
+            "totalMs": 883.776442,
+            "perFrameMs": 12.44755552112676,
+            "calls": 265
+          },
+          {
+            "name": "NetworkTransform.G.Inval",
+            "totalMs": 467.483841,
+            "perFrameMs": 6.5842794507042259,
+            "calls": 68
+          },
+          {
+            "name": "PurrNet.VisibilityV2.Evaluate",
+            "totalMs": 338.811097,
+            "perFrameMs": 4.771987281690141,
+            "calls": 1188000
+          },
+          {
+            "name": "NetworkTransform.G.Replay",
+            "totalMs": 224.239135,
+            "perFrameMs": 3.158297676056338,
+            "calls": 6800
+          },
+          {
+            "name": "NetworkTransform.CommitPacket",
+            "totalMs": 160.488211,
+            "perFrameMs": 2.2603973380281694,
+            "calls": 89789
+          },
+          {
+            "name": "NetworkTransform.GatherState",
+            "totalMs": 101.503203,
+            "perFrameMs": 1.4296225774647889,
+            "calls": 68
+          },
+          {
+            "name": "PurrNet.Hierarchy.SetupIdentities",
+            "totalMs": 98.879461,
+            "perFrameMs": 1.3926684647887325,
+            "calls": 11880
+          },
+          {
+            "name": "PurrNet.Despawn.PutBackInPool",
+            "totalMs": 91.389913,
+            "perFrameMs": 1.2871818732394367,
+            "calls": 11880
+          },
+          {
+            "name": "NetworkManager.ReceiveMessages",
+            "totalMs": 84.830407,
+            "perFrameMs": 1.1947944647887324,
+            "calls": 265
+          },
+          {
+            "name": "PurrNet.Despawn.Events",
+            "totalMs": 72.130277,
+            "perFrameMs": 1.0159193943661973,
+            "calls": 11880
+          },
+          {
+            "name": "NetworkTransform.G.Encode",
+            "totalMs": 56.743366,
+            "perFrameMs": 0.7992023380281691,
+            "calls": 68
+          },
+          {
+            "name": "NetworkTransform.PrepareState",
+            "totalMs": 51.405574,
+            "perFrameMs": 0.7240221690140846,
+            "calls": 889
+          },
+          {
+            "name": "PurrNet.Hierarchy.Prototype",
+            "totalMs": 47.718177,
+            "perFrameMs": 0.672087,
+            "calls": 11880
+          },
+          {
+            "name": "PurrNet.Pool.BuildPrototype",
+            "totalMs": 44.253111,
+            "perFrameMs": 0.6232832535211267,
+            "calls": 11880
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityUpdate.Update() [Invoke]",
+            "totalMs": 43.24422,
+            "perFrameMs": 0.6090735211267605,
+            "calls": 70
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityLatestUpdate.LateUpdate() [Invoke]",
+            "totalMs": 26.648524,
+            "perFrameMs": 0.3753313239436619,
+            "calls": 71
+          },
+          {
+            "name": "PurrNet.Despawn.Unregister",
+            "totalMs": 25.445726,
+            "perFrameMs": 0.3583905070422535,
+            "calls": 11880
+          },
+          {
+            "name": "NetworkTransform.G.Render",
+            "totalMs": 14.264038,
+            "perFrameMs": 0.2009019436619718,
+            "calls": 265
+          },
+          {
+            "name": "PurrNet.Hierarchy.SpawnPacket",
+            "totalMs": 13.788746,
+            "perFrameMs": 0.19420769014084508,
+            "calls": 11880
+          },
+          {
+            "name": "PurrNet.Destroy.CollectIdentities",
+            "totalMs": 13.445366,
+            "perFrameMs": 0.18937135211267606,
+            "calls": 11880
+          },
+          {
+            "name": "PurrNet.Hierarchy.PreObserverAdded",
+            "totalMs": 11.235063,
+            "perFrameMs": 0.15824032394366198,
+            "calls": 11880
+          },
+          {
+            "name": "PurrNet.Despawn.Collect",
+            "totalMs": 8.939956,
+            "perFrameMs": 0.12591487323943663,
+            "calls": 11880
+          },
+          {
+            "name": "PurrNet.Despawn.Unregister.Callbacks",
+            "totalMs": 8.016074,
+            "perFrameMs": 0.11290245070422535,
+            "calls": 23760
+          },
+          {
+            "name": "PurrNet.Despawn.Flush",
+            "totalMs": 7.694263,
+            "perFrameMs": 0.10836990140845071,
+            "calls": 11880
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::NetworkTransform.OnEnable() [Invoke]",
+            "totalMs": 7.105731,
+            "perFrameMs": 0.10008071830985915,
+            "calls": 11880
+          },
+          {
+            "name": "NetworkTransform.G.Demote",
+            "totalMs": 6.566733,
+            "perFrameMs": 0.09248919718309859,
+            "calls": 68
+          },
+          {
+            "name": "NetworkTransform.ShareKeys",
+            "totalMs": 4.909461,
+            "perFrameMs": 0.06914733802816901,
+            "calls": 67
+          },
+          {
+            "name": "NetworkTransform.ProcessAck",
+            "totalMs": 4.444821,
+            "perFrameMs": 0.06260311267605634,
+            "calls": 7577
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::NetworkTransform.OnTransformParentChanged() [Invoke]",
+            "totalMs": 3.625992,
+            "perFrameMs": 0.05107030985915493,
+            "calls": 23760
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::NetworkTransform.OnDisable() [Invoke]",
+            "totalMs": 3.02067,
+            "perFrameMs": 0.04254464788732394,
+            "calls": 11880
+          },
+          {
+            "name": "PurrNet.Despawn.PendingSpawns",
+            "totalMs": 2.84949,
+            "perFrameMs": 0.040133661971830988,
+            "calls": 11880
+          },
+          {
+            "name": "NetworkTransform.G.Anchors",
+            "totalMs": 2.827612,
+            "perFrameMs": 0.03982552112676056,
+            "calls": 6800
+          },
+          {
+            "name": "NetworkTransform.G.Adopt",
+            "totalMs": 2.42753,
+            "perFrameMs": 0.03419056338028169,
+            "calls": 68
+          },
+          {
+            "name": "NetworkTransform.G.Delay",
+            "totalMs": 2.383131,
+            "perFrameMs": 0.033565225352112679,
+            "calls": 265
+          },
+          {
+            "name": "NetworkTransform.G.Prep",
+            "totalMs": 0.86441,
+            "perFrameMs": 0.012174788732394367,
+            "calls": 68
+          },
+          {
+            "name": "NetworkTransform.G.Converge",
+            "totalMs": 0.7262,
+            "perFrameMs": 0.010228169014084507,
+            "calls": 6800
+          },
+          {
+            "name": "NetworkTransform.G.Patches",
+            "totalMs": 0.66764,
+            "perFrameMs": 0.009403380281690141,
+            "calls": 6800
+          },
+          {
+            "name": "NetworkManager.OnPreFixedUpdate",
+            "totalMs": 0.65682,
+            "perFrameMs": 0.009250985915492958,
+            "calls": 265
+          },
+          {
+            "name": "NetworkManager.OnPostFixedUpdate",
+            "totalMs": 0.414161,
+            "perFrameMs": 0.005833253521126761,
+            "calls": 265
+          },
+          {
+            "name": "NetworkTransform.QueueChangedState",
+            "totalMs": 0.27274,
+            "perFrameMs": 0.003841408450704225,
+            "calls": 68
+          },
+          {
+            "name": "RPCBatch<UnionRPCHeader>.Flush",
+            "totalMs": 0.22668,
+            "perFrameMs": 0.003192676056338028,
+            "calls": 795
+          },
+          {
+            "name": "NetworkTransform.G.Release",
+            "totalMs": 0.15962,
+            "perFrameMs": 0.0022481690140845075,
+            "calls": 68
+          },
+          {
+            "name": "PurrNet.NetBench.dll!PurrNet.NetBench::BenchRunner.Update() [Invoke]",
+            "totalMs": 0.1477,
+            "perFrameMs": 0.002080281690140845,
+            "calls": 70
+          },
+          {
+            "name": "NetworkManager.OnBatch",
+            "totalMs": 0.12132,
+            "perFrameMs": 0.0017087323943661972,
+            "calls": 265
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityLatestUpdate.FixedUpdate() [Invoke]",
+            "totalMs": 0.09478,
+            "perFrameMs": 0.0013349295774647888,
+            "calls": 199
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityLatestUpdate.Update() [Invoke]",
+            "totalMs": 0.06683,
+            "perFrameMs": 0.0009412676056338028,
+            "calls": 70
+          },
+          {
+            "name": "DeltaModule.SendAcks",
+            "totalMs": 0.05785,
+            "perFrameMs": 0.0008147887323943662,
+            "calls": 265
+          },
+          {
+            "name": "PurrNet.NetBench.dll!PurrNet.NetBench::BenchRunner.Window() [Coroutine: System.Collections.IEnumerator.get_Current] [Invoke]",
+            "totalMs": 0.05226,
+            "perFrameMs": 0.0007360563380281691,
+            "calls": 71
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityUpdate.LateUpdate() [Invoke]",
+            "totalMs": 0.03009,
+            "perFrameMs": 0.0004238028169014084,
+            "calls": 71
+          }
+        ]
       },
       "ClientInput": {
         "test": 7,
         "name": "ClientInput",
         "objects": 1,
-        "windowSeconds": 9.999941118061543,
-        "connections": 50,
+        "windowSeconds": 9.999899715185166,
+        "connections": 100,
         "truncated": false,
-        "cpuPercent": 2.529076871694923,
-        "avgFrameMs": 16.666742350260419,
-        "minFrameMs": 16.666637420654298,
-        "maxFrameMs": 16.666845321655275,
-        "p95FrameMs": 16.66680145263672,
-        "p99FrameMs": 16.66683006286621,
-        "avgFps": 59.999727540299748,
+        "cpuPercent": 5.58866222579562,
+        "avgFrameMs": 16.66674695968628,
+        "minFrameMs": 16.666370391845704,
+        "maxFrameMs": 16.667112350463868,
+        "p95FrameMs": 16.667020797729493,
+        "p99FrameMs": 16.667078018188478,
+        "avgFps": 59.99971094652194,
         "frameCount": 600,
         "gcCollections": 0,
-        "gcAllocBytes": 57344,
-        "gcAllocBytesPerSec": 5734.433765457607,
-        "gcAllocEstimated": true,
-        "managedHeapBytes": 594612224,
-        "peakRssBytes": 983003136,
+        "gcAllocBytes": 492657,
+        "gcAllocBytesPerSec": 49266.19406511494,
+        "gcAllocEstimated": false,
+        "managedHeapBytes": 754098176,
+        "peakRssBytes": 1416388608,
         "iface": "tailscale0",
-        "txBytes": 669208,
-        "rxBytes": 1036935,
-        "txBytesPerSec": 66921.19404496294,
-        "rxBytesPerSec": 103694.1105710237,
-        "txPacketsPerSec": 1620.4095412854886,
-        "rxPacketsPerSec": 1647.80970262295,
-        "inputsReceived": 14998,
-        "inputsPerSec": 1499.8088311651295,
+        "txBytes": 1344389,
+        "rxBytes": 2370055,
+        "txBytesPerSec": 134440.24823154004,
+        "rxBytesPerSec": 237007.8768291042,
+        "txPacketsPerSec": 3248.5325778488054,
+        "rxPacketsPerSec": 3358.0336759785405,
+        "inputsReceived": 29991,
+        "inputsPerSec": 2999.1300767204407,
         "rpcsSentPerSec": 0.0,
         "rpcsReceivedPerSec": 0.0,
         "syncMutationsPerSec": 0.0,
@@ -1011,41 +3227,270 @@
         "rttP50Ms": 0.0,
         "rttP95Ms": 0.0,
         "rttP99Ms": 0.0,
-        "cpuMarkers": []
+        "cpuMarkers": [
+          {
+            "name": "PlayerLoop",
+            "totalMs": 9980.083147,
+            "perFrameMs": 16.633471911666665,
+            "calls": 599
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::NetworkManager.Update() [Invoke]",
+            "totalMs": 375.807941,
+            "perFrameMs": 0.6263465683333334,
+            "calls": 599
+          },
+          {
+            "name": "NetworkManager.SendMessages",
+            "totalMs": 154.770603,
+            "perFrameMs": 0.257951005,
+            "calls": 299
+          },
+          {
+            "name": "NetworkManager.ReceiveMessages",
+            "totalMs": 130.073903,
+            "perFrameMs": 0.21678983833333335,
+            "calls": 299
+          },
+          {
+            "name": "RPCBatch<UnionRPCHeader>.OnBatchReceived",
+            "totalMs": 37.805417,
+            "perFrameMs": 0.06300902833333333,
+            "calls": 29890
+          },
+          {
+            "name": "NetworkManager.OnPostBatch",
+            "totalMs": 24.893753,
+            "perFrameMs": 0.041489588333333337,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.PostFixedUpdate",
+            "totalMs": 24.743113,
+            "perFrameMs": 0.041238521666666669,
+            "calls": 299
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityLatestUpdate.LateUpdate() [Invoke]",
+            "totalMs": 5.468821,
+            "perFrameMs": 0.009114701666666668,
+            "calls": 600
+          },
+          {
+            "name": "NetworkIdentity.Broadcasting.ValidateIncomingRPC",
+            "totalMs": 4.993704,
+            "perFrameMs": 0.00832284,
+            "calls": 29890
+          },
+          {
+            "name": "PurrNet.NetBench.dll!PurrNet.NetBench::BenchRunner.Window() [Coroutine: MoveNext] [Invoke]",
+            "totalMs": 3.22208,
+            "perFrameMs": 0.005370133333333333,
+            "calls": 599
+          },
+          {
+            "name": "NetworkTransform.G.Anchors",
+            "totalMs": 2.968383,
+            "perFrameMs": 0.004947305,
+            "calls": 29900
+          },
+          {
+            "name": "NetworkTransform.G.Replay",
+            "totalMs": 2.791042,
+            "perFrameMs": 0.004651736666666666,
+            "calls": 29900
+          },
+          {
+            "name": "NetworkTransform.G.Patches",
+            "totalMs": 2.710931,
+            "perFrameMs": 0.004518218333333333,
+            "calls": 29900
+          },
+          {
+            "name": "NetworkTransform.G.Converge",
+            "totalMs": 2.709141,
+            "perFrameMs": 0.004515234999999999,
+            "calls": 29900
+          },
+          {
+            "name": "NetworkTransform.G.Prep",
+            "totalMs": 2.701912,
+            "perFrameMs": 0.0045031866666666669,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.G.Delay",
+            "totalMs": 2.211012,
+            "perFrameMs": 0.0036850200000000004,
+            "calls": 299
+          },
+          {
+            "name": "NetworkManager.OnFixedUpdate",
+            "totalMs": 1.28686,
+            "perFrameMs": 0.0021447666666666667,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.QueueChangedState",
+            "totalMs": 0.82682,
+            "perFrameMs": 0.0013780333333333333,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.G.Inval",
+            "totalMs": 0.77121,
+            "perFrameMs": 0.00128535,
+            "calls": 299
+          },
+          {
+            "name": "NetworkManager.OnPreFixedUpdate",
+            "totalMs": 0.45886,
+            "perFrameMs": 0.0007647666666666667,
+            "calls": 299
+          },
+          {
+            "name": "PurrNet.NetBench.dll!PurrNet.NetBench::BenchRunner.Update() [Invoke]",
+            "totalMs": 0.30618,
+            "perFrameMs": 0.0005103,
+            "calls": 599
+          },
+          {
+            "name": "NetworkManager.OnPostFixedUpdate",
+            "totalMs": 0.26631,
+            "perFrameMs": 0.00044385,
+            "calls": 299
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityLatestUpdate.Update() [Invoke]",
+            "totalMs": 0.22546,
+            "perFrameMs": 0.0003757666666666667,
+            "calls": 599
+          },
+          {
+            "name": "RPCBatch<UnionRPCHeader>.Flush",
+            "totalMs": 0.17531,
+            "perFrameMs": 0.0002921833333333333,
+            "calls": 897
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityLatestUpdate.FixedUpdate() [Invoke]",
+            "totalMs": 0.16959,
+            "perFrameMs": 0.00028264999999999996,
+            "calls": 200
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityUpdate.Update() [Invoke]",
+            "totalMs": 0.16022,
+            "perFrameMs": 0.00026703333333333334,
+            "calls": 599
+          },
+          {
+            "name": "PurrNet.NetBench.dll!PurrNet.NetBench::BenchRunner.Window() [Coroutine: System.Collections.IEnumerator.get_Current] [Invoke]",
+            "totalMs": 0.13853,
+            "perFrameMs": 0.0002308833333333333,
+            "calls": 600
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityUpdate.LateUpdate() [Invoke]",
+            "totalMs": 0.12357,
+            "perFrameMs": 0.00020595,
+            "calls": 600
+          },
+          {
+            "name": "PurrNet.Hierarchy.FlushSpawn",
+            "totalMs": 0.12297,
+            "perFrameMs": 0.00020495,
+            "calls": 299
+          },
+          {
+            "name": "NetworkManager.OnBatch",
+            "totalMs": 0.11315,
+            "perFrameMs": 0.00018858333333333333,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.G.Encode",
+            "totalMs": 0.10319,
+            "perFrameMs": 0.00017198333333333333,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.G.Render",
+            "totalMs": 0.0738,
+            "perFrameMs": 0.000123,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.G.Demote",
+            "totalMs": 0.05664,
+            "perFrameMs": 0.0000944,
+            "calls": 299
+          },
+          {
+            "name": "PurrNet.Hierarchy.LateObservers",
+            "totalMs": 0.05059,
+            "perFrameMs": 0.00008431666666666667,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.G.Adopt",
+            "totalMs": 0.04356,
+            "perFrameMs": 0.0000726,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.G.Release",
+            "totalMs": 0.04347,
+            "perFrameMs": 0.00007245,
+            "calls": 299
+          },
+          {
+            "name": "DeltaModule.SendAcks",
+            "totalMs": 0.03971,
+            "perFrameMs": 0.00006618333333333333,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.GatherState",
+            "totalMs": 0.03262,
+            "perFrameMs": 0.00005436666666666667,
+            "calls": 299
+          }
+        ]
       },
       "SyncVars": {
         "test": 8,
         "name": "SyncVars",
         "objects": 2000,
-        "windowSeconds": 9.993365839123726,
-        "connections": 50,
+        "windowSeconds": 9.947890517301858,
+        "connections": 100,
         "truncated": false,
-        "cpuPercent": 41.05754235411619,
-        "avgFrameMs": 16.67861712137858,
-        "minFrameMs": 16.66620635986328,
-        "maxFrameMs": 19.709260940551759,
-        "p95FrameMs": 16.66681480407715,
-        "p99FrameMs": 16.666850719451906,
-        "avgFps": 59.95700918862178,
-        "frameCount": 600,
-        "gcCollections": 2,
-        "gcAllocBytes": 187890777,
-        "gcAllocBytesPerSec": 18801550.951373489,
-        "gcAllocEstimated": true,
-        "managedHeapBytes": 840384512,
-        "peakRssBytes": 1076506624,
+        "cpuPercent": 74.08792348670723,
+        "avgFrameMs": 22.429287555506414,
+        "minFrameMs": 16.666292190551759,
+        "maxFrameMs": 138.2593994140625,
+        "p95FrameMs": 32.29321575164795,
+        "p99FrameMs": 111.06148605346718,
+        "avgFps": 44.58456371051781,
+        "frameCount": 446,
+        "gcCollections": 3,
+        "gcAllocBytes": 389630170,
+        "gcAllocBytesPerSec": 39167114.80914835,
+        "gcAllocEstimated": false,
+        "managedHeapBytes": 1255735296,
+        "peakRssBytes": 1558286336,
         "iface": "tailscale0",
-        "txBytes": 185600979,
-        "rxBytes": 164412,
-        "txBytesPerSec": 18572419.141644729,
-        "rxBytesPerSec": 16452.114597499472,
-        "txPacketsPerSec": 16624.929245517145,
-        "rxPacketsPerSec": 417.9772928603465,
+        "txBytes": 374406903,
+        "rxBytes": 422973,
+        "txBytesPerSec": 37636813.78969875,
+        "rxBytesPerSec": 42518.863598704134,
+        "txPacketsPerSec": 33475.84087508862,
+        "rxPacketsPerSec": 971.060144178191,
         "inputsReceived": 0,
         "inputsPerSec": 0.0,
         "rpcsSentPerSec": 0.0,
         "rpcsReceivedPerSec": 0.0,
-        "syncMutationsPerSec": 60039.83139004259,
+        "syncMutationsPerSec": 60314.29466945285,
         "syncObservationAvailable": false,
         "syncObservedChanges": 0,
         "syncObservedChangesPerSec": 0.0,
@@ -1054,27 +3499,262 @@
         "syncSilenceMaxMs": 0.0,
         "rpcsSent": 0,
         "rpcsReceived": 0,
-        "syncMutations": 760000,
+        "syncMutations": 702000,
         "deliveryComplete": true,
         "finalStateObjects": 2000,
-        "finalStateHash": "bd720a67fdd883a1",
+        "finalStateHash": "77d19c3e6ceff4c2",
         "rttSamples": 0,
         "rttAvgMs": 0.0,
         "rttP50Ms": 0.0,
         "rttP95Ms": 0.0,
         "rttP99Ms": 0.0,
-        "cpuMarkers": []
+        "cpuMarkers": [
+          {
+            "name": "PlayerLoop",
+            "totalMs": 9906.959114,
+            "perFrameMs": 22.21291281165919,
+            "calls": 445
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::NetworkManager.Update() [Invoke]",
+            "totalMs": 6448.743887,
+            "perFrameMs": 14.459067011210762,
+            "calls": 445
+          },
+          {
+            "name": "NetworkManager.SendMessages",
+            "totalMs": 2720.888992,
+            "perFrameMs": 6.100647964125561,
+            "calls": 299
+          },
+          {
+            "name": "NetworkIdentity.Broadcasting.SendRPC",
+            "totalMs": 2212.884787,
+            "perFrameMs": 4.9616250829596419,
+            "calls": 598000
+          },
+          {
+            "name": "RPCBatch<UnionRPCHeader>.QueueMulti",
+            "totalMs": 2056.315442,
+            "perFrameMs": 4.610572739910314,
+            "calls": 598000
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityLatestUpdate.LateUpdate() [Invoke]",
+            "totalMs": 87.70974,
+            "perFrameMs": 0.19665860986547085,
+            "calls": 446
+          },
+          {
+            "name": "NetworkIdentity.Broadcasting.ValidateSendingRPC",
+            "totalMs": 70.866735,
+            "perFrameMs": 0.15889402466367714,
+            "calls": 598000
+          },
+          {
+            "name": "NetworkManager.ReceiveMessages",
+            "totalMs": 64.409076,
+            "perFrameMs": 0.14441496860986548,
+            "calls": 299
+          },
+          {
+            "name": "NetworkManager.OnPreFixedUpdate",
+            "totalMs": 32.538944,
+            "perFrameMs": 0.0729572735426009,
+            "calls": 299
+          },
+          {
+            "name": "RPCBatch<UnionRPCHeader>.Flush",
+            "totalMs": 31.551424,
+            "perFrameMs": 0.07074310313901346,
+            "calls": 897
+          },
+          {
+            "name": "NetworkManager.OnPostBatch",
+            "totalMs": 29.950861,
+            "perFrameMs": 0.06715439686098655,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.PostFixedUpdate",
+            "totalMs": 29.574211,
+            "perFrameMs": 0.06630989013452915,
+            "calls": 299
+          },
+          {
+            "name": "PurrNet.NetBench.dll!PurrNet.NetBench::BenchRunner.Window() [Coroutine: MoveNext] [Invoke]",
+            "totalMs": 4.745332,
+            "perFrameMs": 0.010639757847533634,
+            "calls": 445
+          },
+          {
+            "name": "NetworkTransform.G.Delay",
+            "totalMs": 3.95053,
+            "perFrameMs": 0.008857690582959642,
+            "calls": 299
+          },
+          {
+            "name": "NetworkManager.OnFixedUpdate",
+            "totalMs": 3.693511,
+            "perFrameMs": 0.008281414798206278,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.G.Anchors",
+            "totalMs": 3.513073,
+            "perFrameMs": 0.00787684529147982,
+            "calls": 27200
+          },
+          {
+            "name": "NetworkTransform.G.Prep",
+            "totalMs": 3.431071,
+            "perFrameMs": 0.007692984304932736,
+            "calls": 272
+          },
+          {
+            "name": "NetworkTransform.G.Replay",
+            "totalMs": 3.099941,
+            "perFrameMs": 0.006950540358744394,
+            "calls": 27200
+          },
+          {
+            "name": "NetworkTransform.G.Converge",
+            "totalMs": 2.708041,
+            "perFrameMs": 0.006071840807174888,
+            "calls": 27200
+          },
+          {
+            "name": "NetworkTransform.G.Patches",
+            "totalMs": 2.482212,
+            "perFrameMs": 0.005565497757847534,
+            "calls": 27200
+          },
+          {
+            "name": "NetworkTransform.G.Inval",
+            "totalMs": 1.52401,
+            "perFrameMs": 0.0034170627802690585,
+            "calls": 272
+          },
+          {
+            "name": "NetworkTransform.QueueChangedState",
+            "totalMs": 1.204582,
+            "perFrameMs": 0.0027008565022421527,
+            "calls": 272
+          },
+          {
+            "name": "NetworkManager.OnPostFixedUpdate",
+            "totalMs": 0.82859,
+            "perFrameMs": 0.0018578251121076234,
+            "calls": 299
+          },
+          {
+            "name": "PurrNet.NetBench.dll!PurrNet.NetBench::BenchRunner.Update() [Invoke]",
+            "totalMs": 0.61262,
+            "perFrameMs": 0.0013735874439461886,
+            "calls": 445
+          },
+          {
+            "name": "PurrNet.Hierarchy.FlushSpawn",
+            "totalMs": 0.49121,
+            "perFrameMs": 0.0011013677130044843,
+            "calls": 299
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityLatestUpdate.Update() [Invoke]",
+            "totalMs": 0.29531,
+            "perFrameMs": 0.0006621300448430493,
+            "calls": 445
+          },
+          {
+            "name": "NetworkTransform.G.Encode",
+            "totalMs": 0.22109,
+            "perFrameMs": 0.0004957174887892377,
+            "calls": 272
+          },
+          {
+            "name": "NetworkTransform.G.Render",
+            "totalMs": 0.19294,
+            "perFrameMs": 0.00043260089686098657,
+            "calls": 299
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityUpdate.Update() [Invoke]",
+            "totalMs": 0.17074,
+            "perFrameMs": 0.0003828251121076233,
+            "calls": 445
+          },
+          {
+            "name": "PurrNet.NetBench.dll!PurrNet.NetBench::BenchRunner.Window() [Coroutine: System.Collections.IEnumerator.get_Current] [Invoke]",
+            "totalMs": 0.16025,
+            "perFrameMs": 0.000359304932735426,
+            "calls": 446
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityLatestUpdate.FixedUpdate() [Invoke]",
+            "totalMs": 0.15977,
+            "perFrameMs": 0.0003582286995515695,
+            "calls": 200
+          },
+          {
+            "name": "NetworkManager.OnBatch",
+            "totalMs": 0.14196,
+            "perFrameMs": 0.00031829596412556054,
+            "calls": 299
+          },
+          {
+            "name": "PurrNet.Runtime.dll!PurrNet::UnityUpdate.LateUpdate() [Invoke]",
+            "totalMs": 0.13962,
+            "perFrameMs": 0.00031304932735426005,
+            "calls": 446
+          },
+          {
+            "name": "PurrNet.Hierarchy.LateObservers",
+            "totalMs": 0.13837,
+            "perFrameMs": 0.0003102466367713004,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.G.Demote",
+            "totalMs": 0.10937,
+            "perFrameMs": 0.00024522421524663675,
+            "calls": 272
+          },
+          {
+            "name": "DeltaModule.SendAcks",
+            "totalMs": 0.08758,
+            "perFrameMs": 0.0001963677130044843,
+            "calls": 299
+          },
+          {
+            "name": "NetworkTransform.G.Adopt",
+            "totalMs": 0.07601,
+            "perFrameMs": 0.00017042600896860984,
+            "calls": 272
+          },
+          {
+            "name": "NetworkTransform.G.Release",
+            "totalMs": 0.06399,
+            "perFrameMs": 0.00014347533632286998,
+            "calls": 272
+          },
+          {
+            "name": "NetworkTransform.GatherState",
+            "totalMs": 0.02978,
+            "perFrameMs": 0.0000667713004484305,
+            "calls": 272
+          }
+        ]
       }
     },
     "clients": {
       "ClientInput": {
         "n": 10,
-        "rxBytesPerSec": 1346.3696590498735,
-        "txBytesPerSec": 2064.2918859432766,
-        "rttAvgMs": 153.0225796169705,
-        "rttP50Ms": 153.35159301757812,
-        "rttP95Ms": 156.75048828125,
-        "rttP99Ms": 156.756591796875,
+        "rxBytesPerSec": 1360.779006040039,
+        "txBytesPerSec": 2274.7598631432606,
+        "rttAvgMs": 156.5464600790455,
+        "rttP50Ms": 156.66961669921875,
+        "rttP95Ms": 160.06290435791016,
+        "rttP99Ms": 160.07080078125,
         "rpcsReceivedPerSec": 0,
         "syncObservationClients": 0,
         "syncObservedChangesPerSec": null,
@@ -1088,12 +3768,12 @@
       },
       "Idle": {
         "n": 10,
-        "rxBytesPerSec": 2158.2803153046143,
-        "txBytesPerSec": 810.736902950962,
-        "rttAvgMs": 148.44341364502907,
-        "rttP50Ms": 146.68288826942444,
-        "rttP95Ms": 156.38464987277985,
-        "rttP99Ms": 156.38591349124908,
+        "rxBytesPerSec": 2284.583868133347,
+        "txBytesPerSec": 935.1187077049517,
+        "rttAvgMs": 166.23017647193404,
+        "rttP50Ms": 165.00336527824402,
+        "rttP95Ms": 176.3020008802414,
+        "rttP99Ms": 176.3020008802414,
         "rpcsReceivedPerSec": 0,
         "syncObservationClients": 0,
         "syncObservedChangesPerSec": null,
@@ -1107,12 +3787,12 @@
       },
       "MoveWander": {
         "n": 10,
-        "rxBytesPerSec": 712128.0490171934,
-        "txBytesPerSec": 1654.5931260573568,
-        "rttAvgMs": 159.11235597398547,
-        "rttP50Ms": 158.36095809936523,
-        "rttP95Ms": 171.1785125732422,
-        "rttP99Ms": 173.42796325683594,
+        "rxBytesPerSec": 699363.1188478443,
+        "txBytesPerSec": 1637.6504434370647,
+        "rttAvgMs": 175.44970951723252,
+        "rttP50Ms": 170.00446319580078,
+        "rttP95Ms": 237.10861206054688,
+        "rttP99Ms": 238.76323699951172,
         "rpcsReceivedPerSec": 0,
         "syncObservationClients": 0,
         "syncObservedChangesPerSec": null,
@@ -1126,12 +3806,12 @@
       },
       "MoveY": {
         "n": 10,
-        "rxBytesPerSec": 119009.09627141543,
-        "txBytesPerSec": 575.4140720769501,
-        "rttAvgMs": 149.632166756524,
-        "rttP50Ms": 150.00085830688477,
-        "rttP95Ms": 151.66959762573242,
-        "rttP99Ms": 153.36933135986328,
+        "rxBytesPerSec": 126099.72162712575,
+        "txBytesPerSec": 593.1648341831682,
+        "rttAvgMs": 158.96129852228248,
+        "rttP50Ms": 156.66799545288086,
+        "rttP95Ms": 176.33697509765622,
+        "rttP99Ms": 190.00158309936523,
         "rpcsReceivedPerSec": 0,
         "syncObservationClients": 0,
         "syncObservedChangesPerSec": null,
@@ -1145,13 +3825,13 @@
       },
       "SendRPC": {
         "n": 10,
-        "rxBytesPerSec": 377142.06703030335,
-        "txBytesPerSec": 323.2084913531329,
-        "rttAvgMs": 1837.5023454605707,
-        "rttP50Ms": 1855.2862167358398,
-        "rttP95Ms": 2298.419418334961,
-        "rttP99Ms": 2328.3695220947266,
-        "rpcsReceivedPerSec": 53616.15165472826,
+        "rxBytesPerSec": 334858.2056049032,
+        "txBytesPerSec": 316.7306516448092,
+        "rttAvgMs": 2019.0273413838754,
+        "rttP50Ms": 2026.493263244629,
+        "rttP95Ms": 2733.2290649414062,
+        "rttP99Ms": 2799.1714859008794,
+        "rpcsReceivedPerSec": 46862.19242917992,
         "syncObservationClients": 0,
         "syncObservedChangesPerSec": null,
         "syncSilenceAvgMs": null,
@@ -1164,12 +3844,12 @@
       },
       "SpawnChurn": {
         "n": 10,
-        "rxBytesPerSec": 300026.42361987074,
-        "txBytesPerSec": 1439.9638463628714,
-        "rttAvgMs": 154.2412397596571,
-        "rttP50Ms": 153.33251953125,
-        "rttP95Ms": 158.34579467773438,
-        "rttP99Ms": 158.34579467773438,
+        "rxBytesPerSec": 266474.1932740058,
+        "txBytesPerSec": 663.398647905043,
+        "rttAvgMs": 224.66981944100507,
+        "rttP50Ms": 216.66793823242188,
+        "rttP95Ms": 340.8515930175781,
+        "rttP99Ms": 340.8515930175781,
         "rpcsReceivedPerSec": 0,
         "syncObservationClients": 0,
         "syncObservedChangesPerSec": null,
@@ -1183,12 +3863,12 @@
       },
       "Static": {
         "n": 10,
-        "rxBytesPerSec": 259.1007674477643,
-        "txBytesPerSec": 163.7294229879804,
-        "rttAvgMs": 150.64179011753626,
-        "rttP50Ms": 150.02155303955078,
-        "rttP95Ms": 151.7120361328125,
-        "rttP99Ms": 151.7120361328125,
+        "rxBytesPerSec": 258.926296640207,
+        "txBytesPerSec": 194.99261545819087,
+        "rttAvgMs": 158.37110095553928,
+        "rttP50Ms": 160.0006103515625,
+        "rttP95Ms": 165.00244140625,
+        "rttP99Ms": 165.00244140625,
         "rpcsReceivedPerSec": 0,
         "syncObservationClients": 0,
         "syncObservedChangesPerSec": null,
@@ -1202,17 +3882,17 @@
       },
       "SyncVars": {
         "n": 10,
-        "rxBytesPerSec": 415117.59653923666,
-        "txBytesPerSec": 354.1642025709851,
-        "rttAvgMs": 3624.3876139322915,
-        "rttP50Ms": 3605.1578521728516,
-        "rttP95Ms": 5155.245208740234,
-        "rttP99Ms": 5155.245208740234,
+        "rxBytesPerSec": 401674.8409694534,
+        "txBytesPerSec": 454.80874234071007,
+        "rttAvgMs": 3842.3703361626394,
+        "rttP50Ms": 3841.790008544922,
+        "rttP95Ms": 5634.808845520019,
+        "rttP99Ms": 5793.4884033203125,
         "rpcsReceivedPerSec": 0,
         "syncObservationClients": 10,
-        "syncObservedChangesPerSec": 37442.15787699593,
-        "syncSilenceAvgMs": 112.51384437073015,
-        "syncSilenceMaxMs": 450.00295493197486,
+        "syncObservedChangesPerSec": 34451.70249568331,
+        "syncSilenceAvgMs": 123.47841479549909,
+        "syncSilenceMaxMs": 550.2118055555485,
         "rpcDeliveryChecked": 0,
         "rpcDeliveryMatched": 0,
         "syncStateChecked": 9,
