@@ -1,8 +1,8 @@
 {
   "metadata": {
     "date": "2026-11-09",
-    "run_url": "https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/42539824766",
-    "run_id": "42539824766",
+    "run_url": "https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/42542056128",
+    "run_id": "42542056128",
     "versions": "PurrNet 1.26.0-beta.7 · FishNet 4.7.3",
     "netcode_versions": {
       "purrnet": "1.26.0-beta.7",
@@ -12,8 +12,8 @@
       "fusion": "version unknown"
     },
     "unity_version": "6000.5.4f1",
-    "source_revision": "737087ab4fe124532fcf6edfb363b0149aa5293d",
-    "source_sha256": "7565a150e76157b0079acdb1fe792808b48e2e69846fc6f1f27d0bb999c8bca5",
+    "source_revision": "e0c92f69c8183a5dfcfe6de5d625428b5a25d5d8",
+    "source_sha256": "9e48224dfa3880ab6ef96467831f7c468d77523c39fb07888c33a732c151b46d",
     "source_data": "source-data.json",
     "source_summary": "source-summary.md",
     "size": [
