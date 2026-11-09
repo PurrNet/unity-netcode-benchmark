@@ -1,42 +1,34 @@
-_Last run 2026-11-09: PurrNet 1.26.0-beta.7 · FishNet 4.7.3 · Unity 6000.5.4f1 · 2000 objects per test · 10 s windows · sessions 50c @ 30 Hz._
+_Last run 2026-11-09: PurrNet 1.26.0-beta.7 · FishNet 4.7.3 · Unity 6000.5.4f1 · 2000 objects per test · 10 s windows · sessions 100c @ 30 Hz._
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="latest-dark.svg">
-  <img alt="At a glance, 50 connections @ 30 Hz; how it scales. Best value per column highlighted in green." src="latest-light.svg">
+  <img alt="At a glance, 100 connections @ 30 Hz; how it scales. Best value per column highlighted in green." src="latest-light.svg">
 </picture>
 
 <details><summary>Same tables as text</summary>
 
-**Who's ahead, 50 connections @ 30 Hz** (best per category; no averaging across categories)
-
-| Category | Bandwidth | Server CPU | GC alloc |
-|---|---:|---:|---:|
-| State replication | tie | tie | tie |
-| Messaging | – | – | – |
-| Spawn / despawn | FishNet | FishNet | PurrNet |
-
-**State replication** (50 connections @ 30 Hz · MoveY, MoveWander, SyncVars)
+**State replication** (100 connections @ 30 Hz · MoveY, MoveWander, SyncVars)
 
 | Netcode | Status | Bandwidth | Server CPU | GC alloc | Collections | Frame p99 |
 |---|---:|---:|---:|---:|---:|---:|
-| PurrNet | Overloaded (1/3) | 20.47 MB/s | 50.0% | 12.40 MB/s | 9 | 32.0 ms |
-| FishNet | Completed | 26.43 MB/s | 56.3% | 109.35 MB/s | 206 | 32.8 ms |
+| PurrNet | Overloaded (2/3) | 42.06 MB/s | 95.3% | 32.88 MB/s | 13 | 236.1 ms |
+| FishNet | Overloaded (2/3) | 51.39 MB/s | 110.5% | 216.67 MB/s | 369 | 979.2 ms |
 
-**Messaging** (50 connections @ 30 Hz · SendRPC, ClientInput)
-
-| Netcode | Status | Bandwidth | Server CPU | GC alloc | Collections | Frame p99 |
-|---|---:|---:|---:|---:|---:|---:|
-| PurrNet | Overloaded (1/2) | 10.15 MB/s | 63.2% | 2.31 MB/s | 1 | 45.3 ms |
-| FishNet | Overloaded (1/2) | 10.14 MB/s | 57.9% | 24.73 MB/s | 26 | 69.8 ms |
-
-**Spawn / despawn** (50 connections @ 30 Hz · SpawnChurn)
+**Messaging** (100 connections @ 30 Hz · SendRPC, ClientInput)
 
 | Netcode | Status | Bandwidth | Server CPU | GC alloc | Collections | Frame p99 |
 |---|---:|---:|---:|---:|---:|---:|
-| PurrNet | Completed | 16.12 MB/s | 71.9% | **1.99 MB/s** | **0** | **16.7 ms** |
-| FishNet | Completed | **8.30 MB/s** | **64.9%** | 105.35 MB/s | 127 | 24.8 ms |
+| PurrNet | Overloaded (1/2) | 21.11 MB/s | 81.2% | 5.33 MB/s | 1 | 89.9 ms |
+| FishNet | Overloaded (1/2) | 19.87 MB/s | 65.5% | 51.64 MB/s | 49 | 599.3 ms |
+
+**Spawn / despawn** (100 connections @ 30 Hz · SpawnChurn)
+
+| Netcode | Status | Bandwidth | Server CPU | GC alloc | Collections | Frame p99 |
+|---|---:|---:|---:|---:|---:|---:|
+| PurrNet | Completed | 33.36 MB/s | 148.7% | 2.97 MB/s | 0 | 17.6 ms |
+| FishNet | Overloaded (1/1) | 16.59 MB/s | 112.3% | 157.73 MB/s | 120 | 42.9 ms |
 
 </details>
 
 Categories are reported separately, with no combined ranking. Bandwidth, CPU and allocation: averages; collections: total; frame p99: maximum. Categories that did not complete have no averages. Completed means the test finished. Overloaded means it finished but the server could not hold the 60 fps budget in that many tests (frame p99 past 33 ms or a sixth of frames dropped); its numbers are shown but never marked best, since they describe a saturated server. Idle and Static remain baselines; scaling requires the full suite.
-Full results: [interactive report](https://purrnet.github.io/unity-netcode-benchmark/) · [workflow run](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/42542058869) · [raw datapoints](latest.json).
+Full results: [interactive report](https://purrnet.github.io/unity-netcode-benchmark/) · [workflow run](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/42544450582) · [raw datapoints](latest.json).
