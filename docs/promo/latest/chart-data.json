@@ -1,19 +1,19 @@
 {
   "metadata": {
     "date": "2026-11-10",
-    "run_url": "https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/42787654442",
-    "run_id": "42787654442",
-    "versions": "PurrNet 1.26.0-beta.11 · FishNet 4.7.3 · Mirror 96.0.1 · NGO 2.13.2 · Fusion 2.1.2 Stable 2279",
+    "run_url": "https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/42799932985",
+    "run_id": "42799932985",
+    "versions": "PurrNet 1.26.0-beta.13 · FishNet 4.7.3 · Mirror 96.0.1 · NGO 2.13.2 · Fusion 2.1.2 Stable 2279",
     "netcode_versions": {
-      "purrnet": "1.26.0-beta.11",
+      "purrnet": "1.26.0-beta.13",
       "fishnet": "4.7.3",
       "mirror": "96.0.1",
       "ngo": "2.13.2",
       "fusion": "2.1.2 Stable 2279"
     },
     "unity_version": "6000.5.4f1",
-    "source_revision": "0a2c157735c3ea20b6f3f98f5c63601d27687c13",
-    "source_sha256": "5e150e6d5d84151de38b79f7484b243af3e1debd52d7ea8c8d2ddfc6bbd1898f",
+    "source_revision": "b12ecc98d3ded8b371438fdd6dd1d58941f6cb5d",
+    "source_sha256": "36ba6316c4b4843e9437980b1618a2e24855c18e805c52ea0a5d5adcfa102ef9",
     "source_data": "source-data.json",
     "source_summary": "source-summary.md",
     "size": [
@@ -22,11 +22,324 @@
     ],
     "note": "One published run. Selected resource comparisons, no overall ranking."
   },
-  "charts": [],
-  "skipped": {
-    "01-state-bandwidth": "PurrNet at 100 connections / 20 Hz: no datapoint",
-    "02-messaging-cpu": "PurrNet at 100 connections / 20 Hz: no datapoint",
-    "03-general-gc": "PurrNet at 100 connections / 20 Hz: no datapoint",
-    "04-connection-scaling": "PurrNet at 10 connections / 20 Hz: no datapoint"
-  }
+  "charts": [
+    {
+      "slug": "01-state-bandwidth",
+      "number": 1,
+      "chart_title": "State replication bandwidth",
+      "takeaway": "PurrNet’s downstream bandwidth was 41% lower than FishNet across the state replication workloads.",
+      "kicker": "NetworkTransform + SyncVars, 100 connections, 20 Hz",
+      "chart_subtitle": "Server downstream, MiB/s, lower is better",
+      "rows": [
+        {
+          "netcode": "purrnet",
+          "value": 1.4947051004334828,
+          "overloaded": 0,
+          "tests": [
+            "MoveY",
+            "MoveWander",
+            "SyncVars"
+          ]
+        },
+        {
+          "netcode": "fishnet",
+          "value": 2.526217451479287,
+          "overloaded": 0,
+          "tests": [
+            "MoveY",
+            "MoveWander",
+            "SyncVars"
+          ]
+        },
+        {
+          "netcode": "mirror",
+          "value": 4.117620559423572,
+          "overloaded": 0,
+          "tests": [
+            "MoveY",
+            "MoveWander",
+            "SyncVars"
+          ]
+        },
+        {
+          "netcode": "ngo",
+          "value": 4.882412264515464,
+          "overloaded": 3,
+          "tests": [
+            "MoveY",
+            "MoveWander",
+            "SyncVars"
+          ]
+        },
+        {
+          "netcode": "fusion",
+          "value": 3.4996438721646044,
+          "overloaded": 0,
+          "tests": [
+            "MoveY",
+            "MoveWander",
+            "SyncVars"
+          ]
+        }
+      ],
+      "baseline": "fishnet",
+      "axis_max": 5.2,
+      "tick_step": 1,
+      "value_format": "{:.2f}",
+      "chart_note": "* NGO: 3/3 workloads overloaded.",
+      "figure_method": "Mean of three transform and synced-variable workloads. 100 objects, 10 s windows.",
+      "method": "Arithmetic mean of server txBytesPerSec. Tests: MoveY, MoveWander, SyncVars. Sessions: 100 connections, 20 Hz. 10 s windows. No idle subtraction. Binary byte units (1 KiB = 1,024 bytes).",
+      "caveat": "One published run. Overloaded rows describe saturated servers and are not used for comparative claims.",
+      "footer": "AMD Ryzen 5 3600, Unity 6000.5.4f1, release build, 60 fps cap",
+      "allocation_estimated": null,
+      "reduction_percent": 40.832286644278284,
+      "reduction_percent_rounded": 41,
+      "alt": "State replication bandwidth. PurrNet’s downstream bandwidth was 41% lower than FishNet across the state replication workloads. NetworkTransform + SyncVars, 100 connections, 20 Hz."
+    },
+    {
+      "slug": "02-messaging-cpu",
+      "number": 2,
+      "chart_title": "Messaging server CPU",
+      "takeaway": "PurrNet’s server CPU usage was 44% lower than Mirror and 11% lower than FishNet in the messaging workloads.",
+      "kicker": "RPCs: server broadcasts + client inputs, 100 connections, 20 Hz",
+      "chart_subtitle": "Whole-process CPU, % of one core, lower is better",
+      "rows": [
+        {
+          "netcode": "purrnet",
+          "value": 6.633495583515755,
+          "overloaded": 0,
+          "tests": [
+            "SendRPC",
+            "ClientInput"
+          ]
+        },
+        {
+          "netcode": "fishnet",
+          "value": 7.476948555894147,
+          "overloaded": 0,
+          "tests": [
+            "SendRPC",
+            "ClientInput"
+          ]
+        },
+        {
+          "netcode": "mirror",
+          "value": 11.883046956187828,
+          "overloaded": 0,
+          "tests": [
+            "SendRPC",
+            "ClientInput"
+          ]
+        },
+        {
+          "netcode": "ngo",
+          "value": 38.490612168767804,
+          "overloaded": 1,
+          "tests": [
+            "SendRPC",
+            "ClientInput"
+          ]
+        },
+        {
+          "netcode": "fusion",
+          "value": 12.957383075566357,
+          "overloaded": 0,
+          "tests": [
+            "SendRPC",
+            "ClientInput"
+          ]
+        }
+      ],
+      "baseline": "mirror",
+      "axis_max": 40,
+      "tick_step": 10,
+      "value_format": "{:.1f}%",
+      "chart_note": "* NGO: 1/2 workloads overloaded.",
+      "figure_method": "Mean of two RPC workloads: broadcasts on 100 objects + client inputs. 10 s windows. No idle subtraction.",
+      "method": "Arithmetic mean of server cpuPercent. Tests: SendRPC, ClientInput. Sessions: 100 connections, 20 Hz. 10 s windows. No idle subtraction. Binary byte units (1 KiB = 1,024 bytes).",
+      "caveat": "One published run. Overloaded rows describe saturated servers and are not used for comparative claims.",
+      "footer": "AMD Ryzen 5 3600, Unity 6000.5.4f1, release build, 60 fps cap",
+      "allocation_estimated": null,
+      "reduction_percent": 44.17681249621326,
+      "reduction_percent_rounded": 44,
+      "alt": "Messaging server CPU. PurrNet’s server CPU usage was 44% lower than Mirror and 11% lower than FishNet in the messaging workloads. RPCs: server broadcasts + client inputs, 100 connections, 20 Hz."
+    },
+    {
+      "slug": "03-general-gc",
+      "number": 3,
+      "chart_title": "GC allocation across workloads",
+      "takeaway": "PurrNet’s estimated GC allocation rate was 93% lower than FishNet across the active workloads.",
+      "kicker": "NetworkTransform + SyncVars + RPCs + spawn/despawn, 100 connections, 20 Hz",
+      "chart_subtitle": "Estimated server gc allocation, kib/s, lower is better",
+      "rows": [
+        {
+          "netcode": "purrnet",
+          "value": 67.51018527678325,
+          "overloaded": 0,
+          "tests": [
+            "MoveY",
+            "MoveWander",
+            "SyncVars",
+            "SendRPC",
+            "ClientInput",
+            "SpawnChurn"
+          ]
+        },
+        {
+          "netcode": "fishnet",
+          "value": 914.0117476615274,
+          "overloaded": 0,
+          "tests": [
+            "MoveY",
+            "MoveWander",
+            "SyncVars",
+            "SendRPC",
+            "ClientInput",
+            "SpawnChurn"
+          ]
+        },
+        {
+          "netcode": "mirror",
+          "value": 3514.6360919515705,
+          "overloaded": 0,
+          "tests": [
+            "MoveY",
+            "MoveWander",
+            "SyncVars",
+            "SendRPC",
+            "ClientInput",
+            "SpawnChurn"
+          ]
+        },
+        {
+          "netcode": "ngo",
+          "value": 193.0742658216154,
+          "overloaded": 4,
+          "tests": [
+            "MoveY",
+            "MoveWander",
+            "SyncVars",
+            "SendRPC",
+            "ClientInput",
+            "SpawnChurn"
+          ]
+        },
+        {
+          "netcode": "fusion",
+          "value": 909.3153544525461,
+          "overloaded": 0,
+          "tests": [
+            "MoveY",
+            "MoveWander",
+            "SyncVars",
+            "SendRPC",
+            "ClientInput",
+            "SpawnChurn"
+          ]
+        }
+      ],
+      "baseline": "fishnet",
+      "axis_max": 4000,
+      "tick_step": 1000,
+      "value_format": "{:,.0f}",
+      "chart_note": "* NGO: 4/6 workloads overloaded.",
+      "figure_method": "Mean allocation rate across six active workloads, 10 s windows. Idle connections and static objects excluded.",
+      "method": "Arithmetic mean of server gcAllocBytesPerSec. Tests: MoveY, MoveWander, SyncVars, SendRPC, ClientInput, SpawnChurn. Sessions: 100 connections, 20 Hz. 10 s windows. No idle subtraction. Binary byte units (1 KiB = 1,024 bytes).",
+      "caveat": "One published run. Overloaded rows describe saturated servers and are not used for comparative claims. Allocation is estimated from frame-to-frame managed-heap growth, using a running average when collection shrinks the heap.",
+      "footer": "AMD Ryzen 5 3600, Unity 6000.5.4f1, release build, 60 fps cap",
+      "allocation_estimated": true,
+      "reduction_percent": 92.6138602212164,
+      "reduction_percent_rounded": 93,
+      "alt": "GC allocation across workloads. PurrNet’s estimated GC allocation rate was 93% lower than FishNet across the active workloads. NetworkTransform + SyncVars + RPCs + spawn/despawn, 100 connections, 20 Hz."
+    },
+    {
+      "slug": "04-connection-scaling",
+      "number": 4,
+      "chart_title": "Bandwidth per added connection",
+      "takeaway": "PurrNet’s additional downstream bandwidth per connection was 32% lower than FishNet from 10 to 100 connections.",
+      "kicker": "NetworkTransform + SyncVars + RPCs + spawn/despawn, 10 → 100 connections, 20 Hz",
+      "chart_subtitle": "Added server downstream, KiB/s per connection, lower is better",
+      "rows": [
+        {
+          "netcode": "purrnet",
+          "value": 11.324619841728351,
+          "overloaded": 0,
+          "tests": [
+            "MoveY",
+            "MoveWander",
+            "SyncVars",
+            "SendRPC",
+            "ClientInput",
+            "SpawnChurn"
+          ]
+        },
+        {
+          "netcode": "fishnet",
+          "value": 16.56730431325885,
+          "overloaded": 0,
+          "tests": [
+            "MoveY",
+            "MoveWander",
+            "SyncVars",
+            "SendRPC",
+            "ClientInput",
+            "SpawnChurn"
+          ]
+        },
+        {
+          "netcode": "mirror",
+          "value": 28.17066785500722,
+          "overloaded": 0,
+          "tests": [
+            "MoveY",
+            "MoveWander",
+            "SyncVars",
+            "SendRPC",
+            "ClientInput",
+            "SpawnChurn"
+          ]
+        },
+        {
+          "netcode": "ngo",
+          "value": 33.21382350364292,
+          "overloaded": 4,
+          "tests": [
+            "MoveY",
+            "MoveWander",
+            "SyncVars",
+            "SendRPC",
+            "ClientInput",
+            "SpawnChurn"
+          ]
+        },
+        {
+          "netcode": "fusion",
+          "value": 25.70539919480704,
+          "overloaded": 0,
+          "tests": [
+            "MoveY",
+            "MoveWander",
+            "SyncVars",
+            "SendRPC",
+            "ClientInput",
+            "SpawnChurn"
+          ]
+        }
+      ],
+      "baseline": "fishnet",
+      "axis_max": 36,
+      "tick_step": 10,
+      "value_format": "{:.1f}",
+      "chart_note": "* NGO: 4/12 workloads overloaded.",
+      "figure_method": "Mean of six active workload deltas: (downstream at 100 connections − at 10) / 90. 10 s windows.",
+      "method": "Mean of per-test (100-connection − 10-connection) server downstream / 90. Tests: MoveY, MoveWander, SyncVars, SendRPC, ClientInput, SpawnChurn. Sessions: 10 → 100 connections, 20 Hz. 10 s windows. No idle subtraction. Binary byte units (1 KiB = 1,024 bytes).",
+      "caveat": "One published run. Overloaded rows describe saturated servers and are not used for comparative claims.",
+      "footer": "AMD Ryzen 5 3600, Unity 6000.5.4f1, release build, 60 fps cap",
+      "allocation_estimated": null,
+      "reduction_percent": 31.644764726961437,
+      "reduction_percent_rounded": 32,
+      "alt": "Bandwidth per added connection. PurrNet’s additional downstream bandwidth per connection was 32% lower than FishNet from 10 to 100 connections. NetworkTransform + SyncVars + RPCs + spawn/despawn, 10 → 100 connections, 20 Hz."
+    }
+  ],
+  "skipped": {}
 }

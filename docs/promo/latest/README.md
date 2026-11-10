@@ -1,28 +1,67 @@
 # PurrNet promotional benchmark charts
 
-0 charts, with 1920 × 1080 PNG and matching SVG exports, from **2026-11-10**.
+4 charts, with 1920 × 1080 PNG and matching SVG exports, from **2026-11-10**.
 
-[PurrNet 1.26.0-beta.11 · FishNet 4.7.3 · Mirror 96.0.1 · NGO 2.13.2 · Fusion 2.1.2 Stable 2279](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/42787654442)
+[PurrNet 1.26.0-beta.13 · FishNet 4.7.3 · Mirror 96.0.1 · NGO 2.13.2 · Fusion 2.1.2 Stable 2279](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/42799932985)
 
 These are selected resource comparisons, not an overall netcode ranking. Each chart includes all five netcodes on a linear scale starting at zero. Asterisks and hatching mark overload. Relative percentages use unrounded values and round to the nearest whole percent.
 
-## Charts unavailable for this run
+## State replication bandwidth
 
-- 01-state-bandwidth: PurrNet at 100 connections / 20 Hz: no datapoint
-- 02-messaging-cpu: PurrNet at 100 connections / 20 Hz: no datapoint
-- 03-general-gc: PurrNet at 100 connections / 20 Hz: no datapoint
-- 04-connection-scaling: PurrNet at 10 connections / 20 Hz: no datapoint
+State replication bandwidth. PurrNet’s downstream bandwidth was 41% lower than FishNet across the state replication workloads. NetworkTransform + SyncVars, 100 connections, 20 Hz.
 
-Unavailable charts are omitted from this bundle; images from earlier runs are not retained here.
+![State replication bandwidth. PurrNet’s downstream bandwidth was 41% lower than FishNet across the state replication workloads. NetworkTransform + SyncVars, 100 connections, 20 Hz.](01-state-bandwidth.png)
+
+[PNG](01-state-bandwidth.png) / [SVG](01-state-bandwidth.svg)
+
+Arithmetic mean of server txBytesPerSec. Tests: MoveY, MoveWander, SyncVars. Sessions: 100 connections, 20 Hz. 10 s windows. No idle subtraction. Binary byte units (1 KiB = 1,024 bytes).
+
+One published run. Overloaded rows describe saturated servers and are not used for comparative claims.
+
+## Messaging server CPU
+
+Messaging server CPU. PurrNet’s server CPU usage was 44% lower than Mirror and 11% lower than FishNet in the messaging workloads. RPCs: server broadcasts + client inputs, 100 connections, 20 Hz.
+
+![Messaging server CPU. PurrNet’s server CPU usage was 44% lower than Mirror and 11% lower than FishNet in the messaging workloads. RPCs: server broadcasts + client inputs, 100 connections, 20 Hz.](02-messaging-cpu.png)
+
+[PNG](02-messaging-cpu.png) / [SVG](02-messaging-cpu.svg)
+
+Arithmetic mean of server cpuPercent. Tests: SendRPC, ClientInput. Sessions: 100 connections, 20 Hz. 10 s windows. No idle subtraction. Binary byte units (1 KiB = 1,024 bytes).
+
+One published run. Overloaded rows describe saturated servers and are not used for comparative claims.
+
+## GC allocation across workloads
+
+GC allocation across workloads. PurrNet’s estimated GC allocation rate was 93% lower than FishNet across the active workloads. NetworkTransform + SyncVars + RPCs + spawn/despawn, 100 connections, 20 Hz.
+
+![GC allocation across workloads. PurrNet’s estimated GC allocation rate was 93% lower than FishNet across the active workloads. NetworkTransform + SyncVars + RPCs + spawn/despawn, 100 connections, 20 Hz.](03-general-gc.png)
+
+[PNG](03-general-gc.png) / [SVG](03-general-gc.svg)
+
+Arithmetic mean of server gcAllocBytesPerSec. Tests: MoveY, MoveWander, SyncVars, SendRPC, ClientInput, SpawnChurn. Sessions: 100 connections, 20 Hz. 10 s windows. No idle subtraction. Binary byte units (1 KiB = 1,024 bytes).
+
+One published run. Overloaded rows describe saturated servers and are not used for comparative claims. Allocation is estimated from frame-to-frame managed-heap growth, using a running average when collection shrinks the heap.
+
+## Bandwidth per added connection
+
+Bandwidth per added connection. PurrNet’s additional downstream bandwidth per connection was 32% lower than FishNet from 10 to 100 connections. NetworkTransform + SyncVars + RPCs + spawn/despawn, 10 → 100 connections, 20 Hz.
+
+![Bandwidth per added connection. PurrNet’s additional downstream bandwidth per connection was 32% lower than FishNet from 10 to 100 connections. NetworkTransform + SyncVars + RPCs + spawn/despawn, 10 → 100 connections, 20 Hz.](04-connection-scaling.png)
+
+[PNG](04-connection-scaling.png) / [SVG](04-connection-scaling.svg)
+
+Mean of per-test (100-connection − 10-connection) server downstream / 90. Tests: MoveY, MoveWander, SyncVars, SendRPC, ClientInput, SpawnChurn. Sessions: 10 → 100 connections, 20 Hz. 10 s windows. No idle subtraction. Binary byte units (1 KiB = 1,024 bytes).
+
+One published run. Overloaded rows describe saturated servers and are not used for comparative claims.
 
 ## Source and calculation
 
-- [Workflow run](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/42787654442)
+- [Workflow run](https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/42799932985)
 - [Exact raw data used for these images](source-data.json)
 - [Run metadata and original summary](source-summary.md)
 - [Plotted values, claims and skipped charts](chart-data.json)
-- Raw data SHA-256: `5e150e6d5d84151de38b79f7484b243af3e1debd52d7ea8c8d2ddfc6bbd1898f`
-- Renderer checkout revision: `0a2c157735c3ea20b6f3f98f5c63601d27687c13`. This identifies the code checkout, not the data snapshot.
+- Raw data SHA-256: `36ba6316c4b4843e9437980b1618a2e24855c18e805c52ea0a5d5adcfa102ef9`
+- Renderer checkout revision: `b12ecc98d3ded8b371438fdd6dd1d58941f6cb5d`. This identifies the code checkout, not the data snapshot.
 - Lower/higher comparisons use `100 × (PurrNet / named competitor − 1)`. Zero baselines and overloaded comparators receive neutral text.
 - Bandwidth and CPU categories use arithmetic means. General GC uses the six active workloads. Scaling averages their per-test `(100 connections − 10 connections) / 90` bandwidth deltas.
 - Idle and Static are excluded. Missing or incomplete workloads are not treated as zero.
