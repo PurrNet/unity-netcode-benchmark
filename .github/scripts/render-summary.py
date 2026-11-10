@@ -57,6 +57,13 @@ def category_failure(r, tests):
     meta = r.get("meta") or {}
     if (meta.get("process") or {}).get("status") == "host-oom":
         return "host memory exhausted"
+    # A server that lost clients before or during a test measured a lighter workload: the
+    # category failed, and the message says how many clients were left.
+    started = meta.get("connectedAtStart")
+    left = [w["connections"] for w in (r.get("server", {}).get(t) for t in tests)
+            if w and isinstance(started, (int, float)) and isinstance(w.get("connections"), (int, float)) and w["connections"] < started]
+    if left:
+        return f"lost clients ({min(left)}/{started} left)"
     def complete(t):
         w = r.get("server", {}).get(t)
         return bool(w and not w.get("truncated") and not (
@@ -348,7 +355,7 @@ def main():
             columns.append((title, cells))
         def status(n):
             if rows[n]["error"]:
-                return "Did not complete"
+                return "Lost clients" if rows[n]["error"].startswith("lost clients") else "Did not complete"
             if rows[n]["overloaded"]:
                 return f"Overloaded ({rows[n]['overloaded']}/{len(tests)})"
             return "Completed"

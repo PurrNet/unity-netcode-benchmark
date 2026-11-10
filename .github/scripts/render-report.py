@@ -382,6 +382,11 @@ function overloadedTests(n, sc, tests) { return tests.filter(t => overloaded(n, 
 function categoryFailure(n, sc, tests) {
   const r = run(n, sc); if (!r) return "no datapoint";
   if (r.meta.process?.status === "host-oom") return "host memory exhausted";
+  // A server that lost clients before or during a test measured a lighter workload: the
+  // category failed, and the message says how many clients were left.
+  const started = r.meta.connectedAtStart;
+  const left = tests.map(t => r.server[t]).filter(w => w && typeof started === "number" && typeof w.connections === "number" && w.connections < started).map(w => w.connections);
+  if (left.length) return `lost clients (${Math.min(...left)}/${started} left)`;
   const complete = tests.filter(t => {
     const w = r.server[t];
     return w && !w.truncated && !(["SendRPC", "SyncVars"].includes(t) &&
@@ -453,7 +458,7 @@ function buildScorecard() {
   ].filter(([, key]) => rows.some(r => r[key] != null));
   document.getElementById("scorecard").innerHTML =
     "<thead><tr><th>Netcode</th>" + COLS.map(([label]) => `<th>${label}</th>`).join("") + "</tr></thead><tbody>" +
-    rows.map((r, i) => `<tr class="${r.err ? "failed" : r.over ? "overloaded" : ""}"${r.err ? ` title="${r.err}"` : r.over ? ` title="server overloaded in ${r.over} of ${tests.length} tests"` : ""}><td class="name">${chip(r.n)}${r.conns != null && r.conns !== sc.size ? `<span class="sub">${r.conns} clients</span>` : ""}</td>` +
+    rows.map((r, i) => `<tr class="${r.err ? "failed" : r.over ? "overloaded" : ""}"${r.err ? ` title="${r.err}"` : r.over ? ` title="server overloaded in ${r.over} of ${tests.length} tests"` : ""}><td class="name">${chip(r.n)}${r.err && r.err.startsWith("lost clients") ? `<span class="sub">${r.err}</span>` : r.conns != null && r.conns !== sc.size ? `<span class="sub">${r.conns} clients</span>` : ""}</td>` +
       COLS.map(([, key, f]) => cell(r, i, key, f)).join("") + "</tr>").join("") + "</tbody>";
   const overloadNote = document.getElementById("score-overload");
   overloadNote.textContent = OVERLOAD_NOTE;
@@ -589,7 +594,7 @@ function refresh() {
     const data = netcodes.map(n => value(n, state.scenario, t));
     if (data.every(v => v == null)) empty++;
     ch.options = baseOptions(t);
-    ch.data.labels = netcodes.map(n => NAMES[n] + (categoryFailure(n, state.scenario, [t]) ? " (Did not complete)" : overloaded(n, state.scenario, t) ? " (Overloaded)" : ""));
+    ch.data.labels = netcodes.map(n => NAMES[n] + ((categoryFailure(n, state.scenario, [t]) || "").startsWith("lost clients") ? " (Lost clients)" : categoryFailure(n, state.scenario, [t]) ? " (Did not complete)" : overloaded(n, state.scenario, t) ? " (Overloaded)" : ""));
     ch.data.datasets = [{ data, backgroundColor: colors, borderColor: colors, borderWidth: 0, borderRadius: 3, barPercentage: 0.7, categoryPercentage: 0.8 }];
     ch.update("none");
   });
