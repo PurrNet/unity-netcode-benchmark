@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "date": "2026-11-09",
-    "run_url": "https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/42700271048",
-    "run_id": "42700271048",
+    "date": "2026-11-10",
+    "run_url": "https://github.com/PurrNet/unity-netcode-benchmark/actions/runs/42777998889",
+    "run_id": "42777998889",
     "versions": "PurrNet 1.26.0-beta.10 · FishNet 4.7.3 · Mirror 96.0.1 · NGO 2.13.2 · Fusion 2.1.2 Stable 2279",
     "netcode_versions": {
       "purrnet": "1.26.0-beta.10",
@@ -12,8 +12,8 @@
       "fusion": "2.1.2 Stable 2279"
     },
     "unity_version": "6000.5.4f1",
-    "source_revision": "bc5339117bab1189e6fd64c3ad6d960bb1d04a9e",
-    "source_sha256": "722df2a47db262dac89c5c7fb012a243966b0f9e1801457b9e5b146266d43671",
+    "source_revision": "782625677cdab8cb51da0832c61b540d9feb5550",
+    "source_sha256": "bf7fb167c8ec152ce08814316de6821ba2b3db49c1034bc4cdd429e9bc46ebe5",
     "source_data": "source-data.json",
     "source_summary": "source-summary.md",
     "size": [
@@ -27,13 +27,13 @@
       "slug": "01-state-bandwidth",
       "number": 1,
       "chart_title": "State replication bandwidth",
-      "takeaway": "PurrNet’s downstream bandwidth was 40% lower than FishNet across the state replication workloads.",
+      "takeaway": "PurrNet’s downstream bandwidth was 41% lower than FishNet across the state replication workloads.",
       "kicker": "NetworkTransform + SyncVars, 100 connections, 20 Hz",
       "chart_subtitle": "Server downstream, MiB/s, lower is better",
       "rows": [
         {
           "netcode": "purrnet",
-          "value": 1.5103663857778695,
+          "value": 1.4834594015172522,
           "overloaded": 0,
           "tests": [
             "MoveY",
@@ -43,7 +43,7 @@
         },
         {
           "netcode": "fishnet",
-          "value": 2.529684209778952,
+          "value": 2.5256626684055306,
           "overloaded": 0,
           "tests": [
             "MoveY",
@@ -53,7 +53,7 @@
         },
         {
           "netcode": "mirror",
-          "value": 4.11842599687759,
+          "value": 4.124619140077692,
           "overloaded": 0,
           "tests": [
             "MoveY",
@@ -63,7 +63,7 @@
         },
         {
           "netcode": "ngo",
-          "value": 4.8741892360311,
+          "value": 4.833947969437852,
           "overloaded": 3,
           "tests": [
             "MoveY",
@@ -73,7 +73,7 @@
         },
         {
           "netcode": "fusion",
-          "value": 3.5063067655888904,
+          "value": 3.4997623884270133,
           "overloaded": 0,
           "tests": [
             "MoveY",
@@ -92,21 +92,21 @@
       "caveat": "One published run. Overloaded rows describe saturated servers and are not used for comparative claims.",
       "footer": "AMD Ryzen 5 3600, Unity 6000.5.4f1, release build, 60 fps cap",
       "allocation_estimated": null,
-      "reduction_percent": 40.29427151660768,
-      "reduction_percent_rounded": 40,
-      "alt": "State replication bandwidth. PurrNet’s downstream bandwidth was 40% lower than FishNet across the state replication workloads. NetworkTransform + SyncVars, 100 connections, 20 Hz."
+      "reduction_percent": 41.264547317644315,
+      "reduction_percent_rounded": 41,
+      "alt": "State replication bandwidth. PurrNet’s downstream bandwidth was 41% lower than FishNet across the state replication workloads. NetworkTransform + SyncVars, 100 connections, 20 Hz."
     },
     {
       "slug": "02-messaging-cpu",
       "number": 2,
       "chart_title": "Messaging server CPU",
-      "takeaway": "PurrNet’s server CPU usage was 39% lower than Mirror and approximately the same as FishNet in the messaging workloads.",
+      "takeaway": "PurrNet’s server CPU usage was 44% lower than Mirror and 10% lower than FishNet in the messaging workloads.",
       "kicker": "RPCs: server broadcasts + client inputs, 100 connections, 20 Hz",
       "chart_subtitle": "Whole-process CPU, % of one core, lower is better",
       "rows": [
         {
           "netcode": "purrnet",
-          "value": 7.2306167201372915,
+          "value": 6.579586912732333,
           "overloaded": 0,
           "tests": [
             "SendRPC",
@@ -115,7 +115,7 @@
         },
         {
           "netcode": "fishnet",
-          "value": 7.239848486152756,
+          "value": 7.289032820183717,
           "overloaded": 0,
           "tests": [
             "SendRPC",
@@ -124,7 +124,7 @@
         },
         {
           "netcode": "mirror",
-          "value": 11.873592203345105,
+          "value": 11.772468904532923,
           "overloaded": 0,
           "tests": [
             "SendRPC",
@@ -133,7 +133,7 @@
         },
         {
           "netcode": "ngo",
-          "value": 38.29482209992829,
+          "value": 38.575067471494144,
           "overloaded": 1,
           "tests": [
             "SendRPC",
@@ -142,7 +142,7 @@
         },
         {
           "netcode": "fusion",
-          "value": 12.956082836283457,
+          "value": 13.535359246841775,
           "overloaded": 0,
           "tests": [
             "SendRPC",
@@ -160,21 +160,21 @@
       "caveat": "One published run. Overloaded rows describe saturated servers and are not used for comparative claims.",
       "footer": "AMD Ryzen 5 3600, Unity 6000.5.4f1, release build, 60 fps cap",
       "allocation_estimated": null,
-      "reduction_percent": 39.10337666725462,
-      "reduction_percent_rounded": 39,
-      "alt": "Messaging server CPU. PurrNet’s server CPU usage was 39% lower than Mirror and approximately the same as FishNet in the messaging workloads. RPCs: server broadcasts + client inputs, 100 connections, 20 Hz."
+      "reduction_percent": 44.11039038549595,
+      "reduction_percent_rounded": 44,
+      "alt": "Messaging server CPU. PurrNet’s server CPU usage was 44% lower than Mirror and 10% lower than FishNet in the messaging workloads. RPCs: server broadcasts + client inputs, 100 connections, 20 Hz."
     },
     {
       "slug": "03-general-gc",
       "number": 3,
       "chart_title": "GC allocation across workloads",
-      "takeaway": "PurrNet’s estimated GC allocation rate was 30% higher than FishNet across the active workloads.",
+      "takeaway": "PurrNet’s estimated GC allocation rate was 59% lower than FishNet across the active workloads.",
       "kicker": "NetworkTransform + SyncVars + RPCs + spawn/despawn, 100 connections, 20 Hz",
       "chart_subtitle": "Estimated server gc allocation, kib/s, lower is better",
       "rows": [
         {
           "netcode": "purrnet",
-          "value": 1094.473387371204,
+          "value": 365.96889860561964,
           "overloaded": 0,
           "tests": [
             "MoveY",
@@ -187,7 +187,7 @@
         },
         {
           "netcode": "fishnet",
-          "value": 840.4436789238649,
+          "value": 895.2040949530539,
           "overloaded": 0,
           "tests": [
             "MoveY",
@@ -200,7 +200,7 @@
         },
         {
           "netcode": "mirror",
-          "value": 3575.5993371509626,
+          "value": 3458.105756070677,
           "overloaded": 0,
           "tests": [
             "MoveY",
@@ -213,7 +213,7 @@
         },
         {
           "netcode": "ngo",
-          "value": 193.50494637624763,
+          "value": 192.90892728277808,
           "overloaded": 4,
           "tests": [
             "MoveY",
@@ -226,7 +226,7 @@
         },
         {
           "netcode": "fusion",
-          "value": 903.4417214235687,
+          "value": 954.1326653935216,
           "overloaded": 0,
           "tests": [
             "MoveY",
@@ -248,9 +248,9 @@
       "caveat": "One published run. Overloaded rows describe saturated servers and are not used for comparative claims. Allocation is estimated from frame-to-frame managed-heap growth, using a running average when collection shrinks the heap.",
       "footer": "AMD Ryzen 5 3600, Unity 6000.5.4f1, release build, 60 fps cap",
       "allocation_estimated": true,
-      "reduction_percent": -30.225667087247054,
-      "reduction_percent_rounded": -30,
-      "alt": "GC allocation across workloads. PurrNet’s estimated GC allocation rate was 30% higher than FishNet across the active workloads. NetworkTransform + SyncVars + RPCs + spawn/despawn, 100 connections, 20 Hz."
+      "reduction_percent": 59.11894274513884,
+      "reduction_percent_rounded": 59,
+      "alt": "GC allocation across workloads. PurrNet’s estimated GC allocation rate was 59% lower than FishNet across the active workloads. NetworkTransform + SyncVars + RPCs + spawn/despawn, 100 connections, 20 Hz."
     },
     {
       "slug": "04-connection-scaling",
@@ -262,7 +262,7 @@
       "rows": [
         {
           "netcode": "purrnet",
-          "value": 11.36439068309999,
+          "value": 11.223770507530297,
           "overloaded": 0,
           "tests": [
             "MoveY",
@@ -275,7 +275,7 @@
         },
         {
           "netcode": "fishnet",
-          "value": 16.592045847472587,
+          "value": 16.581473510860736,
           "overloaded": 0,
           "tests": [
             "MoveY",
@@ -288,7 +288,7 @@
         },
         {
           "netcode": "mirror",
-          "value": 27.966914223699032,
+          "value": 28.052709534276403,
           "overloaded": 0,
           "tests": [
             "MoveY",
@@ -301,7 +301,7 @@
         },
         {
           "netcode": "ngo",
-          "value": 33.591599151040434,
+          "value": 32.802831640011654,
           "overloaded": 4,
           "tests": [
             "MoveY",
@@ -314,7 +314,7 @@
         },
         {
           "netcode": "fusion",
-          "value": 25.708481561588826,
+          "value": 25.715040883296226,
           "overloaded": 0,
           "tests": [
             "MoveY",
@@ -336,7 +336,7 @@
       "caveat": "One published run. Overloaded rows describe saturated servers and are not used for comparative claims.",
       "footer": "AMD Ryzen 5 3600, Unity 6000.5.4f1, release build, 60 fps cap",
       "allocation_estimated": null,
-      "reduction_percent": 31.506995655806424,
+      "reduction_percent": 32.3113805285229,
       "reduction_percent_rounded": 32,
       "alt": "Bandwidth per added connection. PurrNet’s additional downstream bandwidth per connection was 32% lower than FishNet from 10 to 100 connections. NetworkTransform + SyncVars + RPCs + spawn/despawn, 10 → 100 connections, 20 Hz."
     }
