@@ -12,7 +12,7 @@ on:
         required: true
         default: "purrnet,fishnet,mirror,ngo,fusion"
       sessions:
-        description: "Sequential connections@tickHz sessions; empty uses size and tick_rate"
+        description: "Sequential connections@tickHz sessions, optionally xObjects (100@30x2000); empty uses size and tick_rate"
         default: ""
       size:
         description: "Connections when sessions is empty"
@@ -309,13 +309,14 @@ jobs:
             NETCODE=$(jq -r .netcode <<< "$entry")
             TAG=$(jq -r .tag <<< "$entry")
             TOTAL=$(jq -r .total <<< "$entry")
+            OBJECTS=$(jq -r --arg default "$BENCH_OBJECTS" '.objects // $default' <<< "$entry")
             DIR="all/results/$TAG/$NETCODE"
             if [ ! -s "$DIR/server.json" ] && [ ! -s "$DIR/process-server.json" ]; then
               echo "::warning::Missing server result for $TAG/$NETCODE"
               continue
             fi
             bash .github/scripts/bench-aggregate.sh "$DIR" "$NETCODE" "$TOTAL" "$TAG" \
-              "$BENCH_SECONDS" "$BENCH_OBJECTS" scaling
+              "$BENCH_SECONDS" "$OBJECTS" scaling
           done
       - name: Upload scaling datapoints
         if: always()

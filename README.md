@@ -68,8 +68,11 @@ Client-side prediction has its own **Prediction Benchmark** workflow and
 adapters. Its workloads, validation, artifacts and reports are separate from this replication suite.
 
 Dispatch **Netcode Scaling Benchmark** (`.github/workflows/scaling.yml`). Defaults run all five
-netcodes in three sessions, `10@20,100@20,100@60` (connections@tickHz), with 10-second windows
-(Idle and Static use 5, since they only check the floor).
+netcodes in four sessions, `10@20,100@20,100@60,100@30x2000` (connections@tickHz), with 10-second
+windows (Idle and Static use 5, since they only check the floor). A session's `xN` suffix overrides
+`bench_objects` for that session: `100@30x2000` is the stress session, 2000 objects per test where
+the others use 100. It needs a connections@tickHz pair of its own, is labelled with its object count
+in the reports, and stays out of the scaling ("what one more costs") tables.
 The entire suite uses one prepared server/client fleet, sized for the largest session. Sessions
 and netcodes run one after another; every case starts fresh player processes on those same machines.
 Smaller sessions leave the extra loadgen runners idle. `max_parallel` must remain `1`.

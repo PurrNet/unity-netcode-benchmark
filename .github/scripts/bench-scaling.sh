@@ -29,11 +29,12 @@ jq -r '
   (["purrnet", "fishnet", "mirror", "ngo", "fusion"]) as $order
   | (map(.netcode) | unique) as $present
   | [ $order[] | select(. as $n | $present | index($n)) ] as $netcodes
-  | (map({size: .size, tick: .tick}) | unique | sort_by(.size, .tick)) as $sessions
+  | (group_by([.size, .tick]) | map({size: .[0].size, tick: .[0].tick, objects: ([.[].meta.benchObjects | values] | first)})
+     | sort_by(.size, .tick)) as $sessions
   | (reduce .[] as $d ({}; .[$d.netcode + "@" + ($d.size|tostring) + "@" + ($d.tick|tostring)] = $d)) as $dp
   | "### Datapoints\n\n| Session | " + ($netcodes | join(" | ")) + " |\n|---|" + ($netcodes | map("---") | join("|")) + "|\n"
     + ( [ $sessions[] as $s
-          | "| \($s.size) connections @ \($s.tick) Hz | "
+          | "| \($s.size) connections @ \($s.tick) Hz\(if $s.objects then ", \($s.objects) objects" else "" end) | "
             + ( [ $netcodes[] as $n | $dp[$n + "@" + ($s.size|tostring) + "@" + ($s.tick|tostring)] as $d
                   | if $d == null then "missing"
                     else "\($d.meta.connectedAtStart)/\($d.meta.expectedClients)"

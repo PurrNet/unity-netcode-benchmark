@@ -49,7 +49,7 @@ def make_plan(env):
     sessions = []
     entries = env.get('SESSIONS', '').strip()
     for entry in (entries or f"{env.get('SIZE', '10')}@{env.get('TICK_RATE', '20')}").split(','):
-        match = re.fullmatch(r'(\d+)(?:@(\d+))?', entry.strip())
+        match = re.fullmatch(r'(\d+)(?:@(\d+))?(?:x(\d+))?', entry.strip())
         if not match:
             raise ValueError(f'Invalid session: {entry!r}')
         size = positive(match[1], 'connections')
@@ -57,9 +57,14 @@ def make_plan(env):
         tag = f'c{size}t{tick}' if entries else env.get('TAG', 'solo')
         if not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,30}', tag):
             raise ValueError(f'Invalid session tag: {tag!r}')
+        # Reports key a session by connections and tick rate, so an object-count override
+        # needs a tick rate of its own.
         if any(s['tag'] == tag for s in sessions):
             raise ValueError(f'Duplicate session: {tag}')
-        sessions.append(dict(size=size, tick=tick, tag=tag))
+        session = dict(size=size, tick=tick, tag=tag)
+        if match[3]:
+            session['objects'] = positive(match[3], 'objects')
+        sessions.append(session)
     cases = []
     worker_map = {}
     for session in sessions:
@@ -227,7 +232,7 @@ def player_command(case, role, index, process, root, env):
         cmd += ['taskset', '-c', env['BENCH_CPUS']]
     cmd += [str(root / 'players' / f'player-{netcode}' / 'NetBench'), '-batchmode', '-nographics',
             '-role', 'server' if role == 'server' else 'client',
-            '-benchSeconds', env.get('BENCH_SECONDS', '10'), '-benchObjects', env.get('BENCH_OBJECTS', '100'),
+            '-benchSeconds', env.get('BENCH_SECONDS', '10'), '-benchObjects', str(case.get('objects') or env.get('BENCH_OBJECTS', '100')),
             '-tickRate', str(case['tick']), '-connectTimeout', '180', '-maxRunSeconds', '780',
             '-results', str(result), '-logFile', str(log)]
     if role == 'server':

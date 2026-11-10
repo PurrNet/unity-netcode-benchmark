@@ -266,7 +266,16 @@ def main():
     ref = min((s for s in scenarios if s[0] == sizes[-1]), key=lambda s: s[1])
     any_run = next(iter(runs))
     any_test = next((t for t in any_run.get("server", {}).values() if isinstance(t, dict) and t.get("test", 0) > 0), None)
-    objects = any_test["objects"] if any_test else "?"
+    # A session may override the object count (a stress session). It is labelled with its count
+    # and left out of the scaling axes, which compare sessions of the same workload.
+    session_objects = {sc: next((by[(n, sc)]["meta"].get("benchObjects") for n in netcodes
+                                 if (n, sc) in by and (by[(n, sc)].get("meta") or {}).get("benchObjects") is not None), None)
+                       for sc in scenarios}
+    objects = session_objects[ref] if session_objects[ref] is not None else any_test["objects"] if any_test else "?"
+    standard = [sc for sc in scenarios if session_objects[sc] in (None, session_objects[ref]) or session_objects[ref] is None]
+
+    def session_label(sc):
+        return f"{sc[0]}c @ {sc[1]} Hz" + ("" if sc in standard else f" × {session_objects[sc]} objects")
     window = round(any_test["windowSeconds"]) if any_test else "?"
     date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     colors = SERIES["light"]
@@ -274,7 +283,7 @@ def main():
     lines = []
     ver = " · ".join(f"{NAMES[n]} {versions.get(n, '?')}" for n in netcodes)
     lines.append(f"_Last run {date}: {ver} · Unity {versions.get('unity', '?')} · {objects} objects per test · {window} s windows · "
-                 f"sessions {' / '.join(f'{s}c @ {t} Hz' for s, t in scenarios)}._")
+                 f"sessions {' / '.join(session_label(sc) for sc in scenarios)}._")
     lines.append("")
     notes = []
     for n in netcodes:
@@ -289,7 +298,7 @@ def main():
         for n in netcodes:
             error = (by.get((n, sc), {}).get("meta") or {}).get("serverError")
             if error:
-                notes.append(f"{NAMES[n]} at {sc[0]}c @ {sc[1]} Hz: {error}")
+                notes.append(f"{NAMES[n]} at {session_label(sc)}: {error}")
         models = {NAMES[n]: by[(n, sc)]["meta"].get("cpuModel") for n in netcodes if (n, sc) in by and by[(n, sc)]["meta"].get("cpuModel")}
         if len(set(models.values())) > 1:
             notes.append(f"at {sc[0]}c @ {sc[1]} Hz the servers ran on different CPU models (" + "; ".join(f"{n}: {m}" for n, m in models.items()) + "), so CPU is not comparable there")
@@ -349,7 +358,7 @@ def main():
                        ["Status"] + [title for title, _ in columns], table_rows))
 
     # Scaling still requires the complete, identical six-test suite in both sessions.
-    axes = scaling_axes(scenarios)
+    axes = scaling_axes(standard)
     if axes:
         cols2 = [f"{g}\n{label}" for _, _, label, _, _ in axes for g in ("Bandwidth", "Server CPU")]
         cells2 = []

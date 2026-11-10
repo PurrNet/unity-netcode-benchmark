@@ -17,15 +17,15 @@ on:
         required: true
         default: "purrnet,fishnet,mirror,ngo,fusion"
       sessions:
-        description: "Comma-separated sessions as connections@tickHz (a bare number means 20 Hz)"
+        description: "Comma-separated sessions as connections@tickHz (a bare number means 20 Hz); xN overrides bench_objects for that session"
         required: true
-        default: "10@20,100@20,100@60"
+        default: "10@20,100@20,100@60,100@30x2000"
       bench_seconds:
         description: "Steady-state measurement window per test, seconds (Idle and Static always use 5)"
         required: true
         default: "10"
       bench_objects:
-        description: "Objects spawned per test"
+        description: "Objects spawned per test (sessions with an xN suffix use N)"
         required: true
         default: "100"
       profiling:

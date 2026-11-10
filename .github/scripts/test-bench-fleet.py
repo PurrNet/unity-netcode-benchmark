@@ -68,8 +68,20 @@ class Plans(unittest.TestCase):
         self.assertEqual(plan['sessions'], [dict(size=2, tick=60, tag='local')])
         self.assertEqual(plan['expected'], 1)
 
+    def test_session_object_override_reaches_only_its_own_players(self):
+        env = environment(BENCH_OBJECTS='100', SERVER_IP='100.1.2.3')
+        env.update(NETCODES='mirror', SESSIONS='100@20,100@30x2000')
+        plan = fleet.make_plan(env)
+        self.assertEqual(plan['sessions'], [dict(size=100, tick=20, tag='c100t20'),
+                                            dict(size=100, tick=30, tag='c100t30', objects=2000)])
+        for case, objects in zip(plan['cases'], ('100', '2000')):
+            for role in ('server', 'client', 'loadgen'):
+                cmd, _, _ = fleet.player_command(case, role, 1, 1, Path.cwd(), env)
+                self.assertEqual(cmd[cmd.index('-benchObjects') + 1], objects)
+
     def test_invalid_inputs_fail_before_building(self):
         for key, value in [('SESSIONS', '0@20'), ('SESSIONS', '10@'), ('SESSIONS', '10@20,10'),
+                           ('SESSIONS', '100@20,100@20x2000'), ('SESSIONS', '100@30x0'), ('SESSIONS', '100@30x'),
                            ('SESSIONS', '1@20;echo hi'), ('NETCODES', 'mirror,mirror'),
                            ('NETCODES', 'unknown'), ('LOADGEN_PROCS', '0'), ('MAX_PARALLEL', '2'),
                            ('BENCH_SECONDS', 'nan'), ('BENCH_SECONDS', '-1')]:

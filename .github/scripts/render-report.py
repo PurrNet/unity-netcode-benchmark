@@ -291,9 +291,14 @@ const ticks = [...new Set(scenarios.map(s => s.tick))].sort((a, b) => a - b);
 const byKey = {};
 runs.forEach(r => { byKey[r.netcode + "@" + r.size + "@" + r.tick] = r; });
 const run = (n, sc) => byKey[n + "@" + sc.key];
-const scLabel = sc => sc.size + " connections · " + sc.tick + " Hz";
 // Reference session: the largest connection count at the lowest tick rate that has it.
 const reference = scenarios.filter(s => s.size === sizes[sizes.length - 1]).sort((a, b) => a.tick - b.tick)[0];
+// A session may override the object count (a stress session). It is labelled with its count and
+// left out of the scaling axes, which compare sessions of the same workload.
+scenarios.forEach(sc => { sc.objects = netcodes.map(n => run(n, sc)).map(r => r && r.meta && r.meta.benchObjects).find(v => v != null); });
+const sameWorkload = sc => sc.objects == null || reference.objects == null || sc.objects === reference.objects;
+const scShort = sc => sc.size + "c @ " + sc.tick + " Hz" + (sameWorkload(sc) ? "" : " × " + sc.objects + " objects");
+const scLabel = sc => sc.size + " connections · " + sc.tick + " Hz" + (sameWorkload(sc) ? "" : " · " + sc.objects + " objects");
 // Only offer metrics the dataset actually has (older runs lack allocation; some lack client bandwidth).
 const hasAny = m => runs.some(r => TESTS.some(t => { const v = m.get(r, t); return v != null && !Number.isNaN(v); }));
 const AVAILABLE = METRICS.filter(hasAny);
@@ -346,8 +351,8 @@ function buildHeader() {
   const first = runs[0];
   const anyTest = first && Object.values(first.server).find(t => t && t.test > 0);
   const chips = [
-    ["Sessions", scenarios.map(s => s.size + "c @ " + s.tick + " Hz").join(" · ")],
-    ["Objects per test", anyTest ? anyTest.objects : "?"],
+    ["Sessions", scenarios.map(scShort).join(" · ")],
+    ["Objects per test", reference.objects != null ? reference.objects : anyTest ? anyTest.objects : "?"],
     ["Window", anyTest ? Math.round(anyTest.windowSeconds) + " s" : "?"],
     ["Frame cap", "60 fps"],
     ["Build", first && first.meta.devBuild ? "Development" : "Release"]
@@ -475,10 +480,10 @@ function fmtCost(v, unit) { return v == null ? "–" : (Math.abs(v) >= 100 ? v.t
 function buildScaling() {
   const axes = [];
   const baseTick = ticks[0];
-  const bySize = scenarios.filter(s => s.tick === baseTick);
+  const bySize = scenarios.filter(s => s.tick === baseTick && sameWorkload(s));
   if (bySize.length > 1) axes.push({ from: bySize[0], to: bySize[bySize.length - 1], label: "per connection", units: bySize[bySize.length - 1].size - bySize[0].size, note: bySize[0].size + " → " + bySize[bySize.length - 1].size + " connections at " + baseTick + " Hz" });
   const bigSize = sizes[sizes.length - 1];
-  const byTick = scenarios.filter(s => s.size === bigSize);
+  const byTick = scenarios.filter(s => s.size === bigSize && sameWorkload(s));
   if (byTick.length > 1) axes.push({ from: byTick[0], to: byTick[byTick.length - 1], label: "per Hz", units: byTick[byTick.length - 1].tick - byTick[0].tick, note: byTick[0].tick + " → " + byTick[byTick.length - 1].tick + " Hz at " + bigSize + " connections" });
   const section = document.getElementById("scaling-section");
   if (!axes.length) { section.hidden = true; return; }
