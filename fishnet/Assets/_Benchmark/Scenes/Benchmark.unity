@@ -812,6 +812,7 @@ Canvas:
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
   m_VertexColorAlwaysGammaSpace: 0
+  m_UseReflectionProbes: 0
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
@@ -936,6 +937,7 @@ MonoBehaviour:
     SpawnCount: 500
     Prefab: {fileID: 2073510664934458889, guid: 34bfecf67394f7340b1c878afedbb1ac, type: 3}
   _networkManagerPrefab: {fileID: 8240105726314001541, guid: 570d7a8a6ad8ed449ba8bedc23a3fc79, type: 3}
+  _visibilityPrefab: {fileID: 9213075768744943267, guid: a5d5a34089310a34c86ba969ac4766fa, type: 3}
 --- !u!222 &2082965115829548890
 CanvasRenderer:
   m_ObjectHideFlags: 0

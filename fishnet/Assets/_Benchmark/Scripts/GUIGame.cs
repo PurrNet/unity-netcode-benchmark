@@ -1,8 +1,6 @@
 using System.Collections.Generic;
-using System.Reflection;
 using FishNet.Managing;
 using FishNet.Object;
-using FishNet.Observing;
 using FishNet.Transporting;
 using FishNet.Transporting.Tugboat;
 using PurrNet.NetBench;
@@ -17,7 +15,8 @@ namespace StinkySteak.FishnetBenchmark
         private NetworkManager _networkManager;
 
         private readonly List<GameObject> _spawned = new List<GameObject>();
-        private BenchVisibilityCondition _visibilityCondition;
+        // SphereMoveWander with a NetworkObserver carrying BenchVisibilityCondition.
+        [SerializeField] private GameObject _visibilityPrefab;
 
         protected override void Initialize()
         {
@@ -97,15 +96,13 @@ namespace StinkySteak.FishnetBenchmark
 
         public int SpawnTest(int test, int count)
         {
-            var prefab = GetTestPrefab(test);
+            var prefab = BenchRegistry.VisibleOneIn > 1 ? _visibilityPrefab : GetTestPrefab(test);
             if (prefab == null) return 0;
 
             for (int i = 0; i < count; i++)
             {
                 GameObject go = Instantiate(prefab);
                 go.transform.position = Random.insideUnitSphere * 10;
-                if (BenchRegistry.VisibleOneIn > 1)
-                    RestrictVisibility(go);
                 _networkManager.ServerManager.Spawn(go);
                 _spawned.Add(go);
             }
@@ -123,20 +120,7 @@ namespace StinkySteak.FishnetBenchmark
             _networkManager.ServerManager.Objects.RebuildObservers(nob);
         }
 
-        // A NetworkObserver's conditions are an inspector list with no public setter; this fills it
-        // the way the inspector would, before the object spawns.
-        private static readonly FieldInfo s_observerConditions =
-            typeof(NetworkObserver).GetField("_observerConditions", BindingFlags.Instance | BindingFlags.NonPublic);
 
-        private void RestrictVisibility(GameObject go)
-        {
-            if (_visibilityCondition == null)
-                _visibilityCondition = ScriptableObject.CreateInstance<BenchVisibilityCondition>();
-
-            if (!go.TryGetComponent(out NetworkObserver observer))
-                observer = go.AddComponent<NetworkObserver>();
-            ((List<ObserverCondition>)s_observerConditions.GetValue(observer)).Add(_visibilityCondition);
-        }
 
         public void DespawnOldest(int count)
         {
