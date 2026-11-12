@@ -28,6 +28,10 @@ on:
         description: "Objects spawned per test (sessions with an xN suffix use N)"
         required: true
         default: "100"
+      tests:
+        description: "Comma-separated tests to run (empty = all): MoveY, MoveWander, SendRPC, Static, SpawnChurn, ClientInput, SyncVars, Visibility, VisibilityChurn, MoveAllAxis. A narrowed run is not published as the latest results"
+        required: false
+        default: ""
       profiling:
         description: "Development builds (adds a CPU-by-marker table; release builds give cleaner absolute CPU numbers)"
         type: boolean
@@ -104,6 +108,7 @@ jobs:
           FUSION_MAX_CLIENTS: ${{ inputs.fusion_max_clients }}
           BENCH_SECONDS: ${{ inputs.bench_seconds }}
           BENCH_OBJECTS: ${{ inputs.bench_objects }}
+          BENCH_TESTS: ${{ inputs.tests }}
           MAX_PARALLEL: ${{ inputs.max_parallel }}
           RUNNER: ${{ inputs.runner }}
           LOADGEN_RUNNER: ${{ inputs.loadgen_runner }}
@@ -139,6 +144,7 @@ jobs:
       fusion_max_clients: ${{ inputs.fusion_max_clients }}
       bench_seconds: ${{ inputs.bench_seconds }}
       bench_objects: ${{ inputs.bench_objects }}
+      tests: ${{ inputs.tests }}
       build_players: false
       profiling: ${{ inputs.profiling }}
       runner: ${{ inputs.runner }}
@@ -181,6 +187,7 @@ jobs:
         id: report
         env:
           BENCH_RESULT: ${{ needs.bench.result }}
+          BENCH_TESTS: ${{ inputs.tests }}
         run: |
           set -eu
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
@@ -188,7 +195,8 @@ jobs:
           COUNT=$(jq 'length' results-out/scaling.json 2>/dev/null || echo 0)
           EXPECTED=${{ needs.prep.outputs.expected || '0' }}
           COMPLETE=false
-          [ "$COUNT" -eq "$EXPECTED" ] && [ "$COUNT" -gt 0 ] && [ "$BENCH_RESULT" = "success" ] && COMPLETE=true
+          # A run narrowed to some tests is never complete: it must not replace the published report.
+          [ "$COUNT" -eq "$EXPECTED" ] && [ "$COUNT" -gt 0 ] && [ "$BENCH_RESULT" = "success" ] && [ -z "$BENCH_TESTS" ] && COMPLETE=true
           echo "Datapoints: $COUNT of $EXPECTED planned (complete=$COMPLETE)"
           echo "count=$COUNT" >> "$GITHUB_OUTPUT"
           echo "complete=$COMPLETE" >> "$GITHUB_OUTPUT"

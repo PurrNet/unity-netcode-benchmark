@@ -178,6 +178,12 @@ namespace StinkySteak.FusionBenchmark
 
         public double ClientRttMs => _runner != null && _runner.IsRunning ? _runner.GetPlayerRtt(_runner.LocalPlayer) * 1000.0 : 0;
 
+        // Per-player interest needs the project's ReplicationFeatures switched to scheduling and interest
+        // management, which changes how every other test replicates, so Fusion sits Visibility out.
+        public bool SupportsVisibility => false;
+
+        public void RerollVisibility(int index) { }
+
         public int SpawnTest(int test, int count)
         {
             var prefab = GetTestPrefab(test);

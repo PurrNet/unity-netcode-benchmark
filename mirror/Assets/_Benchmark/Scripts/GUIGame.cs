@@ -15,6 +15,7 @@ namespace StinkySteak.MirrorBenchmark
         private NetworkManager _networkManager;
 
         private readonly List<GameObject> _spawned = new List<GameObject>();
+        private BenchInterestManagement _interest;
 
         protected override void Initialize()
         {
@@ -111,6 +112,15 @@ namespace StinkySteak.MirrorBenchmark
             var prefab = GetTestPrefab(test);
             if (prefab == null) return 0;
 
+            // Mirror's interest management is server wide, so it is only installed while the
+            // Visibility objects are alive and every other test keeps the default observers.
+            if (BenchRegistry.VisibleOneIn > 1)
+            {
+                if (_interest == null)
+                    _interest = _networkManager.gameObject.AddComponent<BenchInterestManagement>();
+                NetworkServer.aoi = _interest;
+            }
+
             for (int i = 0; i < count; i++)
             {
                 GameObject go = Instantiate(prefab);
@@ -143,6 +153,21 @@ namespace StinkySteak.MirrorBenchmark
             }
 
             _spawned.Clear();
+            if (_interest != null && NetworkServer.aoi == _interest)
+            {
+                NetworkServer.aoi = null;
+                NetworkClient.aoi = null;
+            }
+        }
+
+        public bool SupportsVisibility => true;
+
+        public void RerollVisibility(int index)
+        {
+            if ((uint)index >= (uint)_spawned.Count || _spawned[index] == null) return;
+            var identity = _spawned[index].GetComponent<NetworkIdentity>();
+            BenchRegistry.RerollVisibility(identity.netId);
+            NetworkServer.RebuildObservers(identity, false);
         }
 
         public void ShutdownBench()

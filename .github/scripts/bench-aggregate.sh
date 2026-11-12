@@ -90,7 +90,7 @@ if [ ${#CLIENT_FILES[@]} -gt 0 ]; then
     | ([ $runs[].tests[].name ] | unique) as $names
     | "### Measured clients (avg of \($n))\n\n"
       + "| Test | Down per client | Up per client | Truncated |\n|---|---|---|---|\n"
-      + ( [ ("Idle", "MoveY", "MoveWander", "SendRPC", "Static", "SpawnChurn", "ClientInput", "SyncVars", "MoveAllAxis") as $name
+      + ( [ ("Idle", "MoveY", "MoveWander", "Visibility", "VisibilityChurn", "SendRPC", "Static", "SpawnChurn", "ClientInput", "SyncVars", "MoveAllAxis") as $name
             | [ $runs[].tests[] | select(.name == $name) ] as $rows
             | select(($rows | length) > 0)
             | "| \($name) | \($rows | avg(.rxBytesPerSec) | hbR) | \($rows | avg(.txBytesPerSec) | hbR) | \([ $rows[] | select(.truncated) ] | length)/\($rows | length) |"
@@ -170,6 +170,7 @@ jq -n \
                        | [ $clients[].tests[] | select(.name == $name) ] as $rows
                        | {key: $name, value: {
                            n: ($rows | length),
+                           objects: ($rows | avg(.objects)),
                            rxBytesPerSec: ($rows | avg(.rxBytesPerSec)),
                            txBytesPerSec: ($rows | avg(.txBytesPerSec)),
                            rttAvgMs: ($rows | avg(.rttAvgMs)),

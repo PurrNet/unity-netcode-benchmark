@@ -18,6 +18,10 @@ namespace PurrNet.NetBench
         public int test;
         public string name;
         public int objects;
+        /// <summary>Visibility test: each client sees about objects / visibleOneIn of the server's objects. 0 elsewhere.</summary>
+        public int visibleOneIn;
+        /// <summary>VisibilityChurn, server: objects given a new audience per second during the window.</summary>
+        public double visibilityRerollsPerSec;
         public double windowSeconds;
         public int connections;
         public bool truncated;

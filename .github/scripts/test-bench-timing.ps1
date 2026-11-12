@@ -17,7 +17,7 @@ function Require([bool]$Condition, [string]$Message) {
 
 foreach ($hz in $TickRates) {
     $benchOutput = New-Item -ItemType Directory -Force -Path (Join-Path $benchBuild "smoke-$hz")
-    $common = "-batchmode -nographics -port $Port -benchObjects 10 -benchSeconds 2 -warmupSeconds 1 -idleSeconds 1 -tests 1,2,3,4,5,6,7,8 -tickRate $hz -connectTimeout 25 -maxRunSeconds 100"
+    $common = "-batchmode -nographics -port $Port -benchObjects 10 -benchSeconds 2 -warmupSeconds 1 -idleSeconds 1 -tests 1,2,3,4,5,6,7,8,9,10 -visibleOneIn 2 -visibilityChurnSeconds 5 -tickRate $hz -connectTimeout 25 -maxRunSeconds 100"
     $benchProcesses = @()
     try {
         foreach ($role in @('server', 'client')) {
@@ -33,7 +33,7 @@ foreach ($hz in $TickRates) {
         foreach ($run in @($server, $client)) {
             Require ($run.completed -and -not $run.error) "$Netcode $hz Hz $($run.role) did not complete"
             Require ($run.tickRate -eq $hz) "$Netcode $($run.role) used $($run.tickRate) Hz, expected $hz"
-            Require ($run.tests.Count -eq 9) "$Netcode $hz Hz $($run.role) missed a test"
+            Require ($run.tests.Count -eq 11) "$Netcode $hz Hz $($run.role) missed a test"
             foreach ($test in $run.tests) {
                 Require (-not $test.truncated) "$Netcode $hz Hz $($run.role) $($test.name) was truncated"
                 Require ($test.connections -eq 1) "$Netcode $hz Hz $($run.role) $($test.name) lost its connection"
@@ -55,6 +55,12 @@ foreach ($hz in $TickRates) {
                 Require ($c.syncSilenceAvgMs -ge 0 -and $c.syncSilenceMaxMs -ge $c.syncSilenceAvgMs) "$Netcode $hz Hz invalid field-silence statistics"
             }
         }
+        $visible = ($client.tests | Where-Object name -eq 'Visibility').objects
+        Require ($visible -gt 0 -and $visible -lt 10) "$Netcode $hz Hz client saw $visible of 10 Visibility objects, expected about half"
+        $rerolls = ($server.tests | Where-Object name -eq 'VisibilityChurn').visibilityRerollsPerSec
+        # A slow period on purpose: with 10 objects a fast one can leave the client with none for a moment,
+        # which it reads as the despawn.
+        Require ($rerolls -gt 0) "$Netcode $hz Hz VisibilityChurn never re-drew an audience"
         $inputRate = ($server.tests | Where-Object name -eq 'ClientInput').inputsPerSec
         Require ([Math]::Abs($inputRate / $hz - 1) -lt 0.1) "$Netcode $hz Hz input rate $inputRate/s, expected $hz/s"
         Write-Output "PASS: $Netcode $hz Hz, all scenarios, workload rates, RPC delivery, client-visible changes, final SyncVars, final-window connection."

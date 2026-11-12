@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using PurrNet;
+using PurrNet.Modules;
 using PurrNet.NetBench;
 using PurrNet.Transports;
 using StinkySteak.NetcodeBenchmark;
@@ -14,6 +15,8 @@ namespace StinkySteak.MirrorBenchmark
         private NetworkManager _networkManager;
 
         private readonly List<GameObject> _spawned = new List<GameObject>();
+        private readonly List<NetworkIdentity> _identities = new List<NetworkIdentity>();
+        private NetworkVisibilityRuleSet _visibilityRules;
 
         protected override void Initialize()
         {
@@ -94,10 +97,60 @@ namespace StinkySteak.MirrorBenchmark
             var prefab = GetTestPrefab(test);
             if (prefab == null) return 0;
 
-            for (int i = 0; i < count; i++)
-                _spawned.Add(Instantiate(prefab, Random.insideUnitSphere * 10, Quaternion.identity));
+            // Instantiate spawns and picks the observers right away, so the rule set goes on in the
+            // pre-spawn callback rather than after the call.
+            bool restrict = BenchRegistry.VisibleOneIn > 1;
+            if (restrict)
+                HierarchyV2.onPreSpawn += RestrictVisibility;
+
+            try
+            {
+                for (int i = 0; i < count; i++)
+                    _spawned.Add(Instantiate(prefab, Random.insideUnitSphere * 10, Quaternion.identity));
+            }
+            finally
+            {
+                if (restrict)
+                    HierarchyV2.onPreSpawn -= RestrictVisibility;
+            }
 
             return count;
+        }
+
+        public bool SupportsVisibility => true;
+
+        public void RerollVisibility(int index)
+        {
+            if ((uint)index >= (uint)_spawned.Count || !_spawned[index]) return;
+            var identity = _spawned[index].GetComponent<NetworkIdentity>();
+            BenchRegistry.RerollVisibility((long)identity.objectId);
+            identity.EvaluateVisibility();
+        }
+
+        // Every identity of the object gets the rule set: they are evaluated one by one.
+        private void RestrictVisibility(GameObject go, bool isSceneObject)
+        {
+            if (!_visibilityRules)
+            {
+                _visibilityRules = ScriptableObject.CreateInstance<NetworkVisibilityRuleSet>();
+                _visibilityRules.Setup(_networkManager);
+                _visibilityRules.AddRule(_networkManager, new BenchVisibilityRule());
+            }
+
+            go.GetComponentsInChildren(true, _identities);
+            for (int i = 0; i < _identities.Count; i++)
+                _identities[i].SetVisibilityRules(_visibilityRules);
+            _identities.Clear();
+        }
+
+        private sealed class BenchVisibilityRule : INetworkVisibilityRule
+        {
+            public int complexity => 0;
+
+            public bool CanSee(PlayerID player, NetworkIdentity target)
+            {
+                return BenchRegistry.IsVisibleTo((long)target.GetRootIdentity().objectId, (long)player.id.value);
+            }
         }
 
         public void DespawnOldest(int count)

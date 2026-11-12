@@ -130,11 +130,38 @@ namespace StinkySteak.NGOBenchmark
                 GameObject go = Instantiate(prefab);
                 go.transform.position = Random.insideUnitSphere * 10;
                 var no = go.GetComponent<NetworkObject>();
+                if (BenchRegistry.VisibleOneIn > 1)
+                {
+                    long key = _visibilityKey++;
+                    _visibilityKeys.Add(key);
+                    no.CheckObjectVisibility = clientId => BenchRegistry.IsVisibleTo(key, (long)clientId);
+                }
                 no.Spawn();
                 _spawned.Add(no);
             }
 
             return count;
+        }
+
+        public bool SupportsVisibility => true;
+
+        private long _visibilityKey;
+        // Index-aligned with _spawned during the Visibility tests, which start from an empty list.
+        private readonly List<long> _visibilityKeys = new List<long>();
+
+        public void RerollVisibility(int index)
+        {
+            if ((uint)index >= (uint)_visibilityKeys.Count || _spawned[index] == null) return;
+            var no = _spawned[index];
+            long key = _visibilityKeys[index];
+            BenchRegistry.RerollVisibility(key);
+            foreach (ulong clientId in _networkManager.ConnectedClientsIds)
+            {
+                bool visible = BenchRegistry.IsVisibleTo(key, (long)clientId);
+                if (visible == no.IsNetworkVisibleTo(clientId)) continue;
+                if (visible) no.NetworkShow(clientId);
+                else no.NetworkHide(clientId);
+            }
         }
 
         public void DespawnOldest(int count)
@@ -158,6 +185,7 @@ namespace StinkySteak.NGOBenchmark
             }
 
             _spawned.Clear();
+            _visibilityKeys.Clear();
         }
 
         public void ShutdownBench()

@@ -18,14 +18,17 @@ namespace PurrNet.NetBench
     ///           -> write -results JSON -> quit
     ///
     /// Tests (ids for -tests): 1 MoveY, 2 MoveAllAxis, 3 MoveWander, 4 SendRPC, 5 Static,
-    /// 6 SpawnChurn, 7 ClientInput, 8 SyncVars. Tests 5-8 reuse the MoveY / SendRPC prefabs with
-    /// movement disabled or a different BenchRegistry.Mode, so no extra assets are needed.
+    /// 6 SpawnChurn, 7 ClientInput, 8 SyncVars, 9 Visibility, 10 VisibilityChurn. Tests 5-10 reuse the MoveY / MoveWander /
+    /// SendRPC prefabs with movement disabled, a different BenchRegistry.Mode or per-client visibility,
+    /// so no extra assets are needed.
     ///
     /// Arguments:
     ///   -role server|client   -count N (server: expected clients)   -serverHost H  -port P
-    ///   -session S -region R -photonAppId ID (relay netcodes)       -tests 1,3,4,5,6,7,8 (2 = MoveAllAxis is opt-in)
+    ///   -session S -region R -photonAppId ID (relay netcodes)       -tests 1,3,4,5,6,7,8,9,10 (ids or names; 2 = MoveAllAxis is opt-in)
     ///   -benchSeconds S (10)  -warmupSeconds S (3)  -idleSeconds S (5, also the Static window)  -benchObjects N (100)
     ///   -tickRate HZ (0 = the project's configured rate; applied to the netcode before it starts)
+    ///   -visibleOneIn N (4; Visibility shows each object to a pseudo-random 1/N of the clients)
+    ///   -visibilityChurnSeconds S (10; VisibilityChurn draws every object a new audience once per S)
     ///   -connectTimeout S (120)  -maxRunSeconds S (900)  -fps N (60)  -netIface NAME (auto)
     ///   -results PATH  -loadgen (client is load only, not a measured sample)
     /// </summary>
@@ -33,13 +36,15 @@ namespace PurrNet.NetBench
     {
         public static readonly string[] TestNames =
         {
-            "Idle", "MoveY", "MoveAllAxis", "MoveWander", "SendRPC", "Static", "SpawnChurn", "ClientInput", "SyncVars"
+            "Idle", "MoveY", "MoveAllAxis", "MoveWander", "SendRPC", "Static", "SpawnChurn", "ClientInput", "SyncVars", "Visibility", "VisibilityChurn"
         };
 
         private const int TestStatic = 5;
         private const int TestSpawnChurn = 6;
         private const int TestClientInput = 7;
         private const int TestSyncVars = 8;
+        private const int TestVisibility = 9;
+        private const int TestVisibilityChurn = 10;
 
         private const float SlackSeconds = 1.5f;
         private const float CooldownSeconds = 2f;
@@ -47,6 +52,8 @@ namespace PurrNet.NetBench
         private const float RttSampleInterval = 0.1f;
 
         private static bool s_started;
+        private static int s_visibleOneIn = 4;
+        private static float s_visibilityChurnSeconds = 10f;
 
         private IBenchAdapter _adapter;
         private RunResult _run;
@@ -119,14 +126,20 @@ namespace PurrNet.NetBench
             _fps = CommandLine.GetInt("-fps", 60);
             _resultsPath = CommandLine.Get("-results");
             _iface = ResolveIface(CommandLine.Get("-netIface"));
+            s_visibleOneIn = Mathf.Max(2, CommandLine.GetInt("-visibleOneIn", 4));
+            s_visibilityChurnSeconds = Mathf.Max(0.1f, CommandLine.GetFloat("-visibilityChurnSeconds", 10f));
 
             var tests = new List<int>();
             // MoveAllAxis (2) measures the same as MoveY on every netcode so far; run it with -tests when wanted.
-            foreach (var part in CommandLine.Get("-tests", "1,3,4,5,6,7,8").Split(','))
+            foreach (var part in CommandLine.Get("-tests", "1,3,4,5,6,7,8,9,10").Split(','))
             {
-                if (int.TryParse(part.Trim(), out var t) && t > 0 && t < TestNames.Length)
+                if (!int.TryParse(part.Trim(), out var t))
+                    t = Array.FindIndex(TestNames, n => n.Equals(part.Trim(), StringComparison.OrdinalIgnoreCase));
+                if (t > 0 && t < TestNames.Length && !tests.Contains(t))
                     tests.Add(t);
             }
+            // Clients tell tests that share a prefab apart by their order, so the order is fixed.
+            tests.Sort();
             _tests = tests.ToArray();
 
             _opts = new BenchConnectOptions
@@ -184,6 +197,7 @@ namespace PurrNet.NetBench
             BenchRegistry.Mode = test == TestClientInput ? BenchMode.ClientInput
                 : test == TestSyncVars ? BenchMode.SyncVars
                 : BenchMode.Broadcast;
+            BenchRegistry.VisibleOneIn = IsVisibilityTest(test) ? s_visibleOneIn : 0;
         }
 
         private static void ResetMode()
@@ -192,7 +206,11 @@ namespace PurrNet.NetBench
             BenchRegistry.WorkloadEnabled = true;
             BenchRegistry.MovementEnabled = true;
             BenchRegistry.Mode = BenchMode.Broadcast;
+            BenchRegistry.VisibleOneIn = 0;
+            BenchRegistry.ResetVisibility();
         }
+
+        private static bool IsVisibilityTest(int test) => test == TestVisibility || test == TestVisibilityChurn;
 
         private IEnumerator Run()
         {
@@ -210,6 +228,13 @@ namespace PurrNet.NetBench
                 Debug.LogError("[NetBench] " + _run.error);
                 Finish(1);
                 yield break;
+            }
+
+            if (!_adapter.SupportsVisibility && Array.Exists(_tests, IsVisibilityTest))
+            {
+                // Server and clients drop them alike, so no client waits for a test that never runs.
+                Debug.Log($"[NetBench] {_adapter.NetcodeName} has no per-client visibility in this setup; skipping the Visibility tests.");
+                _tests = Array.FindAll(_tests, t => !IsVisibilityTest(t));
             }
 
             QualitySettings.vSyncCount = 0;
@@ -301,7 +326,7 @@ namespace PurrNet.NetBench
                 if (!Try(() => spawned = _adapter.SpawnTest(slot, count), $"SpawnTest({test})"))
                     yield break;
 
-                Debug.Log($"[NetBench] Test {test} {TestNames[test]}: spawned {spawned} objects (mode={BenchRegistry.Mode}, movement={BenchRegistry.MovementEnabled}), warming up {_warmupSeconds}s");
+                Debug.Log($"[NetBench] Test {test} {TestNames[test]}: spawned {spawned} objects (mode={BenchRegistry.Mode}, movement={BenchRegistry.MovementEnabled}, visibleOneIn={BenchRegistry.VisibleOneIn}), warming up {_warmupSeconds}s");
                 yield return new WaitForSecondsRealtime(_warmupSeconds);
                 yield return Window(test, WindowSeconds(test));
 
@@ -503,6 +528,10 @@ namespace PurrNet.NetBench
             int slot = BenchRegistry.SlotOf(test);
             bool churn = _isServer && test == TestSpawnChurn;
             int churnCount = Mathf.Max(1, _objects / 50);
+            bool reroll = _isServer && test == TestVisibilityChurn;
+            double rerollAcc = 0;
+            int rerollCursor = 0;
+            long rerolls = 0;
 
             EnforceFrameCap();
             ReadTickRate();
@@ -561,6 +590,19 @@ namespace PurrNet.NetBench
                     }
                 }
 
+                if (reroll)
+                {
+                    // Round-robin, so every object changes audience once per period and the changes
+                    // are spread evenly over the window.
+                    int total = BenchRegistry.Count(slot);
+                    rerollAcc += dt * total / s_visibilityChurnSeconds;
+                    int due = (int)rerollAcc;
+                    rerollAcc -= due;
+                    for (int i = 0; i < due && total > 0; i++)
+                        _adapter.RerollVisibility(rerollCursor++ % total);
+                    rerolls += due;
+                }
+
                 if (test != 0 && BenchRegistry.Count(slot) == 0)
                 {
                     truncated = true;
@@ -585,6 +627,8 @@ namespace PurrNet.NetBench
                 test = test,
                 name = TestNames[test],
                 objects = BenchRegistry.Count(slot),
+                visibleOneIn = IsVisibilityTest(test) ? s_visibleOneIn : 0,
+                visibilityRerollsPerSec = rerolls / wall,
                 windowSeconds = stats.wallSeconds,
                 connections = connections,
                 truncated = truncated,

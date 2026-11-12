@@ -38,11 +38,24 @@ The server spawns `N` objects (100 by default) and replicates them to every clie
 |---|---|
 | MoveY | sine movement on Y |
 | MoveWander | wander steering, position and rotation |
+| Visibility | MoveWander, but each object is replicated to a pseudo-random quarter of the clients |
+| VisibilityChurn | Visibility, plus N/10 objects per second drawn a new quarter of the clients |
 | SendRPC | one observers RPC carrying one `float` |
 | Static | nothing; objects are spawned and never touched |
 | SpawnChurn | N/50 objects despawned and respawned per tick, N kept alive |
 | ClientInput | one hub object; every **client** sends one server RPC (`Vector3` + `float`) per tick |
 | SyncVars | one of four synced fields (`float`, `float`, `float`, `Vector3`) changed per tick |
+
+**Visibility** hides objects through each netcode's own interest system (PurrNet visibility rules,
+FishNet observer conditions, Mirror interest management, NGO `CheckObjectVisibility`), all asking the
+same hash of (object, client), so every client sees a different quarter and almost no object is seen
+by everyone. The set is fixed for the test: it measures replicating to partial audiences.
+**VisibilityChurn** adds objects entering and leaving view: round-robin, every object is drawn a new
+audience once per 10 seconds and re-evaluated with the netcode's own call (PurrNet
+`EvaluateVisibility`, FishNet and Mirror `RebuildObservers`, NGO `NetworkShow` / `NetworkHide`), so
+about 3.75% of all (object, client) pairs change per second. Fusion sits both out, because per-player
+interest there needs the project-wide replication mode switched, which would change every other test.
+Both are shown per test and are not part of the category scores.
 
 An **Idle** window (connected, nothing spawned) is measured first and reported as its own row: what holding the connections costs before anything is replicated. Nothing is subtracted from the other tests.
 Payloads are floats rather than ints on purpose: FishNet varint-packs integers by default and the
@@ -67,7 +80,9 @@ Client-side prediction has its own **Prediction Benchmark** workflow and
 [suite documentation](prediction/README.md), with native PurrDiction, FishNet and Fusion Server-mode
 adapters. Its workloads, validation, artifacts and reports are separate from this replication suite.
 
-Dispatch **Netcode Scaling Benchmark** (`.github/workflows/scaling.yml`). Defaults run all five
+Dispatch **Netcode Scaling Benchmark** (`.github/workflows/scaling.yml`). Its `tests` input narrows a
+run to some tests (`MoveWander,Visibility,VisibilityChurn`); such a run reports as usual but is never
+published as the latest results. Defaults run all five
 netcodes in four sessions, `10@20,100@20,100@60,100@30x2000` (connections@tickHz), with 10-second
 windows (Idle and Static use 5, since they only check the floor). A session's `xN` suffix overrides
 `bench_objects` for that session: `100@30x2000` is the stress session, 2000 objects per test where

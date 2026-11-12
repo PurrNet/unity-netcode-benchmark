@@ -38,6 +38,9 @@ on:
       bench_objects:
         description: "Objects per test"
         default: "100"
+      tests:
+        description: "Comma-separated tests to run (empty = all), e.g. MoveWander,Visibility,VisibilityChurn"
+        default: ""
       build_players:
         description: "Build players (off requires player artifacts already in this workflow run)"
         type: boolean
@@ -93,6 +96,9 @@ on:
       bench_objects:
         type: string
         default: "100"
+      tests:
+        type: string
+        default: ""
       build_players:
         type: boolean
         default: false
@@ -121,6 +127,7 @@ env:
   PHASE_PORT: "8788"
   BENCH_SECONDS: ${{ inputs.bench_seconds }}
   BENCH_OBJECTS: ${{ inputs.bench_objects }}
+  BENCH_TESTS: ${{ inputs.tests }}
   PHOTON_REGION: ${{ inputs.region }}
   PHOTON_APP_ID: ${{ secrets.PHOTON_APP_ID }}
 

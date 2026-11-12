@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace PurrNet.NetBench
@@ -22,7 +23,8 @@ namespace PurrNet.NetBench
     ///
     /// Prefab slots: 1 MoveY, 2 MoveAllAxis, 3 MoveWander, 4 SendRPC. Tests map onto slots via
     /// <see cref="SlotOf"/>: Static and SpawnChurn reuse slot 1 with movement disabled, ClientInput
-    /// and SyncVars reuse slot 4 with a different <see cref="Mode"/>.
+    /// and SyncVars reuse slot 4 with a different <see cref="Mode"/>, Visibility and VisibilityChurn reuse
+    /// slot 3 with <see cref="VisibleOneIn"/> set.
     /// </summary>
     public static class BenchRegistry
     {
@@ -37,6 +39,44 @@ namespace PurrNet.NetBench
 
         /// <summary>Whether the server should generate RPCs / state changes. Paused while final delivery settles.</summary>
         public static bool WorkloadEnabled = true;
+
+        /// <summary>Visibility test: every (object, client) pair is visible with probability 1 / VisibleOneIn.
+        /// 0 or 1 outside that test, where every client sees every object.</summary>
+        public static int VisibleOneIn;
+
+        /// <summary>The one visibility rule every netcode's interest hook asks, so they all hide the same share.
+        /// Keys are whatever ids the netcode has for the object and the client; the pairing only has to be stable.</summary>
+        public static bool IsVisibleTo(long objectKey, long observerKey)
+        {
+            if (VisibleOneIn <= 1)
+                return true;
+
+            int roll = 0;
+            if (s_visibilityRolls.Count > 0)
+                s_visibilityRolls.TryGetValue(objectKey, out roll);
+
+            // Ids are small and sequential, so mix them well before taking the remainder.
+            ulong h = unchecked((ulong)objectKey * 0x9E3779B97F4A7C15UL + (ulong)observerKey * 0xC2B2AE3D27D4EB4FUL
+                                + (ulong)roll * 0x165667B19E3779F9UL);
+            h ^= h >> 33;
+            h = unchecked(h * 0xFF51AFD7ED558CCDUL);
+            h ^= h >> 33;
+            h = unchecked(h * 0xC4CEB9FE1A85EC53UL);
+            h ^= h >> 33;
+            return h % (ulong)VisibleOneIn == 0;
+        }
+
+        private static readonly Dictionary<long, int> s_visibilityRolls = new Dictionary<long, int>();
+
+        /// <summary>VisibilityChurn: draw a new audience for one object. The adapter calls this with the same
+        /// key its interest hook passes to <see cref="IsVisibleTo"/>, then has its netcode re-evaluate the object.</summary>
+        public static void RerollVisibility(long objectKey)
+        {
+            s_visibilityRolls.TryGetValue(objectKey, out int roll);
+            s_visibilityRolls[objectKey] = roll + 1;
+        }
+
+        public static void ResetVisibility() => s_visibilityRolls.Clear();
 
         /// <summary>Shared cadence for frame-driven input and churn, set from the actual network tick rate.</summary>
         public static int TickRate = 20;
@@ -117,7 +157,7 @@ namespace PurrNet.NetBench
             {
                 case 1: case 5: case 6: return 1;
                 case 2: return 2;
-                case 3: return 3;
+                case 3: case 9: case 10: return 3;
                 case 4: case 7: case 8: return 4;
                 default: return 0;
             }

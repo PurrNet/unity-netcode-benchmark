@@ -29,6 +29,19 @@ def positive(value, name, minimum=1):
     return int(value)
 
 
+TESTS = ['MoveY', 'MoveAllAxis', 'MoveWander', 'SendRPC', 'Static', 'SpawnChurn', 'ClientInput', 'SyncVars',
+         'Visibility', 'VisibilityChurn']
+
+
+def selected_tests(env):
+    # Empty runs the player's default suite. Names as the reports show them, any case.
+    names = [t.strip() for t in env.get('BENCH_TESTS', '').split(',') if t.strip()]
+    known = {t.lower(): t for t in TESTS}
+    if any(t.lower() not in known for t in names):
+        raise ValueError(f'Unknown test in tests; choose from {", ".join(TESTS)}')
+    return ','.join(known[t.lower()] for t in names)
+
+
 def make_plan(env):
     netcodes = [n.strip() for n in env['NETCODES'].split(',')]
     if not netcodes or len(set(netcodes)) != len(netcodes) or any(n not in NETCODES for n in netcodes):
@@ -42,6 +55,7 @@ def make_plan(env):
     if not math.isfinite(seconds) or seconds <= 0:
         raise ValueError('bench_seconds must be a positive, finite number')
     positive(env.get('BENCH_OBJECTS', '100'), 'bench_objects')
+    selected_tests(env)
     if env.get('MAX_PARALLEL', '1') != '1':
         raise ValueError('max_parallel must be 1: the measurement fleet is sequential')
     if env.get('FUSION_AFTER', ''):
@@ -235,6 +249,8 @@ def player_command(case, role, index, process, root, env):
             '-benchSeconds', env.get('BENCH_SECONDS', '10'), '-benchObjects', str(case.get('objects') or env.get('BENCH_OBJECTS', '100')),
             '-tickRate', str(case['tick']), '-connectTimeout', '180', '-maxRunSeconds', '780',
             '-results', str(result), '-logFile', str(log)]
+    if selected_tests(env):
+        cmd += ['-tests', selected_tests(env)]
     if role == 'server':
         cmd += ['-count', str(case['total'])]
     if role == 'loadgen':

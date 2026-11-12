@@ -249,10 +249,14 @@ const DATA = __DATA__;
 
 const ORDER = ["purrnet", "fishnet", "mirror", "ngo", "fusion"];
 const NAMES = { purrnet: "PurrNet", fishnet: "FishNet", mirror: "Mirror", ngo: "NGO", fusion: "Fusion" };
-const TESTS = ["Idle", "MoveY", "MoveWander", "SyncVars", "SendRPC", "ClientInput", "Static", "SpawnChurn"];
+const TESTS = ["Idle", "MoveY", "MoveWander", "Visibility", "VisibilityChurn", "SyncVars", "SendRPC", "ClientInput", "Static", "SpawnChurn"];
+// A netcode may sit these out (Fusion has no per-client visibility in this setup); they are never scored.
+const OPTIONAL_TESTS = ["Visibility", "VisibilityChurn"];
 const TEST_DESC = {
   Idle: "Connected; no objects", MoveY: "N objects moving on Y",
-  MoveWander: "N objects moving and rotating", SyncVars: "1 field update per object per tick",
+  MoveWander: "N objects moving and rotating", Visibility: "MoveWander; each client sees a random 1/4",
+  VisibilityChurn: "Visibility; N/10 objects change audience per second",
+  SyncVars: "1 field update per object per tick",
   SendRPC: "1 float RPC per object per tick", ClientInput: "1 RPC per client per tick",
   Static: "N unchanged objects", SpawnChurn: "Replace N/50 objects per tick; N kept alive"
 };
@@ -372,6 +376,7 @@ function runFailure(n, sc) {
   return categoryFailure(n, sc, SCORE_TESTS);
 }
 function unscored(n, sc, t) { return !!categoryFailure(n, sc, [t]); }
+function skipped(n, sc, t) { const r = run(n, sc); return OPTIONAL_TESTS.includes(t) && !!r && !r.meta.serverError && !r.server[t]; }
 // The server finished the test but could not hold the 60 fps budget: frame p99 past twice the
 // budget or more than a sixth of its frames dropped. Its numbers are shown, marked, never best.
 function overloaded(n, sc, t) {
@@ -594,7 +599,7 @@ function refresh() {
     const data = netcodes.map(n => value(n, state.scenario, t));
     if (data.every(v => v == null)) empty++;
     ch.options = baseOptions(t);
-    ch.data.labels = netcodes.map(n => NAMES[n] + ((categoryFailure(n, state.scenario, [t]) || "").startsWith("lost clients") ? " (Lost clients)" : categoryFailure(n, state.scenario, [t]) ? " (Did not complete)" : overloaded(n, state.scenario, t) ? " (Overloaded)" : ""));
+    ch.data.labels = netcodes.map(n => NAMES[n] + (skipped(n, state.scenario, t) ? " (Not supported)" : (categoryFailure(n, state.scenario, [t]) || "").startsWith("lost clients") ? " (Lost clients)" : categoryFailure(n, state.scenario, [t]) ? " (Did not complete)" : overloaded(n, state.scenario, t) ? " (Overloaded)" : ""));
     ch.data.datasets = [{ data, backgroundColor: colors, borderColor: colors, borderWidth: 0, borderRadius: 3, barPercentage: 0.7, categoryPercentage: 0.8 }];
     ch.update("none");
   });
